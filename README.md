@@ -1,6 +1,8 @@
 # AntiSlop 🎨⚡
 > **Taste-Driven Real-Time Frontend Editor & Self-Refining Design Critic Loop**  
-> 🌐 **Live Production Domain:** [`https://antislop.live`](https://antislop.live) *(registered live at 12:56 PM ET during the hackathon)*  
+> 🚀 **Live Studio (Vercel Production):** [`https://portfolio-starter-livid-pi.vercel.app`](https://portfolio-starter-livid-pi.vercel.app)  
+> ☁️ **Live Engine & Vite HMR Preview (Google Cloud Run):** [`https://antislop-engine-a53petnlfa-uc.a.run.app`](https://antislop-engine-a53petnlfa-uc.a.run.app)  
+> 🌐 **Custom Domain Registered Live (12:56 PM ET):** `antislop.live`  
 > Built for the **Gemini 4 NYC Hackathon** (November 21, 2026)  
 > *Target Tracks: Element 119 (Multimodal Core) · 5 Sigma (Reliability & Baseline Evaluation) · Best Use of Managed Agents*
 
