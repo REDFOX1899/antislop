@@ -47,34 +47,52 @@ AntiSlop includes a built-in **Side-by-Side Baseline Evaluation**:
 
 ## 🏛️ System Architecture
 ```
-[ User Multimodal Inputs ]
-  ├── 🖼️ Moodboard Images
-  ├── 🎥 Interaction Videos
-  ├── 📷 Physical Webcam
-  └── 🎙️ Voice Guidance
+[ User Multimodal Inputs (AntiSlop Studio) ]
+  ├── 🖼️ Moodboard Images (3–14 refs)
+  ├── 🎥 Interaction / Motion Videos
+  ├── 📷 Physical Webcam (Books, Print, Objects)
+  └── 🎙️ Voice Guidance + Circle-to-Tweak Canvas
           │
           ▼
-[ Gemini 4 Carbon (Reasoning) ] ──> Synthesizes Design System Tokens
+[ Gemini 4 Carbon (Design Director) ] ──> Synthesizes Typed DesignManifest + Conflict Notes
+          │
+          ├──> [ Nano Banana 2.1 ] ─────> Generates Bespoke Editorial Hero & Surface Art
           │
           ▼
-[ Gemini 4 Hydrogen (Executor) ] ──> Rewrites Target Repo React/Tailwind Code
+[ Gemini 4 Neon (Parallel Racer x3) ] ──> Produces N=3 Distinct React/Tailwind Candidates
           │
           ▼
-[ Vite Dev Server + HMR ] ───────> Hot Reloads Target UI in Iframe
+[ Embedded Vite HMR + Puppeteer ] ──────> Captures Desktop/Mobile Screenshots + DOM Audit
           │
           ▼
-[ Puppeteer Headless Capture ] ──> Renders Live App Screenshot
+[ Gemini Decision 1 (12-Probe Critic) ] ──> ~200ms Calibrated Taste, Slop & Layout Gate
+  + [ Gemini Embedding 2 ] ─────────────> Multimodal Cosine Convergence Tracking
           │
-          ▼
-[ Gemini Decision 1 (Critic) ] ──> Evaluates Aesthetic, Slop, Layout
-          │
-          ├── (Fails Bar) ───────> Feeds critic diff back to Carbon/Hydrogen
-          └── (Passes Bar) ──────> Deploys live refined interface!
+          ├── (Fails Gate) ──> [ Gemini 4 Hydrogen ] Surgical Fix Loop
+          └── (Passes Bar) ──> Live HMR Canvas + [ Antigravity Managed Agent ] Remote Repo Ship!
 ```
+
+---
+
+## 📚 Engineering Documentation (For Judges)
+We document every architectural decision, benchmark, failure mode, and parallel build step openly in this repository:
+
+- **[System Architecture](docs/ARCHITECTURE.md)** — Multi-model Gemini 4 choreography, 12-probe `gemini-decision-1` rubric, and Cloud Run + Vercel production topology
+- **[Parallel Build Plan](docs/PARALLEL_BUILD_PLAN.md)** — Multi-agent swarm ownership boundaries & hackathon execution schedule
+- **[Engineering Build Log](docs/BUILD_LOG.md)** — Timestamped build journal from ideation to live deployment
+- **[Breaking Points & Failure Analysis](docs/BREAKING_POINTS.md)** — Honest Element 119 stress-test failures and architectural fixes
+- **[Shared Type Contract](shared/types.ts)** — Locked TypeScript API & Decisions Scorecard schema across `/backend`, `/studio`, and `/benchmarks`
+- **[Environment Setup](env/README.md)** — How to configure `env/.env` safely (all secrets strictly gitignored)
+- **Architecture Decision Records (ADRs):**
+  - [ADR-001: Official `@google/genai` SDK vs. LangChain (+ Optional LangSmith)](docs/ADR/001-official-genai-sdk-over-langchain.md)
+  - [ADR-002: AntiSlop Studio Canvas IDE vs. Metrics Dashboard](docs/ADR/002-studio-canvas-not-dashboard.md)
+  - [ADR-003: Parallel Tier-3 Racing & Calibrated Decisions API Critic](docs/ADR/003-parallel-tier3-racing-and-decisions-critic.md)
+  - [ADR-004: Hybrid Cloud Run + Vercel & Antigravity Managed Agents](docs/ADR/004-hybrid-cloud-run-vercel-and-managed-agents.md)
 
 ---
 
 ## 🛠️ Repository & Team
 - **Author:** Shantanu Patil ([@REDFOX1899](https://github.com/REDFOX1899))
-- **Event:** Gemini 4 NYC Hackathon (Cerebral Valley & Google DeepMind)
+- **Event:** Gemini 4 NYC Hackathon (Cerebral Valley & Google DeepMind — Nov 21, 2026)
+- **Tracks:** Element 119 · 5 Sigma · Best Use of Managed Agents (`antigravity-preview-09-2026`)
 - **License:** MIT

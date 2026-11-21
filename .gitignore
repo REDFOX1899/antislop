@@ -1,18 +1,39 @@
-node_modules
-.DS_Store
+# Dependencies
+node_modules/
+target-repo/node_modules/
+studio/node_modules/
+backend/node_modules/
+benchmarks/node_modules/
+
+# Secrets & Environment Files (NEVER commit real keys!)
 .env
-.env*.local
-dist
-build
-coverage
+.env.*
+!.env.example
+env/.env
+env/.env.*
+!env/.env.example
+*.local
+*.pem
+*.key
+*service-account*.json
+*credentials*.json
+
+# Build Outputs
+dist/
+build/
+coverage/
+target-repo/dist/
+studio/.next/
+studio/out/
+backend/dist/
+
+# Runtime Artifacts & Generated Media
 *.log
-.gemini
-tmp
-target-repo/node_modules
-target-repo/dist
-dashboard/.next
-dashboard/out
-dashboard/node_modules
-backend/node_modules
-backend/uploads
-backend/screenshots
+.DS_Store
+.gemini/
+tmp/
+backend/uploads/
+backend/screenshots/
+backend/.snapshots/
+target-repo/public/generated/
+benchmarks/results/raw/
