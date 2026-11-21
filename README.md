@@ -1,7 +1,8 @@
 # AntiSlop 🎨⚡
 > **Taste-Driven Real-Time Frontend Editor & Self-Refining Design Critic Loop**  
+> 🌐 **Live Production Domain:** [`https://antislop.live`](https://antislop.live) *(registered live at 12:56 PM ET during the hackathon)*  
 > Built for the **Gemini 4 NYC Hackathon** (November 21, 2026)  
-> *Target Tracks: Element 119 (Multimodal Core) & 5 Sigma (Reliability & Baseline Evaluation)*
+> *Target Tracks: Element 119 (Multimodal Core) · 5 Sigma (Reliability & Baseline Evaluation) · Best Use of Managed Agents*
 
 ---
 

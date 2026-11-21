@@ -38,6 +38,9 @@
   - **GitHub Token**: PASS (`421ms`, authenticated as `REDFOX1899`).
   - **LangSmith Service Key (`LANGSMITH_TRACING=true`)**: PASS (`HTTP 202 Run created` after configuring `LANGSMITH_WORKSPACE_ID` via `X-Tenant-Id`).
 
+### 12:56 PM ET · Production Domain Registered — `antislop.live`
+- Registered live production domain **`antislop.live`** mid-hackathon to host the public AntiSlop Studio & live Cloud Run engine (`https://antislop.live` → Studio UI, `https://api.antislop.live` → Cloud Run Engine + embedded Vite HMR preview).
+
 ---
 
 *(Subsequent phases will append real commit hashes, live latency metrics, Decisions API calibration logs, and deployment URLs as each parallel wave lands.)*
