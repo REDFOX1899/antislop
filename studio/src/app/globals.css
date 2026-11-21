@@ -419,8 +419,8 @@ dialog:modal {
   background-color: var(--bg-card);
   color: var(--ink-primary);
   box-shadow: var(--shadow-float);
-  max-width: min(94vw, 720px);
-  max-height: 88vh;
+  max-width: 95vw;
+  max-height: 90vh;
   overflow: hidden;
 }
 

@@ -125,7 +125,7 @@ export function NativeDialog({
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="studio-scroll flex-1 overflow-y-auto bg-[var(--bg-card)] p-5">
+      <div className="studio-scroll min-h-0 flex-auto overflow-y-auto bg-[var(--bg-card)] p-5">
         {children}
       </div>
     </dialog>
