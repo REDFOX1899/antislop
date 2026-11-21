@@ -3,19 +3,16 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ExecutionSpeedMode, WorkspaceRepoInfo } from '@shared/types';
 import {
-  Brain,
+  ArrowLeft,
   Check,
   ChevronDown,
-  FlaskConical,
   FolderGit2,
   GitPullRequest,
   Layers,
   Moon,
   Plus,
-  RotateCcw,
   Search,
   Sun,
-  Terminal,
   Zap,
 } from 'lucide-react';
 import type { StudioTheme } from '@/lib/useTheme';
@@ -33,8 +30,6 @@ interface TopBarProps {
   onSwitchWorkspace: (workspaceId: string) => void;
   switchingWorkspace: boolean;
   onOpenRepoModal: () => void;
-  onResetBaseline: () => void;
-  resettingBaseline: boolean;
   onOpenPr: () => void;
   openingPr: boolean;
   backendHealthy: boolean;
@@ -123,8 +118,6 @@ export function TopBar({
   onSwitchWorkspace,
   switchingWorkspace,
   onOpenRepoModal,
-  onResetBaseline,
-  resettingBaseline,
   onOpenPr,
   openingPr,
   backendHealthy,
@@ -168,17 +161,17 @@ export function TopBar({
   }, [switcherOpen]);
 
   return (
-    <header className="flex h-[60px] shrink-0 items-center justify-between gap-3 bg-[var(--bg-void)] px-4">
-      {/* Left: AntiSlop Prism Emblem + Wordmark (returns to Landing Hub) */}
-      <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+    <header className="flex h-[60px] shrink-0 items-center justify-between gap-4 bg-[var(--bg-void)] px-4">
+      {/* Left: Pure AntiSlop Prism Emblem + Wordmark (returns to Landing Hub) */}
+      <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
         <button
           type="button"
           onClick={onGoLanding}
           title="Back to AntiSlop Launch Hub"
           className="group flex items-center gap-2 rounded-full py-1 pl-0.5 pr-2 transition-colors hover:bg-[var(--bg-subtle)]"
         >
-          <AntiSlopPrismMark className="h-[24px] w-[24px] shrink-0" />
-          <span className="text-[17px] font-medium tracking-[-0.02em] text-[var(--ink-primary)]">
+          <AntiSlopPrismMark className="h-[22px] w-[22px] shrink-0" />
+          <span className="text-[16px] font-medium tracking-[-0.02em] text-[var(--ink-primary)]">
             AntiSlop
           </span>
           <span
@@ -191,19 +184,26 @@ export function TopBar({
           />
         </button>
 
+        {/* Contextual calm back-link only when viewing secondary Arena / Agent tabs */}
         {activeTab !== 'canvas' && (
-          <button
-            type="button"
-            onClick={() => onTabChange('canvas')}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2.5 text-[12px] font-medium text-[var(--ink-secondary)] transition-colors hover:border-[var(--sapphire-border)] hover:text-[var(--ink-primary)] whitespace-nowrap"
-          >
-            <Layers className="h-3.5 w-3.5 text-[var(--sapphire-ice)]" />
-            <span>Canvas</span>
-          </button>
+          <div className="flex items-center gap-2 text-[12px]">
+            <button
+              type="button"
+              onClick={() => onTabChange('canvas')}
+              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Studio</span>
+            </button>
+            <span className="text-[var(--ink-muted)]">/</span>
+            <span className="font-medium text-[var(--cobalt-ice)]">
+              {activeTab === 'arena' ? '5-Sigma Proof' : 'Managed Agent'}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Center: ONE Sleek Floating Code Wiki Repo Pill Bar with Instant Switcher Dropdown */}
+      {/* Center: ONE Sculptural 340px Code Wiki Repo Pill Switcher */}
       <div
         ref={switcherRef}
         className="relative flex min-w-0 flex-1 justify-center px-2"
@@ -215,11 +215,11 @@ export function TopBar({
           aria-controls={menuId}
           disabled={switchingWorkspace}
           onClick={() => setSwitcherOpen((v) => !v)}
-          className="codewiki-pill flex h-[40px] w-full max-w-[360px] items-center justify-between gap-2 rounded-full px-4 text-left disabled:opacity-60"
+          className="codewiki-pill flex h-[40px] w-full max-w-[340px] items-center justify-between gap-2 rounded-full px-4 text-left disabled:opacity-60"
         >
           <div className="flex min-w-0 items-center gap-2">
             {currentWorkspace?.isGithub ? (
-              <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--sapphire-ice)]" />
+              <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--cobalt-ice)]" />
             ) : (
               <Search className="h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />
             )}
@@ -232,7 +232,7 @@ export function TopBar({
           </div>
           <ChevronDown
             className={`h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)] transition-transform ${
-              switcherOpen ? 'rotate-180 text-[var(--sapphire-ice)]' : ''
+              switcherOpen ? 'rotate-180 text-[var(--cobalt-ice)]' : ''
             }`}
           />
         </button>
@@ -242,7 +242,7 @@ export function TopBar({
             id={menuId}
             role="menu"
             aria-label="Switch active repository workspace"
-            className="absolute top-[48px] z-50 w-full max-w-[380px] overflow-hidden rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-1.5 shadow-[var(--shadow-float)]"
+            className="absolute top-[48px] z-50 w-full max-w-[340px] overflow-hidden rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-1.5 shadow-[var(--shadow-float)]"
           >
             <div className="px-2.5 pb-1 pt-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--ink-muted)]">
               Workspaces
@@ -262,13 +262,13 @@ export function TopBar({
                     }}
                     className={`flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${
                       isActive
-                        ? 'bg-[var(--sapphire-tint)] text-[var(--ink-primary)]'
+                        ? 'bg-[var(--cobalt-tint)] text-[var(--ink-primary)]'
                         : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-2">
                       {ws.isGithub ? (
-                        <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--sapphire-ice)]" />
+                        <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--cobalt-ice)]" />
                       ) : (
                         <Layers className="h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />
                       )}
@@ -282,11 +282,11 @@ export function TopBar({
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2 py-0.5 font-mono text-[9.5px] text-[var(--ink-secondary)]">
+                      <span className="font-mono text-[10px] text-[var(--ink-muted)]">
                         {ws.tag}
                       </span>
                       {isActive && (
-                        <Check className="h-3.5 w-3.5 text-[var(--sapphire-ice)]" />
+                        <Check className="h-3.5 w-3.5 text-[var(--cobalt-ice)]" />
                       )}
                     </div>
                   </button>
@@ -303,22 +303,22 @@ export function TopBar({
                 setSwitcherOpen(false);
                 onOpenRepoModal();
               }}
-              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium text-[var(--sapphire-ice)] transition-colors hover:bg-[var(--sapphire-tint)]"
+              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium text-[var(--cobalt-ice)] transition-colors hover:bg-[var(--cobalt-tint)]"
             >
               <Plus className="h-4 w-4 shrink-0" />
-              <span>Connect Any GitHub Repo…</span>
+              <span>Connect GitHub Repo</span>
             </button>
           </div>
         )}
       </div>
 
-      {/* Right: Uncluttered Single-Line Controls (whitespace-nowrap, NEVER wraps!) */}
-      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-        {/* Compact Speed Pill */}
+      {/* Right: ONLY 4 Ultra-Calm Controls (Zero Header Clutter!) */}
+      <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+        {/* 1. Compact Segmented Speed Pill: ⚡ Fast | Deep 4× */}
         <div
           role="group"
           aria-label="Execution speed mode"
-          className="flex h-[34px] shrink-0 items-center rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] p-0.5"
+          className="flex h-[34px] shrink-0 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] p-0.5"
         >
           <button
             type="button"
@@ -326,72 +326,36 @@ export function TopBar({
             title="Fast Demo (~35s single pass)"
             className={`inline-flex h-[28px] items-center gap-1 rounded-full px-2.5 text-[11.5px] font-medium transition-colors whitespace-nowrap ${
               speedMode === 'fast_demo'
-                ? 'bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]'
+                ? 'bg-[var(--cobalt-tint)] text-[var(--cobalt-ice)]'
                 : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]'
             }`}
           >
             <Zap className="h-3 w-3 shrink-0" />
             <span>Fast</span>
-            <span className="hidden font-mono text-[10px] opacity-75 2xl:inline">
-              ~35s
-            </span>
           </button>
           <button
             type="button"
             onClick={() => onSpeedModeChange('deep_atelier')}
             title="Deep Atelier 4× parallel racing + Gemini 4 Carbon High Thinking"
-            className={`inline-flex h-[28px] items-center gap-1 rounded-full px-2.5 text-[11.5px] font-medium transition-colors whitespace-nowrap ${
+            className={`inline-flex h-[28px] items-center rounded-full px-2.5 text-[11.5px] font-medium transition-colors whitespace-nowrap ${
               speedMode === 'deep_atelier'
-                ? 'bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]'
+                ? 'bg-[var(--cobalt-tint)] text-[var(--cobalt-ice)]'
                 : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]'
             }`}
           >
-            <Brain className="h-3 w-3 shrink-0" />
             <span>Deep 4×</span>
           </button>
         </div>
 
-        {/* 5-Sigma Arena Pill */}
-        <button
-          type="button"
-          onClick={() => onTabChange(activeTab === 'arena' ? 'canvas' : 'arena')}
-          title="5-Sigma Empirical Benchmark Arena"
-          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'arena'
-              ? 'border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]'
-              : 'border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--ink-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]'
-          }`}
-        >
-          <FlaskConical className="h-3.5 w-3.5 shrink-0" />
-          <span>5-Sigma</span>
-        </button>
-
-        {/* Agent Ship Pill */}
-        <button
-          type="button"
-          onClick={() =>
-            onTabChange(activeTab === 'managed_agent' ? 'canvas' : 'managed_agent')
-          }
-          title="Ship verified taste via Antigravity Managed Agent remote Linux sandbox"
-          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition-colors whitespace-nowrap ${
-            activeTab === 'managed_agent'
-              ? 'border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]'
-              : 'border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--ink-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]'
-          }`}
-        >
-          <Terminal className="h-3.5 w-3.5 shrink-0" />
-          <span>Agent Ship</span>
-        </button>
-
-        {/* Theme Toggle Circle Icon Button */}
+        {/* 2. Clean Circle Theme Toggle */}
         <button
           type="button"
           onClick={onToggleTheme}
           aria-label={
-            theme === 'dark' ? 'Switch to Light Atelier theme' : 'Switch to Obsidian Dark theme'
+            theme === 'dark' ? 'Switch to Light Paper theme' : 'Switch to Obsidian Dark theme'
           }
-          title={theme === 'dark' ? 'Switch to Light Atelier' : 'Switch to Obsidian Dark'}
-          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]"
+          title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]"
         >
           {theme === 'dark' ? (
             <Sun className="h-3.5 w-3.5" />
@@ -400,33 +364,19 @@ export function TopBar({
           )}
         </button>
 
-        {/* Reset Baseline Circle Icon Button */}
-        <button
-          type="button"
-          disabled={resettingBaseline}
-          onClick={onResetBaseline}
-          aria-label="Reset target app to baseline"
-          title="Reset target app back to original AI Slop baseline"
-          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)] disabled:opacity-50"
-        >
-          <RotateCcw
-            className={`h-3.5 w-3.5 ${resettingBaseline ? 'animate-spin' : ''}`}
-          />
-        </button>
-
-        {/* Share / PR Pill (echoes Code Wiki's Share button) */}
+        {/* 3. Clean Subtle Share / PR Pill */}
         <button
           type="button"
           disabled={openingPr}
           onClick={onOpenPr}
           title="Commit active transformation and open a real GitHub Pull Request"
-          className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[10px] border border-[var(--border-card)] bg-[var(--bg-card)] px-3 text-[12px] font-medium text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)] disabled:opacity-50 whitespace-nowrap"
+          className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 text-[12px] font-medium text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)] disabled:opacity-50 whitespace-nowrap"
         >
           <GitPullRequest className="h-3.5 w-3.5 shrink-0" />
           <span>{openingPr ? 'Opening…' : 'Share / PR'}</span>
         </button>
 
-        {/* Sapphire-Outlined ✦ Direct Toggle Button (exact Code Wiki ✦ Chat style!) */}
+        {/* 4. Exact Code Wiki Cobalt-Outlined ✦ Direct Pill */}
         <button
           type="button"
           onClick={() => {
@@ -438,10 +388,10 @@ export function TopBar({
             onToggleDirector();
           }}
           title={directorOpen ? 'Hide Gemini Director panel' : 'Open Gemini Director panel'}
-          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[12.5px] font-medium transition-colors whitespace-nowrap ${
+          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[12.5px] font-medium whitespace-nowrap ${
             directorOpen && activeTab === 'canvas'
-              ? 'border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]'
-              : 'border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--sapphire-ice)] hover:border-[var(--sapphire-border)] hover:bg-[var(--sapphire-tint)]'
+              ? 'cobalt-direct-pill'
+              : 'border border-[var(--cobalt-border)] bg-transparent text-[var(--cobalt-ice)] transition-colors hover:bg-[var(--cobalt-tint)]'
           }`}
         >
           <GeminiSparkleMark className="h-3.5 w-3.5 shrink-0" />

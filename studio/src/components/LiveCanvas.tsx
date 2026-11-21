@@ -11,7 +11,6 @@ import {
 import type { DrawnCircleAnnotation, TransformRunRequest } from '@shared/types';
 import {
   Columns2,
-  ExternalLink,
   Loader2,
   Mic,
   Monitor,
@@ -27,7 +26,7 @@ import {
 } from 'lucide-react';
 import { resolveBackendUrl } from '@/lib/api';
 import { useVoiceRecorder } from '@/lib/useVoiceRecorder';
-import { GeminiSparkleMark, GitHubMark } from './BrandMarks';
+import { GeminiSparkleMark } from './BrandMarks';
 
 export interface LiveCanvasHandle {
   /** Exports current freehand vermilion circles + numbered pins as transparent PNG base64 */
@@ -124,7 +123,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       buildCacheBustedUrl(previewUrl, reloadNonce, 0)
     );
 
-    // Dramatic Arrival Reveal Sweep + Fix-Glow + 6s What Changed Pill
+    // Dramatic Google Cobalt Arrival Reveal Sweep + Fix-Glow + Floating Delta Pill
     const [revealKey, setRevealKey] = useState<number>(0);
     const [showRevealEffect, setShowRevealEffect] = useState(false);
     const [showWhatChangedPill, setShowWhatChangedPill] = useState(false);
@@ -211,7 +210,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       if (!lastRunSummary) return;
       setShowWhatChangedPill(true);
       triggerArrivalReveal();
-      const t = setTimeout(() => setShowWhatChangedPill(false), 6000);
+      const t = setTimeout(() => setShowWhatChangedPill(false), 6500);
       return () => clearTimeout(t);
     }, [lastRunSummary, triggerArrivalReveal]);
 
@@ -486,51 +485,66 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
           `Slop ${lastRunSummary.slopBefore.toFixed(1)} → ${lastRunSummary.slopAfter.toFixed(1)}`
         );
       } else if (typeof lastRunSummary.slopAfter === 'number') {
-        parts.push(`Slop ${lastRunSummary.slopAfter.toFixed(1)}/10`);
+        parts.push(`Slop ${lastRunSummary.slopAfter.toFixed(1)}`);
       }
       if (typeof lastRunSummary.matchAfter === 'number') {
-        parts.push(`Match ${lastRunSummary.matchAfter.toFixed(1)}/10`);
+        parts.push(`Match ${lastRunSummary.matchAfter.toFixed(1)}`);
       }
       if (typeof lastRunSummary.latencyMs === 'number' && lastRunSummary.latencyMs > 0) {
-        parts.push(`${(lastRunSummary.latencyMs / 1000).toFixed(1)}s`);
+        const secs = lastRunSummary.latencyMs / 1000;
+        parts.push(secs >= 10 ? `${Math.round(secs)}s` : `${secs.toFixed(1)}s`);
       }
       return parts.join(' · ');
     })();
 
     return (
-      /* Floating 16px-radius Obsidian Card mirroring Code Wiki's main documentation card */
+      /* Floating 16px-radius Deep Obsidian Card (#080A0E, rgba(255,255,255,0.09) hairline) */
       <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-[var(--border-card)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
-        {/* Crisp Code Wiki Card Header: Repo Slug + [✦ Powered by Gemini 4] + Minimal Canvas Tools */}
-        <div className="flex h-[50px] shrink-0 items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4">
-          {/* Left: Repo Slug + Sapphire Powered by Gemini 4 Badge */}
+        {/* Minimal 48px Single-Row Header */}
+        <div className="flex h-[48px] shrink-0 items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4">
+          {/* Left: Workspace Slug + Sleek Cobalt Powered by Gemini 4 Pill */}
           <div className="flex min-w-0 items-center gap-2.5">
-            <h1 className="truncate text-[15px] font-medium tracking-[-0.015em] text-[var(--ink-primary)]">
-              {workspaceSlug}
-            </h1>
-            <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--sapphire-ice)] whitespace-nowrap lg:inline-flex">
+            {workspaceRepoUrl ? (
+              <a
+                href={workspaceRepoUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={`Open ${workspaceSlug} on GitHub`}
+                className="truncate text-[14px] font-medium tracking-[-0.015em] text-[var(--ink-primary)] transition-colors hover:text-[var(--cobalt-ice)]"
+              >
+                {workspaceSlug}
+              </a>
+            ) : (
+              <h1 className="truncate text-[14px] font-medium tracking-[-0.015em] text-[var(--ink-primary)]">
+                {workspaceSlug}
+              </h1>
+            )}
+            <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--cobalt-ice)] whitespace-nowrap lg:inline-flex">
               <GeminiSparkleMark className="h-3 w-3 shrink-0" />
               <span>Powered by Gemini 4</span>
             </span>
             {showHmrBadge && !isRunning && (
-              <span className="hidden shrink-0 items-center gap-1 rounded-full border border-[var(--emerald-border)] bg-[var(--emerald-bg)] px-2 py-0.5 font-mono text-[9.5px] font-medium text-[var(--emerald)] xl:inline-flex">
+              <span className="hidden shrink-0 items-center gap-1 font-mono text-[10px] font-medium text-[var(--emerald)] xl:inline-flex">
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--emerald)]" />
-                LIVE
+                Live
               </span>
             )}
           </div>
 
-          {/* Right: Clean Minimal Canvas Tools */}
-          <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-            {/* Circle Draw Toggle */}
+          {/* Right: ONLY Minimal Ghost Controls */}
+          <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+            {/* 1. Circle Ghost Control (lights up vermilion/cobalt when active) */}
             <button
               type="button"
               onClick={() => onDrawModeChange(!drawMode)}
-              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium transition-colors ${
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors ${
                 drawMode
-                  ? 'border-[var(--vermilion)] bg-[var(--vermilion)] text-white'
-                  : 'border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-primary)] hover:border-[var(--border-strong)]'
+                  ? 'bg-[var(--vermilion)] text-white'
+                  : drawnCircles.length > 0
+                  ? 'bg-[var(--vermilion-bg)] text-[var(--vermilion)]'
+                  : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
               }`}
-              title="Draw freehand vermilion circles directly over elements of the live app"
+              title="Circle any element directly on the live app"
             >
               <Pencil className="h-3 w-3" />
               <span>{drawMode ? 'Circling' : 'Circle'}</span>
@@ -539,7 +553,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   className={`rounded-full px-1.5 font-mono text-[9.5px] ${
                     drawMode
                       ? 'bg-white/25 text-white'
-                      : 'bg-[var(--vermilion-bg)] text-[var(--vermilion)]'
+                      : 'bg-[var(--vermilion)] text-white'
                   }`}
                 >
                   {drawnCircles.length}
@@ -553,26 +567,28 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   type="button"
                   onClick={undoCircle}
                   title="Undo last circle"
-                  className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]"
+                  aria-label="Undo last circle"
+                  className="flex h-[28px] w-[28px] items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
                 >
                   <Undo2 className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
                   onClick={clearCircles}
-                  title="Clear all drawn circles"
-                  className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)] hover:border-[var(--vermilion-border)] hover:text-[var(--vermilion)]"
+                  title="Clear drawn circles"
+                  aria-label="Clear drawn circles"
+                  className="flex h-[28px] w-[28px] items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--vermilion)]"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
                   onClick={onApplyCircleSpeak}
-                  className="inline-flex h-[30px] items-center gap-1 rounded-full bg-[var(--vermilion)] px-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-[var(--vermilion-hover)]"
+                  className="inline-flex h-[28px] items-center gap-1 rounded-full bg-[var(--vermilion)] px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-[var(--vermilion-hover)]"
                   title={
                     isRunning
-                      ? 'Add this circled region edit to the automatic queue'
-                      : 'Run surgical circle-to-tweak edit via gemini-4-hydrogen'
+                      ? 'Queue circled edit'
+                      : 'Apply surgical circle-to-tweak edit'
                   }
                 >
                   {isRunning ? (
@@ -585,42 +601,42 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               </>
             )}
 
-            {/* Inline Voice Speak Pill */}
-            <div className="flex h-[30px] items-center gap-1 rounded-full border border-[var(--border-card)] bg-[var(--bg-subtle)] px-1">
+            {/* 2. Speak Ghost Control */}
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={canvasVoice.toggleRecording}
-                className={`inline-flex h-[24px] items-center gap-1 rounded-full px-2 text-[11.5px] font-medium transition-colors ${
+                className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors ${
                   canvasVoice.isRecording
                     ? 'bg-[var(--vermilion)] text-white'
-                    : 'text-[var(--ink-primary)] hover:bg-[var(--bg-subtle-hover)]'
+                    : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
                 }`}
-                title="Speak an edit aloud (uses gemini-3.5-transcribe)"
+                title="Speak an edit aloud (gemini-3.5-transcribe)"
               >
                 {canvasVoice.isRecording ? (
                   <>
                     <Square className="h-2.5 w-2.5 fill-current" />
-                    <span className="font-mono text-[10px]">
+                    <span className="font-mono text-[10.5px]">
                       0:{String(canvasVoice.durationSec).padStart(2, '0')}
                     </span>
                   </>
                 ) : (
                   <>
-                    <Mic className="h-3 w-3 text-[var(--vermilion)]" />
+                    <Mic className="h-3.5 w-3.5" />
                     <span>Speak</span>
                   </>
                 )}
               </button>
 
               {(canvasVoice.isRecording || canvasVoice.isTranscribing) && (
-                <div className="flex h-3.5 items-center gap-[2px] pr-1.5">
+                <div className="flex h-3.5 items-center gap-[2px] pr-1">
                   {canvasVoice.isTranscribing ? (
-                    <span className="flex items-center gap-1 font-mono text-[9.5px] text-[var(--amber)]">
+                    <span className="flex items-center gap-1 font-mono text-[10px] text-[var(--amber)]">
                       <Loader2 className="h-2.5 w-2.5 animate-spin" />
                       transcribing
                     </span>
                   ) : (
-                    canvasVoice.levels.slice(0, 7).map((lvl, idx) => (
+                    canvasVoice.levels.slice(0, 6).map((lvl, idx) => (
                       <span
                         key={idx}
                         style={{ height: `${Math.round(lvl * 100)}%` }}
@@ -632,93 +648,79 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               )}
             </div>
 
-            {/* Before / After Toggle */}
-            <button
-              type="button"
-              disabled={!canCompare}
-              onClick={() => {
-                onDrawModeChange(false);
-                setCompareMode((v) => !v);
-              }}
-              className={`inline-flex h-[30px] items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-                compareMode
-                  ? 'border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]'
-                  : 'border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]'
-              }`}
-              title={
-                canCompare
-                  ? 'Drag split curtain between AI Slop baseline and live transformed app'
-                  : 'Run a transform first to capture the baseline screenshot'
-              }
-            >
-              <Columns2 className="h-3 w-3" />
-              <span className="hidden xl:inline">Before/After</span>
-            </button>
+            {/* 3. Before / After Ghost Toggle (shown ONLY when baseline exists!) */}
+            {canCompare && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDrawModeChange(false);
+                  setCompareMode((v) => !v);
+                }}
+                className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors ${
+                  compareMode
+                    ? 'bg-[var(--cobalt-tint)] text-[var(--cobalt-ice)]'
+                    : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
+                }`}
+                title="Compare Before baseline vs After AntiSlop"
+              >
+                <Columns2 className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Before/After</span>
+              </button>
+            )}
 
-            {/* 1440 | 390 Viewport Switcher */}
-            <div className="flex h-[30px] items-center rounded-full border border-[var(--border-card)] bg-[var(--bg-subtle)] p-0.5">
+            <span
+              aria-hidden="true"
+              className="mx-0.5 h-3.5 w-px bg-[var(--border-subtle)]"
+            />
+
+            {/* 4. Minimal Desktop / Mobile Ghost Toggle */}
+            <div
+              role="group"
+              aria-label="Preview viewport size"
+              className="flex items-center gap-0.5"
+            >
               <button
                 type="button"
                 onClick={() => setViewportMode('desktop')}
-                className={`inline-flex h-[24px] items-center gap-1 rounded-full px-2 font-mono text-[10px] transition-colors ${
+                aria-label="Desktop viewport"
+                title="Desktop preview"
+                className={`flex h-[28px] w-[28px] items-center justify-center rounded-full transition-colors ${
                   viewportMode === 'desktop'
-                    ? 'bg-[var(--bg-card-elevated)] text-[var(--ink-primary)]'
+                    ? 'bg-[var(--bg-subtle-hover)] text-[var(--ink-primary)]'
                     : 'text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
                 }`}
-                title="Desktop preview (1440px)"
               >
-                <Monitor className="h-3 w-3" />
-                <span className="hidden 2xl:inline">1440</span>
+                <Monitor className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => setViewportMode('mobile')}
-                className={`inline-flex h-[24px] items-center gap-1 rounded-full px-2 font-mono text-[10px] transition-colors ${
+                aria-label="Mobile viewport"
+                title="Mobile preview (390px)"
+                className={`flex h-[28px] w-[28px] items-center justify-center rounded-full transition-colors ${
                   viewportMode === 'mobile'
-                    ? 'bg-[var(--bg-card-elevated)] text-[var(--ink-primary)]'
+                    ? 'bg-[var(--bg-subtle-hover)] text-[var(--ink-primary)]'
                     : 'text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
                 }`}
-                title="Mobile preview (390px)"
               >
-                <Smartphone className="h-3 w-3" />
-                <span className="hidden 2xl:inline">390</span>
+                <Smartphone className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {/* Refresh Live Preview */}
+            {/* 5. Minimal Reload Ghost Button */}
             <button
               type="button"
               onClick={() => setManualReload((n) => n + 1)}
-              title="Refresh live preview seamlessly"
-              aria-label="Refresh live preview"
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]"
+              title="Reload live preview"
+              aria-label="Reload live preview"
+              className="flex h-[28px] w-[28px] items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
             >
-              <RefreshCw className="h-3 w-3" />
+              <RefreshCw className="h-3.5 w-3.5" />
             </button>
-
-            {/* GitHub Icon / Open Live Preview Link */}
-            <a
-              href={workspaceRepoUrl || previewUrl}
-              target="_blank"
-              rel="noreferrer"
-              title={
-                workspaceRepoUrl
-                  ? `Open repository on GitHub (${workspaceRepoUrl})`
-                  : `Open live target app (${previewUrl}) in new tab`
-              }
-              aria-label={workspaceRepoUrl ? 'Open GitHub repository' : 'Open live preview in new tab'}
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]"
-            >
-              {workspaceRepoUrl ? (
-                <GitHubMark className="h-3.5 w-3.5" />
-              ) : (
-                <ExternalLink className="h-3 w-3" />
-              )}
-            </a>
           </div>
         </div>
 
-        {/* Slim Contextual Ink Ribbon when Circling */}
+        {/* Slim Contextual Ribbon ONLY When Circling */}
         {(drawMode || drawnCircles.length > 0) && (
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] px-4 py-1.5 text-[11.5px]">
             <div className="flex min-w-0 items-center gap-2 text-[var(--ink-primary)]">
@@ -726,13 +728,13 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               <span className="truncate">
                 {drawMode
                   ? isRunning
-                    ? 'Circle next region while current edit builds — speak or click Queue.'
-                    : 'Circle any headline, card, or section, then speak or direct what to change.'
+                    ? 'Circle next region while building — speak or click Queue.'
+                    : 'Circle any section on the live site, then speak or direct what to change.'
                   : `${drawnCircles.length} target region${drawnCircles.length > 1 ? 's' : ''} marked.`}
                 {voiceTranscript.trim() ? (
                   <span className="ml-2 font-mono text-[10.5px] text-[var(--ink-secondary)]">
-                    &ldquo;{voiceTranscript.trim().slice(0, 84)}
-                    {voiceTranscript.trim().length > 84 ? '…' : ''}&rdquo;
+                    &ldquo;{voiceTranscript.trim().slice(0, 80)}
+                    {voiceTranscript.trim().length > 80 ? '…' : ''}&rdquo;
                   </span>
                 ) : null}
               </span>
@@ -743,29 +745,28 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                 onClick={() => onDrawModeChange(false)}
                 className="shrink-0 font-mono text-[10.5px] font-medium text-[var(--vermilion)] underline"
               >
-                Done circling
+                Done
               </button>
             )}
           </div>
         )}
 
-        {/* Unobstructed Live Interactive Website Preview Stage */}
-        <div className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2.5">
+        {/* Pure Unobstructed Interactive Live Website Stage */}
+        <div className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2">
           <div
             ref={stageRef}
-            className={`relative flex h-full flex-col overflow-hidden rounded-[12px] border border-[var(--border-card)] bg-white shadow-[var(--shadow-card)] transition-[width] duration-200 ${
+            className={`relative flex h-full flex-col overflow-hidden rounded-[12px] border border-[var(--border-subtle)] bg-white shadow-[var(--shadow-card)] transition-[width] duration-200 ${
               viewportMode === 'mobile' ? 'w-[390px] max-w-full' : 'w-full'
             }`}
           >
-            {/* Live Viewport Container */}
             <div className="relative flex-1 overflow-hidden bg-white">
-              {/* Ultra-thin animated sapphire top-edge progress bar while building */}
+              {/* Ultra-thin Google Cobalt progress bar while building */}
               {isRunning && (
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-x-0 top-0 z-30 h-[2.5px] overflow-hidden bg-black/15"
                 >
-                  <div className="atelier-progress-bar h-full w-1/2 bg-[#4285F4]" />
+                  <div className="atelier-progress-bar h-full w-1/2 bg-gradient-to-r from-[#0B57D0] via-[#4285F4] to-[#8AB4F8]" />
                 </div>
               )}
 
@@ -793,7 +794,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                 />
               )}
 
-              {/* 1.4s Luminous Sapphire-Emerald Hairline Reveal Sweep on Render Arrival */}
+              {/* Dramatic Google Cobalt (#4285F4 / #8AB4F8) Luminous Arrival Sweep */}
               {showRevealEffect && !compareMode && (
                 <div
                   key={`sweep-${revealKey}`}
@@ -801,13 +802,14 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   className="atelier-reveal-sweep pointer-events-none absolute inset-0 z-[25]"
                   style={{
                     background:
-                      'linear-gradient(180deg, rgba(66,133,244,0) 0%, rgba(138,180,248,0.14) 64%, rgba(52,211,153,0.16) 94%, rgba(66,133,244,0.42) 100%)',
-                    borderBottom: '2px solid #34D399',
+                      'linear-gradient(180deg, rgba(11,87,208,0) 0%, rgba(26,115,232,0.10) 56%, rgba(66,133,244,0.22) 92%, rgba(138,180,248,0.48) 100%)',
+                    borderBottom: '2px solid #8AB4F8',
+                    boxShadow: '0 4px 28px rgba(66, 133, 244, 0.52)',
                   }}
                 />
               )}
 
-              {/* Animated Emerald/Sapphire Fix-Glow Halos over Circled Regions OR Outer Perimeter */}
+              {/* Subtle Cobalt/Emerald Fix-Glow Halos around Circled/Changed Regions */}
               {showRevealEffect && !compareMode && lastAppliedCircles.length > 0 && (
                 <div
                   key={`halos-${revealKey}`}
@@ -823,15 +825,15 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                         width: `${Math.min(98, circle.width * 100 + 2)}%`,
                         height: `${Math.min(98, circle.height * 100 + 2)}%`,
                         boxShadow:
-                          '0 0 0 2px rgba(52,211,153,0.88), 0 0 24px 3px rgba(66,133,244,0.34), inset 0 0 18px rgba(52,211,153,0.12)',
+                          '0 0 0 1.5px rgba(138,180,248,0.9), 0 0 28px 3px rgba(66,133,244,0.38), inset 0 0 18px rgba(52,211,153,0.12)',
                       }}
-                      className="atelier-fix-halo absolute rounded-[8px] border border-[#34D399] bg-[#34D399]/[0.05]"
+                      className="atelier-fix-halo absolute rounded-[8px] border border-[#8AB4F8] bg-[#4285F4]/[0.05]"
                     >
                       <span className="absolute -left-px -top-px h-2.5 w-2.5 border-l-2 border-t-2 border-[#4285F4]" />
                       <span className="absolute -right-px -top-px h-2.5 w-2.5 border-r-2 border-t-2 border-[#4285F4]" />
                       <span className="absolute -bottom-px -left-px h-2.5 w-2.5 border-b-2 border-l-2 border-[#34D399]" />
                       <span className="absolute -bottom-px -right-px h-2.5 w-2.5 border-b-2 border-r-2 border-[#34D399]" />
-                      <span className="absolute -top-2.5 right-1.5 rounded-full bg-[#0B0D10] px-2 py-0.5 font-mono text-[8.5px] font-semibold uppercase tracking-wider text-[#34D399] ring-1 ring-[#34D399]/50">
+                      <span className="absolute -top-2.5 right-1.5 rounded-full bg-[#080A0E] px-2 py-0.5 font-mono text-[8.5px] font-semibold uppercase tracking-wider text-[#8AB4F8] ring-1 ring-[#4285F4]/60">
                         ✓ #{idx + 1} Refined
                       </span>
                     </div>
@@ -839,27 +841,28 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                 </div>
               )}
 
+              {/* Subtle Google Cobalt Outer Perimeter Pulse on Full Transform Arrival */}
               {showRevealEffect && !compareMode && lastAppliedCircles.length === 0 && (
                 <div
                   key={`frame-glow-${revealKey}`}
                   aria-hidden="true"
                   style={{
                     boxShadow:
-                      'inset 0 0 0 2.5px rgba(52,211,153,0.85), inset 0 0 38px rgba(66,133,244,0.18)',
+                      'inset 0 0 0 2px rgba(66,133,244,0.82), inset 0 0 36px rgba(138,180,248,0.22)',
                   }}
                   className="atelier-frame-arrival pointer-events-none absolute inset-0 z-[25]"
                 />
               )}
 
-              {/* Floating "What Changed" Delta Pill at Top-Center */}
+              {/* Ultra-Clean Floating Delta Pill (✦ Updated · Slop 9.1 → 1.8 · Match 9.2 · 34s) */}
               {showWhatChangedPill && lastRunSummary && !compareMode && (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="atelier-what-changed-pill absolute left-1/2 top-3 z-30 flex max-w-[94%] items-center gap-2 rounded-full border border-[var(--sapphire-border)] bg-[#0B0D10]/95 py-1.5 pl-3.5 pr-1.5 text-[#F1F3F4] shadow-[var(--shadow-float)]"
+                  className="atelier-what-changed-pill absolute left-1/2 top-3 z-30 flex max-w-[94%] items-center gap-2 rounded-full border border-[rgba(138,180,248,0.34)] bg-[#080A0E]/95 py-1.5 pl-3.5 pr-1.5 text-[#F1F3F4] shadow-[0_12px_36px_-8px_rgba(11,87,208,0.55)]"
                 >
                   <GeminiSparkleMark className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate font-mono text-[10.5px] font-medium">
+                  <span className="truncate font-mono text-[11px] font-medium tracking-[-0.01em]">
                     {whatChangedSummaryText}
                   </span>
                   {canCompare && (
@@ -870,7 +873,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                         setCompareMode(true);
                         setShowWhatChangedPill(false);
                       }}
-                      className="shrink-0 rounded-full bg-[#1A73E8] px-2.5 py-0.5 font-mono text-[9.5px] font-medium text-white transition-colors hover:bg-[#2B7DE9]"
+                      className="shrink-0 rounded-full bg-[#1A73E8] px-2.5 py-0.5 font-mono text-[10px] font-medium text-white transition-colors hover:bg-[#0B57D0]"
                     >
                       Compare
                     </button>
@@ -886,7 +889,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                 </div>
               )}
 
-              {/* Before / After Wipe Curtain Overlay */}
+              {/* Before / After Cobalt Wipe Curtain Overlay */}
               {compareMode && resolvedBaseline && (
                 <div className="absolute inset-0 z-20 overflow-hidden bg-white">
                   {resolvedFinal ? (
@@ -901,7 +904,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                     style={{
                       clipPath: `inset(0 ${100 - wipePercent}% 0 0)`,
                     }}
-                    className="absolute inset-0 overflow-hidden bg-[#0B0D10]"
+                    className="absolute inset-0 overflow-hidden bg-[#080A0E]"
                   >
                     <img
                       src={resolvedBaseline}
@@ -914,15 +917,15 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                     style={{ left: `${wipePercent}%` }}
                     className="pointer-events-none absolute inset-y-0 z-10 w-[2px] -translate-x-1/2 bg-[#4285F4]"
                   >
-                    <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-[#4285F4] bg-[#0B0D10] text-[#8AB4F8] shadow-lg">
+                    <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-[#4285F4] bg-[#080A0E] text-[#8AB4F8] shadow-lg">
                       <Columns2 className="h-4 w-4" />
                     </div>
                   </div>
 
-                  <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/15 bg-[#0B0D10]/90 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#F1F3F4]">
+                  <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/12 bg-[#080A0E]/90 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-[#F1F3F4]">
                     Before · Baseline
                   </div>
-                  <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-[#34D399]/40 bg-[#0B0D10]/90 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#34D399]">
+                  <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-[#8AB4F8]/40 bg-[#080A0E]/90 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-[#8AB4F8]">
                     After · AntiSlop
                   </div>
 
@@ -980,7 +983,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                       </button>
 
                       {editingCircleId === circle.id && (
-                        <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0B0D10] px-3 py-1 shadow-lg">
+                        <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#080A0E] px-3 py-1 shadow-lg">
                           <input
                             type="text"
                             autoFocus
@@ -994,7 +997,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                               }
                             }}
                             placeholder="Optional note…"
-                            className="w-36 bg-transparent text-[11px] text-[#F1F3F4] placeholder:text-[#70757A] focus:outline-none"
+                            className="w-36 bg-transparent text-[11px] text-[#F1F3F4] placeholder:text-[#6E747B] focus:outline-none"
                           />
                           <button
                             type="button"
@@ -1010,12 +1013,12 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   </div>
                 ))}
 
-              {/* Minimal Floating Bottom-Center Pill while Building */}
+              {/* Minimal Floating Bottom-Center Cobalt Status Pill while Building */}
               {isRunning && (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="pointer-events-none absolute bottom-3 left-1/2 z-30 flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--sapphire-border)] bg-[#0B0D10]/95 px-3.5 py-1.5 text-[#F1F3F4] shadow-[var(--shadow-float)]"
+                  className="pointer-events-none absolute bottom-3 left-1/2 z-30 flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border border-[rgba(138,180,248,0.32)] bg-[#080A0E]/95 px-3.5 py-1.5 text-[#F1F3F4] shadow-[var(--shadow-float)]"
                 >
                   <span className="h-2 w-2 shrink-0 rounded-full bg-[#4285F4] animate-studio-pulse" />
                   <span className="truncate font-mono text-[10.5px]">
@@ -1027,7 +1030,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                       : 'Gemini 4 working · keeping live preview active…'}
                   </span>
                   {queueCount > 0 && (
-                    <span className="shrink-0 rounded-full bg-[#1A73E8] px-2 py-0.5 font-mono text-[9px] font-semibold text-white">
+                    <span className="shrink-0 rounded-full bg-[#1A73E8] px-2 py-0.5 font-mono text-[9.5px] font-medium text-white">
                       +{queueCount} queued
                     </span>
                   )}

@@ -78,6 +78,12 @@
 - **Vercel Production Wired:** Configured `prj_5Go6HmY5xn2pyAQqxALrdxRaJB74` via Vercel API (`rootDirectory = "studio"`, `framework = "nextjs"`, `NEXT_PUBLIC_BACKEND_URL = https://antislop-engine-a53petnlfa-uc.a.run.app`).
 - **Wave 3 Obsidian Spatial Redesign (`CodeWikiStudioRedesignBuilder`):** Audited `codewiki.google` & `codewiki.google/github.com/openclaw/openclaw` via Retina captures + `.mp4` walkthroughs, then redesigned `/studio` into a 2-page Google Obsidian Spatial UI (`LandingHub` + `2:9:2` Floating-Card Studio with zero-wrap `60px` TopBar, borderless Left References rail, `16px`-radius Center Canvas with `✦ Powered by Gemini 4` badge, `16px`-radius Gemini Sparkle Right Director card, and working Dark/Light Atelier toggle). Verified `tsc` (`0` errors), `next lint` (`0` warnings), `next build` (`1.77s`), and Retina visual audit (`wrappedButtons: []`, `overflowX: 0`).
 
+### 2:30 PM – 2:45 PM ET · Cloud Run Rev-2 Live E2E Verified + Wave 4 Google Cobalt 3D & Ultra-Minimal Studio Polish
+- **Cloud Run Rev-2 (`antislop-engine-00002-sr2`) Verified 100% Live:** Deployed directly via workspace service account (`workspace-deployer@gitunderstand.iam.gserviceaccount.com`) with `--min-instances=1 --no-cpu-throttling --session-affinity`. Verified `/api/health` (`viteReady: true`, `3` workspaces), `/preview/` (`200 OK`), and live `POST /api/reference/capture-url` on `https://www.connorhyatt.com/` (`6.7s`, `Libre Baskerville 36px`, `Inter 16px`, `131 KB` JPEG).
+- **Wave 4 Parallel Polish (`Cobalt3DLandingBuilder` + `UltraMinimalStudioCleaner`):**
+  - Built 60fps Retina 3D translucent **Google Cobalt Glass Prism Cube** (`studio/src/components/CobaltCube3D.tsx` — `#0B57D0 → #1A73E8 → #4285F4 → #8AB4F8` Fresnel facets, inner refractive prism, cursor tilt, 4 variants) and 4-section scrollytelling `LandingHub`.
+  - Cut 50% of Studio visual clutter: 4-control serene TopBar, box-free borderless Left References rail, ~72% Center Stage with Cobalt reveal sweep & fix-glow, and ultra-calm Right Gemini Sparkle Director card (`tsc`, `next lint`, `next build` 0 errors/warnings in `1.75s`).
+
 ---
 
 *(Subsequent phases will append real commit hashes, live latency metrics, Decisions API calibration logs, and deployment URLs as each parallel wave lands.)*
