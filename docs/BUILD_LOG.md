@@ -67,6 +67,12 @@
   - Added 3rd instant-switch demo target app (`target-templates/portfolio-starter` — generic AI-slop developer portfolio with animated hero butterfly artwork `data-section="artwork"` + 5 nav sections, built in `1.01s`).
   - Documented real origin story in [CASE_STUDY_ORIGIN.md](CASE_STUDY_ORIGIN.md) and V1 empirical results in [BREAKING_POINTS.md](BREAKING_POINTS.md).
 
+### 1:51 PM – 2:02 PM ET · V2 Live 8-Trial 5-Sigma & Element 119 Benchmark Complete (`100% AntiSlop Pass Rate!`)
+- Re-ran automated evaluation (`benchmarks/run-5sigma.ts --fast-only`) against live V2 backend (`http://localhost:4000`), writing full empirical proof to [`benchmarks/results/REPORT.md`](../benchmarks/results/REPORT.md) and [`benchmarks/results/latest-report.json`](../benchmarks/results/latest-report.json):
+  - **Control (`text_baseline`, 3 trials):** `0/3` pass (`0%`) · Avg Taste **`13.8/100`** · Slop **`9.09/10`** · Match **`1.52/10`** · Embed-2 **`0.554`**.
+  - **AntiSlop V2 (`fast_demo`, 3 trials):** **`3/3` PASS (`100%`)** on Iteration 1 · Avg Taste **`99.5/100` (+85.7 pts, Cohen's *d* = 38.30)** · Slop **`2.38/10` (-6.71)** · Match **`8.88/10` (+7.35)** · Embed-2 **`0.739` (+0.185)** · **`35.1s`** avg (**3.9× faster than V1's `136.7s`**!).
+  - **Element 119 Chaos Stress Tests (`deep_atelier` 3× Parallel, 2 trials):** **`2/2` PASS (`100%`)** on Iteration 1 — 4-Way Conflicting Chaos Set (**`100.0` Taste, `1.37` Slop, `9.30` Match**, synthesized `Kiln, Rag & Caliper` via structured conflict arbitration) and Dim `-11.5°` Tilted ISO-3200 Glare Webcam Magazine (**`100.0` Taste, `1.80` Slop, `8.93` Match**, synthesized `Monolith Plaster & Alabaster`). `0` DOM defects across all passing runs.
+
 ---
 
 *(Subsequent phases will append real commit hashes, live latency metrics, Decisions API calibration logs, and deployment URLs as each parallel wave lands.)*

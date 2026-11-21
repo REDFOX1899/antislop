@@ -1,0 +1,779 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-11-21T19:02:03.414Z",
+  "backendUrl": "http://localhost:4000",
+  "cliOptions": {
+    "fastOnly": true,
+    "stressOnly": false,
+    "scenarioFilter": [],
+    "timeoutMs": 300000
+  },
+  "backendHealth": {
+    "status": "ok",
+    "service": "antislop-backend",
+    "timestamp": "2026-11-21T18:50:32.923Z",
+    "port": 4000,
+    "targetVitePort": 5173,
+    "viteReady": true,
+    "previewUrl": "/preview/",
+    "activeWorkspace": {
+      "id": "novaflow-slop",
+      "name": "NovaFlow AI (Slop Baseline)",
+      "source": "builtin",
+      "localPath": "/Users/shantanu/Desktop/Gemini 4 NYC Hackathon/target-repo",
+      "framework": "vite",
+      "previewUrl": "/preview/",
+      "editableFiles": [
+        "index.html",
+        "src/index.css",
+        "src/App.tsx",
+        "src/data/content.ts"
+      ],
+      "active": true
+    },
+    "availableWorkspaces": 3,
+    "lastViteError": null,
+    "pool": {
+      "primaryConfigured": true,
+      "secondaryConfigured": true,
+      "totalCalls": 0
+    },
+    "geminiPool": {
+      "primaryConfigured": true,
+      "secondaryConfigured": true,
+      "totalCalls": 0
+    },
+    "githubConfigured": true,
+    "models": {
+      "director": "gemini-4-carbon",
+      "architect": "gemini-4-neon",
+      "patcher": "gemini-4-hydrogen",
+      "fastCritic": "gemini-4-argon",
+      "decisions": "gemini-decision-1",
+      "imageGen": "gemini-nano-banana-2.1",
+      "embedding": "gemini-embedding-2",
+      "transcribe": "gemini-3.5-transcribe",
+      "managedAgentBase": "antigravity-preview-09-2026"
+    }
+  },
+  "groupSummaries": {
+    "control_text_baseline": {
+      "group": "control_text_baseline",
+      "label": "Control (Text-Only Baseline)",
+      "totalTrials": 3,
+      "completedTrials": 2,
+      "passedAllGatesCount": 0,
+      "passRatePct": 0,
+      "meanWallClockMs": 40577.5,
+      "medianWallClockMs": 40577.5,
+      "meanOverallTasteScore": 13.8,
+      "stdOverallTasteScore": 3.677,
+      "meanSlopPenalty": 9.085,
+      "meanAestheticMatch": 1.525,
+      "meanTypographyCraft": 5.615,
+      "meanLayoutBrokenProb": 0.144,
+      "meanContrastFailingProb": 0.341,
+      "meanEmbeddingSimilarity": 0.554,
+      "meanIterations": 1,
+      "totalDomDefects": 0
+    },
+    "treatment_fast_demo": {
+      "group": "treatment_fast_demo",
+      "label": "Treatment 1 (AntiSlop fast_demo)",
+      "totalTrials": 3,
+      "completedTrials": 3,
+      "passedAllGatesCount": 3,
+      "passRatePct": 100,
+      "meanWallClockMs": 35056.667,
+      "medianWallClockMs": 34557,
+      "meanOverallTasteScore": 99.5,
+      "stdOverallTasteScore": 0.866,
+      "meanSlopPenalty": 2.38,
+      "meanAestheticMatch": 8.877,
+      "meanTypographyCraft": 8.923,
+      "meanLayoutBrokenProb": 0.082,
+      "meanContrastFailingProb": 0.172,
+      "meanEmbeddingSimilarity": 0.739,
+      "meanIterations": 1,
+      "totalDomDefects": 0
+    },
+    "treatment_deep_atelier": {
+      "group": "treatment_deep_atelier",
+      "label": "Treatment 2 (AntiSlop deep_atelier)",
+      "totalTrials": 0,
+      "completedTrials": 0,
+      "passedAllGatesCount": 0,
+      "passRatePct": 0,
+      "meanWallClockMs": null,
+      "medianWallClockMs": null,
+      "meanOverallTasteScore": null,
+      "stdOverallTasteScore": null,
+      "meanSlopPenalty": null,
+      "meanAestheticMatch": null,
+      "meanTypographyCraft": null,
+      "meanLayoutBrokenProb": null,
+      "meanContrastFailingProb": null,
+      "meanEmbeddingSimilarity": null,
+      "meanIterations": null,
+      "totalDomDefects": 0
+    },
+    "element119_stress_test": {
+      "group": "element119_stress_test",
+      "label": "Element 119 Chaos Stress Tests",
+      "totalTrials": 2,
+      "completedTrials": 2,
+      "passedAllGatesCount": 2,
+      "passRatePct": 100,
+      "meanWallClockMs": 233638.5,
+      "medianWallClockMs": 233638.5,
+      "meanOverallTasteScore": 100,
+      "stdOverallTasteScore": 0,
+      "meanSlopPenalty": 1.585,
+      "meanAestheticMatch": 9.115,
+      "meanTypographyCraft": 9.165,
+      "meanLayoutBrokenProb": 0.152,
+      "meanContrastFailingProb": 0.184,
+      "meanEmbeddingSimilarity": 0.596,
+      "meanIterations": 1,
+      "totalDomDefects": 0
+    }
+  },
+  "pairedDeltasVsControl": {
+    "fastDemoVsControl": {
+      "deltaOverallTasteScore": 85.7,
+      "cohensDOverallTaste": 38.301,
+      "deltaSlopPenalty": -6.705,
+      "deltaAestheticMatch": 7.352,
+      "deltaTypographyCraft": 3.308,
+      "deltaEmbeddingSimilarity": 0.185
+    },
+    "deepAtelierVsControl": {
+      "deltaOverallTasteScore": null,
+      "cohensDOverallTaste": null,
+      "deltaSlopPenalty": null,
+      "deltaAestheticMatch": null,
+      "deltaTypographyCraft": null,
+      "deltaEmbeddingSimilarity": null
+    }
+  },
+  "trials": [
+    {
+      "trialId": "control-swiss-editorial-print",
+      "scenarioId": "swiss-editorial-print",
+      "scenarioTitle": "Swiss Editorial Print (Archival Cream + Vermilion)",
+      "group": "control_text_baseline",
+      "mode": "text_baseline",
+      "speedMode": "fast_demo",
+      "startedAt": "2026-11-21T18:50:32.927Z",
+      "completedAt": "2026-11-21T18:51:16.925Z",
+      "resetOk": true,
+      "resetLatencyMs": 407,
+      "wallClockMs": 43588,
+      "backendLatencyMs": 42290,
+      "runId": "run-mwqrjojm-a4bd78",
+      "status": "max_iterations_reached",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-hydrogen",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrjojm-a4bd78-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqrjojm-a4bd78-i1-d3297e57-2d75-473d-ab4e-c99acf062eed-desktop.png",
+      "metrics": {
+        "overallTasteScore": 16.4,
+        "passedAllGates": false,
+        "slopPenalty": 8.82,
+        "slopPenaltyConfidence": 0.62,
+        "aestheticMatch": 2.25,
+        "aestheticMatchConfidence": 0.414,
+        "typographyCraft": 5.64,
+        "visualRhythm": 6.39,
+        "colorHarmony": 5.29,
+        "motionCohesion": 5.17,
+        "layoutBroken": 0.171,
+        "contrastFailing": 0.363,
+        "genericAiCliche": 0.971,
+        "productionReady": 0.236,
+        "dominantAestheticClass": "generic_ai_saas_slop",
+        "primaryDefectClass": "generic_ai_cliche",
+        "embeddingSimilarityInitial": 0.571,
+        "embeddingSimilarityFinal": 0.571,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 1899
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "fast_pass",
+          "overallTasteScore": 16.4,
+          "slopPenalty": 8.82,
+          "aestheticMatch": 2.25,
+          "typographyCraft": 5.64,
+          "layoutBroken": 0.171,
+          "contrastFailing": 0.363,
+          "embeddingSimilarity": 0.571,
+          "passedAllGates": false,
+          "primaryDefectClass": "generic_ai_cliche",
+          "candidateCount": 1
+        }
+      ],
+      "honestFailureReasons": [
+        "Reached max_iterations (1/1) without passing all Decisions API gates",
+        "passedAllGates=false (overallTasteScore=16.4/100)",
+        "AI slop threshold breached: slopPenalty=8.82/10",
+        "Aesthetic fidelity below bar: aestheticMatch=2.25/10",
+        "Contrast legibility failure: contrastFailing prob=0.363"
+      ]
+    },
+    {
+      "trialId": "control-brutalist-tokyo-poster",
+      "scenarioId": "brutalist-tokyo-poster",
+      "scenarioTitle": "Brutalist Tokyo Poster (Concrete Grid + Electric Yellow)",
+      "group": "control_text_baseline",
+      "mode": "text_baseline",
+      "speedMode": "fast_demo",
+      "startedAt": "2026-11-21T18:51:16.925Z",
+      "completedAt": "2026-11-21T18:51:50.524Z",
+      "resetOk": true,
+      "resetLatencyMs": 410,
+      "wallClockMs": 33188,
+      "backendLatencyMs": 32949,
+      "runId": "run-mwqrkmht-a91749",
+      "status": "failed",
+      "iterationCount": 0,
+      "modelsInvoked": [],
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrkmht-a91749-baseline-desktop.png",
+      "iterationTrajectory": [],
+      "honestFailureReasons": [
+        "Backend reported terminal status=failed",
+        "No DecisionsScorecard recorded in iterations"
+      ]
+    },
+    {
+      "trialId": "control-warm-botanical-atelier",
+      "scenarioId": "warm-botanical-atelier",
+      "scenarioTitle": "Warm Botanical Atelier (Linen + Heritage Sage + Terracotta)",
+      "group": "control_text_baseline",
+      "mode": "text_baseline",
+      "speedMode": "fast_demo",
+      "startedAt": "2026-11-21T18:51:50.524Z",
+      "completedAt": "2026-11-21T18:52:28.497Z",
+      "resetOk": true,
+      "resetLatencyMs": 405,
+      "wallClockMs": 37567,
+      "backendLatencyMs": 36804,
+      "runId": "run-mwqrlcf0-519d87",
+      "status": "max_iterations_reached",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-hydrogen",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrlcf0-519d87-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqrlcf0-519d87-i1-653f3692-a6b9-41e3-8433-d0c1d32d0695-desktop.png",
+      "metrics": {
+        "overallTasteScore": 11.2,
+        "passedAllGates": false,
+        "slopPenalty": 9.35,
+        "slopPenaltyConfidence": 0.781,
+        "aestheticMatch": 0.8,
+        "aestheticMatchConfidence": 0.744,
+        "typographyCraft": 5.59,
+        "visualRhythm": 6.42,
+        "colorHarmony": 5.69,
+        "motionCohesion": 4.83,
+        "layoutBroken": 0.116,
+        "contrastFailing": 0.319,
+        "genericAiCliche": 0.987,
+        "productionReady": 0.207,
+        "dominantAestheticClass": "generic_ai_saas_slop",
+        "primaryDefectClass": "generic_ai_cliche",
+        "embeddingSimilarityInitial": 0.538,
+        "embeddingSimilarityFinal": 0.538,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 1544
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "fast_pass",
+          "overallTasteScore": 11.2,
+          "slopPenalty": 9.35,
+          "aestheticMatch": 0.8,
+          "typographyCraft": 5.59,
+          "layoutBroken": 0.116,
+          "contrastFailing": 0.319,
+          "embeddingSimilarity": 0.538,
+          "passedAllGates": false,
+          "primaryDefectClass": "generic_ai_cliche",
+          "candidateCount": 1
+        }
+      ],
+      "honestFailureReasons": [
+        "Reached max_iterations (1/1) without passing all Decisions API gates",
+        "passedAllGates=false (overallTasteScore=11.2/100)",
+        "AI slop threshold breached: slopPenalty=9.35/10",
+        "Aesthetic fidelity below bar: aestheticMatch=0.80/10"
+      ]
+    },
+    {
+      "trialId": "fast-swiss-editorial-print",
+      "scenarioId": "swiss-editorial-print",
+      "scenarioTitle": "Swiss Editorial Print (Archival Cream + Vermilion)",
+      "group": "treatment_fast_demo",
+      "mode": "antislop",
+      "speedMode": "fast_demo",
+      "startedAt": "2026-11-21T18:52:28.497Z",
+      "completedAt": "2026-11-21T18:53:04.978Z",
+      "resetOk": true,
+      "resetLatencyMs": 413,
+      "wallClockMs": 36063,
+      "backendLatencyMs": 34861,
+      "runId": "run-mwqrm5q4-d39eef",
+      "status": "passed",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-hydrogen",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "vibeTitle": "Swiss Editorial Print Monograph",
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrm5q4-d39eef-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqrm5q4-d39eef-i1-6ace6f74-2085-4831-80bb-545158bdf96b-desktop.png",
+      "metrics": {
+        "overallTasteScore": 100,
+        "passedAllGates": true,
+        "slopPenalty": 1.75,
+        "slopPenaltyConfidence": 0.483,
+        "aestheticMatch": 9.16,
+        "aestheticMatchConfidence": 0.694,
+        "typographyCraft": 9.2,
+        "visualRhythm": 8.73,
+        "colorHarmony": 9.21,
+        "motionCohesion": 8.39,
+        "layoutBroken": 0.095,
+        "contrastFailing": 0.153,
+        "genericAiCliche": 0.039,
+        "productionReady": 0.848,
+        "dominantAestheticClass": "editorial_print",
+        "primaryDefectClass": "none",
+        "embeddingSimilarityInitial": 0.8011,
+        "embeddingSimilarityFinal": 0.8011,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 3249
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "fast_pass",
+          "overallTasteScore": 100,
+          "slopPenalty": 1.75,
+          "aestheticMatch": 9.16,
+          "typographyCraft": 9.2,
+          "layoutBroken": 0.095,
+          "contrastFailing": 0.153,
+          "embeddingSimilarity": 0.8011,
+          "passedAllGates": true,
+          "primaryDefectClass": "none",
+          "candidateCount": 1
+        }
+      ],
+      "honestFailureReasons": [
+        "fast_demo latency SLA exceeded: 36.1s > 25.0s target"
+      ]
+    },
+    {
+      "trialId": "fast-brutalist-tokyo-poster",
+      "scenarioId": "brutalist-tokyo-poster",
+      "scenarioTitle": "Brutalist Tokyo Poster (Concrete Grid + Electric Yellow)",
+      "group": "treatment_fast_demo",
+      "mode": "antislop",
+      "speedMode": "fast_demo",
+      "startedAt": "2026-11-21T18:53:04.978Z",
+      "completedAt": "2026-11-21T18:53:39.939Z",
+      "resetOk": true,
+      "resetLatencyMs": 410,
+      "wallClockMs": 34550,
+      "backendLatencyMs": 34186,
+      "runId": "run-mwqrmxv7-af3b3e",
+      "status": "passed",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-hydrogen",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "vibeTitle": "Tokyo Concrete Brutalism",
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrmxv7-af3b3e-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqrmxv7-af3b3e-i1-a083a048-7276-46be-b28d-81e97eaf8b89-desktop.png",
+      "metrics": {
+        "overallTasteScore": 100,
+        "passedAllGates": true,
+        "slopPenalty": 2.35,
+        "slopPenaltyConfidence": 0.403,
+        "aestheticMatch": 9.08,
+        "aestheticMatchConfidence": 0.662,
+        "typographyCraft": 8.88,
+        "visualRhythm": 8.55,
+        "colorHarmony": 8.98,
+        "motionCohesion": 8.08,
+        "layoutBroken": 0.052,
+        "contrastFailing": 0.117,
+        "genericAiCliche": 0.041,
+        "productionReady": 0.885,
+        "dominantAestheticClass": "swiss_architectural",
+        "primaryDefectClass": "none",
+        "embeddingSimilarityInitial": 0.7612,
+        "embeddingSimilarityFinal": 0.7612,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 1923
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "fast_pass",
+          "overallTasteScore": 100,
+          "slopPenalty": 2.35,
+          "aestheticMatch": 9.08,
+          "typographyCraft": 8.88,
+          "layoutBroken": 0.052,
+          "contrastFailing": 0.117,
+          "embeddingSimilarity": 0.7612,
+          "passedAllGates": true,
+          "primaryDefectClass": "none",
+          "candidateCount": 1
+        }
+      ],
+      "honestFailureReasons": [
+        "fast_demo latency SLA exceeded: 34.5s > 25.0s target"
+      ]
+    },
+    {
+      "trialId": "fast-warm-botanical-atelier",
+      "scenarioId": "warm-botanical-atelier",
+      "scenarioTitle": "Warm Botanical Atelier (Linen + Heritage Sage + Terracotta)",
+      "group": "treatment_fast_demo",
+      "mode": "antislop",
+      "speedMode": "fast_demo",
+      "startedAt": "2026-11-21T18:53:39.940Z",
+      "completedAt": "2026-11-21T18:54:14.903Z",
+      "resetOk": true,
+      "resetLatencyMs": 405,
+      "wallClockMs": 34557,
+      "backendLatencyMs": 33731,
+      "runId": "run-mwqrnou9-16239f",
+      "status": "passed",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-hydrogen",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "vibeTitle": "Warm Botanical Linen Atelier",
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrnou9-16239f-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqrnou9-16239f-i1-3cbc05be-de58-4943-a790-76f1581848eb-desktop.png",
+      "metrics": {
+        "overallTasteScore": 98.5,
+        "passedAllGates": true,
+        "slopPenalty": 3.04,
+        "slopPenaltyConfidence": 0.418,
+        "aestheticMatch": 8.39,
+        "aestheticMatchConfidence": 0.461,
+        "typographyCraft": 8.69,
+        "visualRhythm": 8.38,
+        "colorHarmony": 8.97,
+        "motionCohesion": 8.26,
+        "layoutBroken": 0.098,
+        "contrastFailing": 0.247,
+        "genericAiCliche": 0.075,
+        "productionReady": 0.872,
+        "dominantAestheticClass": "warm_tactile_craft",
+        "primaryDefectClass": "broken_or_missing_imagery",
+        "embeddingSimilarityInitial": 0.6542,
+        "embeddingSimilarityFinal": 0.6542,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 1490
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "fast_pass",
+          "overallTasteScore": 98.5,
+          "slopPenalty": 3.04,
+          "aestheticMatch": 8.39,
+          "typographyCraft": 8.69,
+          "layoutBroken": 0.098,
+          "contrastFailing": 0.247,
+          "embeddingSimilarity": 0.6542,
+          "passedAllGates": true,
+          "primaryDefectClass": "broken_or_missing_imagery",
+          "candidateCount": 1
+        }
+      ],
+      "honestFailureReasons": [
+        "AI slop threshold breached: slopPenalty=3.04/10",
+        "fast_demo latency SLA exceeded: 34.6s > 25.0s target"
+      ]
+    },
+    {
+      "trialId": "stress-conflicting-chaos-4way",
+      "scenarioId": "conflicting-chaos-set",
+      "scenarioTitle": "Conflicting 4-Way Chaos Set (Swiss + Cyberpunk + Ceramic + Blueprint)",
+      "group": "element119_stress_test",
+      "mode": "stress_test",
+      "speedMode": "deep_atelier",
+      "startedAt": "2026-11-21T18:54:14.903Z",
+      "completedAt": "2026-11-21T18:57:26.134Z",
+      "resetOk": true,
+      "resetLatencyMs": 411,
+      "wallClockMs": 190816,
+      "backendLatencyMs": 190116,
+      "runId": "run-mwqroftz-ef1d93",
+      "status": "passed",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-carbon",
+        "gemini-4-neon",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "vibeTitle": "Kiln, Rag & Caliper",
+      "conflictResolutionNotes": "Four diametrically opposed references are resolved through strict structural hierarchy rather than muddy averaging: (1) Swiss Minimal (Ref 01) governs macro spatial pacing—65%+ calm negative space, asymmetric 12-column proportions, and whisper-thin 1px dividing rules. (2) Earthy Ceramic Craft (Ref 03) defines the physical material palette and primary display voice—replacing sterile white with warm unbleached stoneware linen (#F4EFE6), iron-glaze charcoal ink (#181614), and sculpted Spectral serif headlines. (3) Corporate CAD Blueprint (Ref 04) contributes the secondary structural skeleton—ISO title-block metadata strips, indexed specification tables, and orthographic callouts—stripped of overpowering Prussian blue fill and rendered as crisp carbon-ink drafting lines on rag paper. (4) Neon Cyberpunk (Ref 02) is strictly quarantined from palette and typography—its magenta/cyan/acid synthwave glow and chromatic aberration are banned, while its high-frequency telemetry impulse is sublimated into disciplined live monospace status readouts and a single high-chroma kiln-vermilion signal dot (#B8331A) bridging Swiss red and fired terracotta.",
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqroftz-ef1d93-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqroftz-ef1d93-i1-b3f81dcf-53b4-4986-8730-0157278daaf9-desktop.png",
+      "metrics": {
+        "overallTasteScore": 100,
+        "passedAllGates": true,
+        "slopPenalty": 1.37,
+        "slopPenaltyConfidence": 0.579,
+        "aestheticMatch": 9.3,
+        "aestheticMatchConfidence": 0.746,
+        "typographyCraft": 9.28,
+        "visualRhythm": 8.72,
+        "colorHarmony": 9.19,
+        "motionCohesion": 8.62,
+        "layoutBroken": 0.097,
+        "contrastFailing": 0.152,
+        "genericAiCliche": 0.023,
+        "productionReady": 0.923,
+        "dominantAestheticClass": "warm_tactile_craft",
+        "primaryDefectClass": "none",
+        "embeddingSimilarityInitial": 0.6037,
+        "embeddingSimilarityFinal": 0.6037,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 1623
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "parallel_race",
+          "overallTasteScore": 100,
+          "slopPenalty": 1.37,
+          "aestheticMatch": 9.3,
+          "typographyCraft": 9.28,
+          "layoutBroken": 0.097,
+          "contrastFailing": 0.152,
+          "embeddingSimilarity": 0.6037,
+          "passedAllGates": true,
+          "primaryDefectClass": "none",
+          "candidateCount": 3
+        }
+      ],
+      "honestFailureReasons": []
+    },
+    {
+      "trialId": "stress-dim-tilted-webcam",
+      "scenarioId": "dim-tilted-webcam-magazine",
+      "scenarioTitle": "Dim Tilted Glare-Streaked Webcam Magazine (ISO 3200 Tungsten)",
+      "group": "element119_stress_test",
+      "mode": "stress_test",
+      "speedMode": "deep_atelier",
+      "startedAt": "2026-11-21T18:57:26.134Z",
+      "completedAt": "2026-11-21T19:02:03.003Z",
+      "resetOk": true,
+      "resetLatencyMs": 406,
+      "wallClockMs": 276461,
+      "backendLatencyMs": 275310,
+      "runId": "run-mwqrsjdq-c9e147",
+      "status": "passed",
+      "iterationCount": 1,
+      "modelsInvoked": [
+        "gemini-4-carbon",
+        "gemini-4-neon",
+        "gemini-decision-1",
+        "gemini-embedding-2"
+      ],
+      "vibeTitle": "Monolith Plaster & Alabaster",
+      "conflictResolutionNotes": "The source frame presents three acute visual tensions: (1) a gritty, tilted (-11.5°), ISO-3200 low-light webcam surveillance capture with oblique tungsten glare and a stained dark slate desk colliding with a serene, museum-grade print monograph; (2) a triadic earth palette (Olive Plaster, Burnt Sienna, Alabaster Paper) set against a near-black noisy background that would turn muddy grey if averaged; and (3) Kyoto wabi-sabi materiality versus Milanese rationalist geometry. We resolve these through strict hierarchical separation: Alabaster Paper (#F2EDE2) becomes the orthogonal dominant canvas (rejecting literal -11.5° CSS tilts or unreadable glare streaks), deep mineral charcoal (#1B1D18) secures 14.5:1 reading legibility, Olive Plaster (#474D3F) governs secondary structural ink and architectural plates at >5.9:1 contrast, Burnt Sienna (#9A4629) serves exclusively as a deliberate geometric accent, and the webcam's technical HUD ('CAM_01 · ISO 3200 · 2900K') is sublimated into refined monospace folio metadata along hairline dividers.",
+      "baselineScreenshotUrl": "/artifacts/screenshots/run-mwqrsjdq-c9e147-baseline-desktop.png",
+      "finalScreenshotUrl": "/artifacts/screenshots/run-mwqrsjdq-c9e147-i1-477486ec-1107-4664-82be-3be9a3897e88-desktop.png",
+      "metrics": {
+        "overallTasteScore": 100,
+        "passedAllGates": true,
+        "slopPenalty": 1.8,
+        "slopPenaltyConfidence": 0.481,
+        "aestheticMatch": 8.93,
+        "aestheticMatchConfidence": 0.628,
+        "typographyCraft": 9.05,
+        "visualRhythm": 8.66,
+        "colorHarmony": 9.3,
+        "motionCohesion": 8.45,
+        "layoutBroken": 0.208,
+        "contrastFailing": 0.216,
+        "genericAiCliche": 0.031,
+        "productionReady": 0.852,
+        "dominantAestheticClass": "warm_tactile_craft",
+        "primaryDefectClass": "none",
+        "embeddingSimilarityInitial": 0.5887,
+        "embeddingSimilarityFinal": 0.5887,
+        "embeddingSimilarityDelta": 0,
+        "decisionsLatencyMs": 1990
+      },
+      "domAudit": {
+        "horizontalOverflowPx": 0,
+        "overlappingTextNodes": 0,
+        "brokenImageCount": 0,
+        "consoleErrorCount": 0,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "iterationTrajectory": [
+        {
+          "iteration": 1,
+          "phase": "parallel_race",
+          "overallTasteScore": 100,
+          "slopPenalty": 1.8,
+          "aestheticMatch": 8.93,
+          "typographyCraft": 9.05,
+          "layoutBroken": 0.208,
+          "contrastFailing": 0.216,
+          "embeddingSimilarity": 0.5887,
+          "passedAllGates": true,
+          "primaryDefectClass": "none",
+          "candidateCount": 3
+        }
+      ],
+      "honestFailureReasons": []
+    }
+  ],
+  "honestFailures": [
+    {
+      "trialId": "control-swiss-editorial-print",
+      "group": "control_text_baseline",
+      "scenarioTitle": "Swiss Editorial Print (Archival Cream + Vermilion)",
+      "status": "max_iterations_reached",
+      "reasons": [
+        "Reached max_iterations (1/1) without passing all Decisions API gates",
+        "passedAllGates=false (overallTasteScore=16.4/100)",
+        "AI slop threshold breached: slopPenalty=8.82/10",
+        "Aesthetic fidelity below bar: aestheticMatch=2.25/10",
+        "Contrast legibility failure: contrastFailing prob=0.363"
+      ],
+      "primaryDefectClass": "generic_ai_cliche"
+    },
+    {
+      "trialId": "control-brutalist-tokyo-poster",
+      "group": "control_text_baseline",
+      "scenarioTitle": "Brutalist Tokyo Poster (Concrete Grid + Electric Yellow)",
+      "status": "failed",
+      "reasons": [
+        "Backend reported terminal status=failed",
+        "No DecisionsScorecard recorded in iterations"
+      ]
+    },
+    {
+      "trialId": "control-warm-botanical-atelier",
+      "group": "control_text_baseline",
+      "scenarioTitle": "Warm Botanical Atelier (Linen + Heritage Sage + Terracotta)",
+      "status": "max_iterations_reached",
+      "reasons": [
+        "Reached max_iterations (1/1) without passing all Decisions API gates",
+        "passedAllGates=false (overallTasteScore=11.2/100)",
+        "AI slop threshold breached: slopPenalty=9.35/10",
+        "Aesthetic fidelity below bar: aestheticMatch=0.80/10"
+      ],
+      "primaryDefectClass": "generic_ai_cliche"
+    },
+    {
+      "trialId": "fast-swiss-editorial-print",
+      "group": "treatment_fast_demo",
+      "scenarioTitle": "Swiss Editorial Print (Archival Cream + Vermilion)",
+      "status": "passed",
+      "reasons": [
+        "fast_demo latency SLA exceeded: 36.1s > 25.0s target"
+      ],
+      "primaryDefectClass": "none"
+    },
+    {
+      "trialId": "fast-brutalist-tokyo-poster",
+      "group": "treatment_fast_demo",
+      "scenarioTitle": "Brutalist Tokyo Poster (Concrete Grid + Electric Yellow)",
+      "status": "passed",
+      "reasons": [
+        "fast_demo latency SLA exceeded: 34.5s > 25.0s target"
+      ],
+      "primaryDefectClass": "none"
+    },
+    {
+      "trialId": "fast-warm-botanical-atelier",
+      "group": "treatment_fast_demo",
+      "scenarioTitle": "Warm Botanical Atelier (Linen + Heritage Sage + Terracotta)",
+      "status": "passed",
+      "reasons": [
+        "AI slop threshold breached: slopPenalty=3.04/10",
+        "fast_demo latency SLA exceeded: 34.6s > 25.0s target"
+      ],
+      "primaryDefectClass": "broken_or_missing_imagery"
+    }
+  ]
+}
