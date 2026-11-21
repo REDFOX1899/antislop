@@ -103,15 +103,14 @@ HARD TECHNICAL RULES (NON-NEGOTIABLE):
 1. Return ONLY a single strictly valid JSON object with the exact shape:
    {
      "files": {
-       "index.html": "...full file content...",
-       "src/index.css": "...full file content...",
-       "src/App.tsx": "...full file content..."
+       "<exact existing filepath from the provided source files>": "...full file content..."
      },
      "diffSummary": "Concise 1-2 sentence summary of aesthetic & structural changes",
      "changedSections": ["hero", "palette", "typography", "navigation", "cards", "footer"]
    }
+   CRITICAL STACK MATCHING: Edit ONLY the exact file paths provided in the target repository! If it is a React/Vite repo (index.html, src/index.css, src/App.tsx), rewrite those exact files. If it is a vanilla HTML/CSS/JS repo (index.html, styles.css, app.js, content.js), edit those exact files directly in vanilla HTML/CSS/JS — NEVER invent src/App.tsx or React imports on a vanilla static repo!
 2. NEVER invent npm packages! Only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Stick to standard widely available lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
-3. In \`index.html\`: load the DesignManifest's Google Fonts stylesheet cleanly (preconnect + stylesheet link), set a tasteful <title>, and preserve the existing \`<div id="root"></div>\` and \`<script type="module" src="/src/main.tsx"></script>\` entry script verbatim.
+3. In \`index.html\`: load the DesignManifest's Google Fonts stylesheet cleanly (preconnect + stylesheet link), set a tasteful <title>, and preserve the existing mount container (\`<div id="root"></div>\` or \`<div id="app"></div>\`) and entry \`<script type="module" ...>\` verbatim.
 4. In \`src/index.css\`: if the original CSS contains \`@import "tailwindcss";\`, YOU MUST PRESERVE \`@import "tailwindcss";\` on line 1! Define CSS variables (\`:root { --canvas: ...; --surface: ...; --ink-primary: ...; --ink-secondary: ...; --accent: ...; --accent-contrast: ...; }\`), set \`html, body { overflow-x: hidden; background-color: var(--canvas); color: var(--ink-primary); }\`, and add refined editorial typography & motion utilities.
 5. In \`src/App.tsx\`:
    - MUST export \`export default function App()\` (or \`export default App\`).
@@ -324,7 +323,12 @@ function sanitizeAndValidateFiles(
     }
 
     if (filePath === 'index.html' || filePath.endsWith('/index.html')) {
-      if (!content.includes('root') || !content.includes('<script')) {
+      const originalHtml = originalFiles[filePath] || '';
+      const expectsRootId = originalHtml.includes('id="root"');
+      if (expectsRootId && !content.includes('root')) {
+        continue;
+      }
+      if (!content.includes('<html') && !content.includes('<body') && !content.includes('<div')) {
         continue;
       }
     }

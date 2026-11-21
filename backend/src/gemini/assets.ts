@@ -156,6 +156,99 @@ async function generateSingleAsset(
 }
 
 /**
+ * Generates a single studio-isolated bespoke artwork image for targeted Circle & Speak
+ * visual replacements (e.g., "transform this butterfly into a tiger") using `gemini-nano-banana-2.1`.
+ */
+export async function generateTargetedArtwork(params: {
+  instruction: string;
+  outputDir: string;
+  publicPrefix: string;
+  referenceImages?: MediaAssetInput[];
+}): Promise<{ filePath: string; publicUrl: string; latencyMs: number } | null> {
+  const start = Date.now();
+  return traceSpan(
+    'antislop.assets.generateTargetedArtwork',
+    'llm',
+    { model: ENV.GEMINI_MODEL_IMAGE_GEN, instruction: params.instruction.slice(0, 140) },
+    async () => {
+      const refBlocks: Interactions.ImageContent[] = [];
+      for (const ref of (params.referenceImages || []).slice(0, 3)) {
+        const bin = await resolveAssetBinary(ref);
+        if (!bin || !bin.mimeType.startsWith('image/')) continue;
+        refBlocks.push({ type: 'image', data: bin.base64, mime_type: bin.mimeType });
+      }
+
+      const promptText = [
+        `Generate a single striking, museum-grade studio artwork fulfilling this user visual change request: "${params.instruction}".`,
+        `Composition: Center the single main subject prominently with a dramatic, unmistakable silhouette against a PURE SOLID WHITE (#FFFFFF) background.`,
+        `Style: High-contrast artistic editorial photography/illustration with deep luminous cobalt blue and crisp charcoal ink shading so it looks extraordinary both directly and when sampled by a halftone dot-matrix canvas shader.`,
+        `Strict Rules: ABSOLUTELY ZERO text, letters, numbers, UI chrome, borders, or watermarks.`,
+      ].join('\n');
+
+      const userInputStep: Interactions.Step[] = [
+        {
+          type: 'user_input',
+          content: [...refBlocks, { type: 'text', text: promptText }],
+        },
+      ];
+
+      let interaction;
+      try {
+        interaction = await withTimeout(
+          withV1BetaClient((client) =>
+            client.interactions.create({
+              model: ENV.GEMINI_MODEL_IMAGE_GEN,
+              input: userInputStep,
+              response_modalities: ['image'],
+              generation_config: {
+                image_config: {
+                  aspect_ratio: '3:4',
+                  image_size: '1K',
+                },
+              },
+              store: false,
+            })
+          ),
+          PER_ASSET_TIMEOUT_MS,
+          'nano-banana-targeted'
+        );
+      } catch {
+        try {
+          interaction = await withTimeout(
+            withV1BetaClient((client) =>
+              client.interactions.create({
+                model: ENV.GEMINI_MODEL_IMAGE_GEN,
+                input: userInputStep,
+                response_modalities: ['image'],
+                store: false,
+              })
+            ),
+            PER_ASSET_TIMEOUT_MS,
+            'nano-banana-targeted-fallback'
+          );
+        } catch {
+          return null;
+        }
+      }
+
+      const generated = extractImageFromInteraction(interaction);
+      if (!generated) return null;
+
+      const ext = extensionForMime(generated.mimeType);
+      const fileName = `antislop-art-${Date.now().toString(36)}${ext}`;
+      const fullPath = path.join(params.outputDir, fileName);
+
+      await fs.mkdir(params.outputDir, { recursive: true });
+      await fs.writeFile(fullPath, Buffer.from(generated.data, 'base64'));
+
+      const prefix = params.publicPrefix.replace(/\/+$/, '');
+      const publicUrl = `${prefix}/${fileName}`;
+      return { filePath: fullPath, publicUrl, latencyMs: Date.now() - start };
+    }
+  );
+}
+
+/**
  * Generates bespoke editorial imagery using `gemini-nano-banana-2.1` on `v1beta`,
  * conditioning on up to 6 moodboard reference images. Always degrades gracefully on failure.
  */

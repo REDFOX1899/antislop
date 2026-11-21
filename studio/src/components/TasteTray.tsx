@@ -31,7 +31,7 @@ import { NativeDialog } from './NativeDialog';
 import type { StudioTab } from './TopBar';
 
 const QUICK_SITE_REFS: Array<{ label: string; url: string }> = [
-  { label: 'connorhyatt.com', url: 'https://www.connorhyatt.com' },
+  { label: 'linear.app', url: 'https://linear.app' },
   { label: 'are.na', url: 'https://www.are.na' },
 ];
 
@@ -446,7 +446,7 @@ export function TasteTray({
                   setSiteUrlInput(e.target.value);
                   if (captureError) setCaptureError(null);
                 }}
-                placeholder="connorhyatt.com"
+                placeholder="Paste site URL (linear.app)"
                 disabled={Boolean(capturingUrl)}
                 aria-label="Live reference website URL"
                 className="min-w-0 flex-1 bg-transparent text-[12px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:outline-none disabled:opacity-60"

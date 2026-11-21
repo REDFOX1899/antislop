@@ -42,6 +42,9 @@ const STATIC_MIME_TYPES: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.pdf': 'application/pdf',
 };
 
 export interface PreviewProxyBundle {
@@ -332,7 +335,8 @@ export class ViteManager {
     const resolvedRoot = path.resolve(workspacePath);
     const server = http.createServer(async (req, res) => {
       try {
-        const reqPath = decodeURIComponent((req.url || '/').split('?')[0]);
+        const rawPath = decodeURIComponent((req.url || '/').split('?')[0]);
+        const reqPath = rawPath.replace(/^\/preview(?=\/|$)/, '') || '/';
         let rel = reqPath === '/' ? 'index.html' : reqPath.replace(/^\/+/, '');
         let target = path.resolve(resolvedRoot, rel);
 

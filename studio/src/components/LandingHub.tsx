@@ -81,8 +81,8 @@ const FEATURED_WORKSPACES: FeaturedWorkspaceSpec[] = [
     owner: 'antislop',
     subtitle: 'Dev Portfolio · Butterfly Case Study',
     description:
-      'Minimal developer portfolio calibrated for live connorhyatt.com editorial taste transfer.',
-    badge: 'connorhyatt.com',
+      'Minimal developer portfolio template ready for live editorial typography and motion taste transfer.',
+    badge: 'Portfolio',
     badgeTone: 'cobalt',
     fallbackWorkspaceId: 'dev-portfolio',
     matchTokens: ['portfolio'],
@@ -374,7 +374,7 @@ export function LandingHub({
                   value={commandInput}
                   onChange={(e) => setCommandInput(e.target.value)}
                   disabled={isSubmittingCommand}
-                  placeholder="Paste a GitHub repo or live reference site (e.g. connorhyatt.com)"
+                  placeholder="Paste a GitHub repo or live reference site (e.g. linear.app)"
                   aria-label="Paste a GitHub repo or live reference site"
                   className="h-full min-w-0 flex-1 bg-transparent text-[14.5px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:outline-none disabled:opacity-60"
                 />
@@ -408,8 +408,8 @@ export function LandingHub({
                 type="button"
                 disabled={isSubmittingCommand}
                 onClick={() => {
-                  setCommandInput('connorhyatt.com');
-                  void onSubmitCommand('connorhyatt.com');
+                  setCommandInput('linear.app');
+                  void onSubmitCommand('linear.app');
                 }}
                 className={`rounded-full px-2.5 py-0.5 font-mono text-[11.5px] transition-colors disabled:opacity-50 ${
                   isDark
@@ -417,7 +417,7 @@ export function LandingHub({
                     : 'text-[#1A73E8]/85 hover:bg-[#1A73E8]/10 hover:text-[#0B57D0]'
                 }`}
               >
-                connorhyatt.com
+                linear.app
               </button>
               <span aria-hidden="true" className="opacity-45">
                 ·

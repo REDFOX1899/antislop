@@ -117,10 +117,11 @@ async function bootstrap(): Promise<void> {
     res.status(204).end();
   });
 
-  // Fallback static serving from active workspace's public/ dir for root-relative assets in cloned GitHub repos
+  // Fallback static serving from active workspace's public/ AND root dir (for root-relative /styles.css, /app.js, /assets/* in static/vanilla/cloned GitHub repos)
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (
       req.method !== 'GET' ||
+      req.path === '/' ||
       req.path.startsWith('/api') ||
       req.path.startsWith('/artifacts') ||
       req.path.startsWith('/preview')
@@ -134,12 +135,36 @@ async function bootstrap(): Promise<void> {
       next();
       return;
     }
-    const publicDir = path.join(active.localPath, 'public');
-    if (!fs.existsSync(publicDir)) {
+
+    // Security guard: never expose dotfiles, .git, node_modules, or server/package scripts
+    const cleanRel = decodeURIComponent(req.path).replace(/^\/+/, '');
+    if (
+      !cleanRel ||
+      cleanRel.includes('..') ||
+      /(^|\/)\./.test(cleanRel) ||
+      cleanRel.startsWith('node_modules/') ||
+      /^(package(-lock)?\.json|server\.m?js|build\.m?js|vercel\.json)$/i.test(cleanRel)
+    ) {
       next();
       return;
     }
-    express.static(publicDir)(req, res, next);
+
+    const publicDir = path.join(active.localPath, 'public');
+    const tryRootStatic = () => {
+      const candidate = path.resolve(active.localPath, cleanRel);
+      if (candidate.startsWith(path.resolve(active.localPath)) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        res.setHeader('Cache-Control', 'no-cache');
+        res.sendFile(candidate);
+        return;
+      }
+      next();
+    };
+
+    if (fs.existsSync(publicDir)) {
+      express.static(publicDir, { fallthrough: true })(req, res, tryRootStatic);
+      return;
+    }
+    tryRootStatic();
   });
 
   // Express structured JSON error handler

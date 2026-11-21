@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -13,6 +14,7 @@ import type {
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
 import type { GeneratedCandidateCode } from '../gemini/contracts.js';
+import { generateTargetedArtwork } from '../gemini/assets.js';
 import { geminiEngine } from '../gemini/index.js';
 import { eventBus } from '../sandbox/eventBus.js';
 import { puppeteerAuditor, type PuppeteerAuditCapture } from '../sandbox/puppeteerAuditor.js';
@@ -534,12 +536,65 @@ export class TransformOrchestrator {
     const currentFiles = await snapshotManager.readEditableFiles(wsPath);
     const prePatchSnap = await snapshotManager.saveTempSnapshot(wsPath, 'pre-circle-tweak');
 
+    // Auto-detect visual subject/artwork replacement (e.g. "transform this butterfly into a tiger")
+    const needsTargetedArtwork =
+      Boolean(req.generateBespokeAssets) ||
+      /(butterfly|tiger|tigger|lion|wolf|fox|bird|eagle|dragon|phoenix|cat|dog|flower|rose|tree|mountain|ocean|artwork|illustration|mascot|animal|portrait|hero\s+image|replace\s+.+\s+with|transform\s+.+\s+(to|into)|turn\s+.+\s+into|change\s+.+\s+(to|into)|swap\s+.+\s+(for|with))/i.test(
+        instruction
+      );
+
+    let enrichedInstruction = instruction;
+    const generatedUrls: string[] = [];
+
+    if (needsTargetedArtwork) {
+      const hasRootAssetsDir = fs.existsSync(path.join(wsPath, 'assets'));
+      const outputDir = hasRootAssetsDir
+        ? path.join(wsPath, 'assets')
+        : path.join(wsPath, 'public', 'generated');
+      const publicPrefix = hasRootAssetsDir ? '/assets' : '/generated';
+
+      eventBus.emit(
+        run.runId,
+        'director_thinking',
+        `Generating bespoke artwork via ${ENV.GEMINI_MODEL_IMAGE_GEN} for "${instruction.slice(0, 80)}"...`,
+        { iteration: 1, model: ENV.GEMINI_MODEL_IMAGE_GEN }
+      );
+
+      const art = await generateTargetedArtwork({
+        instruction,
+        outputDir,
+        publicPrefix,
+        referenceImages,
+      });
+
+      if (art) {
+        modelsInvoked.add(ENV.GEMINI_MODEL_IMAGE_GEN);
+        generatedUrls.push(art.publicUrl);
+        eventBus.emit(run.runId, 'asset_generated', `Generated bespoke artwork at ${art.publicUrl} (${art.latencyMs}ms)`, {
+          iteration: 1,
+          model: ENV.GEMINI_MODEL_IMAGE_GEN,
+          payload: { publicUrl: art.publicUrl, latencyMs: art.latencyMs },
+        });
+
+        enrichedInstruction = [
+          instruction,
+          '',
+          `BESPOKE GENERATED ARTWORK SAVED ON DISK AT: ${art.publicUrl}`,
+          `CRITICAL INTEGRATION INSTRUCTIONS:`,
+          `- Use this exact generated image URL ("${art.publicUrl}") to replace the circled/target artwork.`,
+          `- If the codebase renders artwork via a <canvas> halftone/dot shader fed by a <video> (such as startArtwork in app.js), PRESERVE the exact canvas halftone shader visual style, load \`const artImg = new Image(); artImg.crossOrigin = 'anonymous'; artImg.src = '${art.publicUrl}';\` for that page, and render \`artImg\` continuously inside the \`draw()\` / \`requestAnimationFrame\` loop with subtle organic breathing/prowling scale & gentle drift motion (using \`artImg.complete && artImg.naturalWidth > 0\` instead of \`video.readyState\`)!`,
+          `- Otherwise render \`<img src="${art.publicUrl}" alt="..." />\` cleanly with smooth CSS entrance & hover motion.`,
+        ].join('\n');
+      }
+    }
+
     eventBus.emit(run.runId, 'candidate_started', 'Applying surgical Circle-to-Tweak patch...', {
       iteration: 1,
       model: ENV.GEMINI_MODEL_PATCHER,
       payload: {
         drawnCirclesCount: req.drawnCircles?.length ?? 0,
         annotatedScreenshotUrl: run.annotatedScreenshotUrl,
+        generatedAssetUrls: generatedUrls,
       },
     });
 
@@ -550,7 +605,7 @@ export class TransformOrchestrator {
       drawnCircles: req.drawnCircles,
       referenceAssets: req.assets,
       targetRegion: req.targetRegion,
-      instruction,
+      instruction: enrichedInstruction,
       speedMode: run.speedMode,
     });
     modelsInvoked.add(patch.modelUsed);
