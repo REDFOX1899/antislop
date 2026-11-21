@@ -1,0 +1,69 @@
+# =============================================================================
+# AntiSlop Engine — Google Cloud Build -> Cloud Run Production Pipeline
+# =============================================================================
+# Usage (from repository root):
+#   gcloud builds submit --project=gitunderstand --config=deploy/cloudbuild.yaml .
+#
+# For one-command deployment with env/.env secrets synced safely, use:
+#   ./deploy/deploy-cloudrun.sh
+# =============================================================================
+
+substitutions:
+  _SERVICE_NAME: antislop-engine
+  _REGION: us-central1
+  _IMAGE_TAG: latest
+  _CORS_ORIGIN: "https://antislop.live,https://www.antislop.live,http://localhost:3000"
+
+steps:
+  # 1. Build production multi-stage container (Node 22 + Chromium + Git + Vite workspaces)
+  - name: "gcr.io/cloud-builders/docker"
+    id: "build-antislop-engine"
+    args:
+      - "build"
+      - "-f"
+      - "deploy/Dockerfile"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:build-$BUILD_ID"
+      - "."
+
+  # 2. Push container images to Google Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    id: "push-antislop-engine"
+    args:
+      - "push"
+      - "--all-tags"
+      - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}"
+
+  # 3. Deploy to Cloud Run with session affinity (required for stateful Vite HMR + SSE + Puppeteer)
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "deploy-cloud-run"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image=gcr.io/$PROJECT_ID/${_SERVICE_NAME}:build-$BUILD_ID"
+      - "--region=${_REGION}"
+      - "--platform=managed"
+      - "--memory=8Gi"
+      - "--cpu=4"
+      - "--cpu-boost"
+      - "--session-affinity"
+      - "--timeout=900"
+      - "--concurrency=20"
+      - "--max-instances=3"
+      - "--port=8080"
+      - "--allow-unauthenticated"
+      - "--update-env-vars=NODE_ENV=production,GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=${_REGION},TARGET_VITE_PORT=5173,PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium,CORS_ORIGIN=${_CORS_ORIGIN}"
+
+images:
+  - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${_IMAGE_TAG}"
+  - "gcr.io/$PROJECT_ID/${_SERVICE_NAME}:build-$BUILD_ID"
+
+options:
+  machineType: "E2_HIGHCPU_8"
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: "1800s"

@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-sans), "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: var(--font-serif), "Instrument Serif", Georgia, serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+
+  --color-stone-canvas: #F5F3EE;
+  --color-stone-recessed: #ECE8DF;
+  --color-paper: #FFFFFF;
+  --color-ink: #141413;
+  --color-graphite: #64625D;
+  --color-hairline: #E5E1D8;
+  --color-vermilion: #E03E2D;
+  --color-emerald-gate: #15803D;
+  --color-amber-critique: #B45309;
+}
+
+:root {
+  color-scheme: light;
+  --studio-canvas: #F5F3EE;
+  --studio-paper: #FFFFFF;
+  --studio-ink: #141413;
+  --studio-graphite: #64625D;
+  --studio-hairline: #E5E1D8;
+  --studio-vermilion: #E03E2D;
+  --studio-emerald: #15803D;
+  --studio-amber: #B45309;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--studio-canvas);
+  color: var(--studio-ink);
+}
+
+/* Tactile subtle drafting grid used behind the live preview stage */
+.atelier-stage-grid {
+  background-color: #EFECE5;
+  background-image:
+    radial-gradient(#D5CFC3 0.9px, transparent 0.9px);
+  background-size: 18px 18px;
+}
+
+/* Native <dialog> top-layer modal best practices (modern-web-guidance: dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #E5E1D8;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  color: #141413;
+  box-shadow: 0 24px 60px -20px rgba(20, 20, 19, 0.22), 0 4px 16px -4px rgba(20, 20, 19, 0.08);
+  max-width: min(94vw, 720px);
+  max-height: 88vh;
+  overflow: hidden;
+}
+
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog::backdrop {
+  background: rgba(20, 20, 19, 0.42);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Standard scrollbars with 3:1+ contrast & legacy WebKit fallback (modern-web-guidance) */
+.studio-scroll {
+  --scrollbar-thumb: #8E8A82;
+  --scrollbar-track: #F5F3EE;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+@supports not (scrollbar-color: auto) {
+  .studio-scroll {
+    scrollbar-width: auto;
+  }
+
+  .studio-scroll::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+
+  .studio-scroll::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+
+  .studio-scroll::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+}
+
+/* Accessible native range input for the Before/After comparison curtain */
+.wipe-range-input {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.wipe-range-input:focus-visible {
+  outline: 2px solid #E03E2D;
+  outline-offset: 2px;
+}
+
+.wipe-range-input::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+
+.wipe-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.wipe-range-input::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+
+.wipe-range-input::-moz-range-thumb {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+.animate-studio-pulse {
+  animation: pulse-dot 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

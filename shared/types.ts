@@ -4,7 +4,26 @@
  * Locked before parallel agent fan-out so all subsystems integrate cleanly.
  */
 
-export type InputModality = 'moodboard_image' | 'motion_video' | 'webcam_frame' | 'voice_audio' | 'region_annotation';
+export type InputModality =
+  | 'moodboard_image'
+  | 'motion_video'
+  | 'webcam_frame'
+  | 'voice_audio'
+  | 'region_annotation';
+
+export type ExecutionSpeedMode = 'fast_demo' | 'deep_atelier';
+
+export interface DrawnCircleAnnotation {
+  id: string;
+  /** Normalized bounding box [0..1] relative to the viewport */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Optional freehand stroke polyline in normalized [0..1] coords */
+  points?: Array<{ x: number; y: number }>;
+  note?: string;
+}
 
 export interface MediaAssetInput {
   id: string;
@@ -15,7 +34,6 @@ export interface MediaAssetInput {
   fileUrl?: string;
   filename?: string;
   label?: string;
-  /** Optional normalized region box [0..1] when user circles a region on the live canvas */
   regionBox?: {
     x: number;
     y: number;
@@ -142,7 +160,7 @@ export interface CandidateResult {
 
 export interface CriticIteration {
   iteration: number;
-  phase: 'baseline_capture' | 'parallel_race' | 'refinement' | 'circle_tweak';
+  phase: 'baseline_capture' | 'fast_pass' | 'parallel_race' | 'refinement' | 'circle_tweak';
   candidates: CandidateResult[];
   winnerCandidateId: string;
   scorecard: DecisionsScorecard;
@@ -154,16 +172,25 @@ export interface CriticIteration {
 
 export interface TransformRunRequest {
   mode: 'antislop' | 'text_baseline' | 'stress_test' | 'circle_tweak';
+  /** fast_demo (<25s live judging) vs deep_atelier (4x parallel Tier 3 + Carbon High Thinking) */
+  speedMode?: ExecutionSpeedMode;
   assets: MediaAssetInput[];
+  /** Optional recorded voice audio (base64) for zero-typing voice-only mode */
+  voiceAudioBase64?: string;
+  voiceAudioMimeType?: string;
   voiceTranscript?: string;
   textPrompt?: string;
-  /** Number of parallel candidate variants (1..4) using Tier 3 quota */
+  /** Number of parallel candidate variants (1..4) */
   parallelCandidates?: number;
   /** Max autonomous refinement loops driven by Decisions API */
   maxIterations?: number;
   /** Whether to generate bespoke hero/texture imagery via gemini-nano-banana-2.1 */
   generateBespokeAssets?: boolean;
-  /** Optional region annotation for surgical circle-to-tweak */
+  /** Freehand circles drawn directly on top of the live UI canvas */
+  drawnCircles?: DrawnCircleAnnotation[];
+  /** Transparent PNG base64 of the user's freehand circles overlay (composited onto screenshot) */
+  circleOverlayPngBase64?: string;
+  /** Optional single region annotation for surgical circle-to-tweak */
   targetRegion?: {
     x: number;
     y: number;
@@ -176,15 +203,50 @@ export interface TransformRunRequest {
 export interface TransformRunResult {
   runId: string;
   mode: TransformRunRequest['mode'];
+  speedMode: ExecutionSpeedMode;
   status: 'running' | 'passed' | 'max_iterations_reached' | 'failed';
   startedAt: string;
   completedAt?: string;
+  voiceTranscript?: string;
   baselineScreenshotUrl: string;
   finalScreenshotUrl?: string;
+  annotatedScreenshotUrl?: string;
   manifest?: DesignManifest;
   iterations: CriticIteration[];
   modelsInvoked: string[];
   totalLatencyMs: number;
+}
+
+export interface WorkspaceRepoInfo {
+  id: string;
+  name: string;
+  source: 'builtin' | 'github';
+  repoUrl?: string;
+  branch?: string;
+  localPath: string;
+  framework: 'vite' | 'next' | 'static';
+  previewUrl: string;
+  active: boolean;
+  editableFiles: string[];
+}
+
+export interface GitHubRepoSummary {
+  fullName: string;
+  name: string;
+  htmlUrl: string;
+  description: string | null;
+  defaultBranch: string;
+  private: boolean;
+  language: string | null;
+  updatedAt: string;
+}
+
+export interface GitHubPrResponse {
+  branchName: string;
+  commitSha: string;
+  prUrl: string;
+  prNumber: number;
+  filesChanged: string[];
 }
 
 export interface ManagedAgentShipRequest {

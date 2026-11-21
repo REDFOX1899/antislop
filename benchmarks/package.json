@@ -1,0 +1,20 @@
+{
+  "name": "antislop-benchmarks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "5-Sigma Reliability Evaluation & Element 119 Multimodal Stress-Test Harness for AntiSlop",
+  "scripts": {
+    "fixtures": "node fixtures/generate-fixtures.mjs",
+    "run": "tsx run-5sigma.ts",
+    "run:fast": "tsx run-5sigma.ts --fast-only",
+    "run:stress": "tsx run-5sigma.ts --stress-only",
+    "dry-run": "tsx run-5sigma.ts --dry-run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

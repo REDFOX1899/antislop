@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-11-21T18:12:13.657Z",
+  "renderer": "puppeteer-chromium",
+  "count": 9,
+  "fixtures": [
+    {
+      "id": "swiss-editorial-print",
+      "file": "swiss-editorial-print.png",
+      "modality": "moodboard_image",
+      "scenario": "5-Sigma Core Editorial",
+      "description": "Warm archival cream paper, bold Didot serif + Helvetica grotesk grid, razor vermilion rules.",
+      "bytes": 1037653,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "brutalist-tokyo-poster",
+      "file": "brutalist-tokyo-poster.png",
+      "modality": "moodboard_image",
+      "scenario": "5-Sigma Core Brutalist",
+      "description": "High-contrast monochrome raw concrete grid, stark industrial typography, electric yellow stamp.",
+      "bytes": 893662,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "dim-tilted-webcam-magazine",
+      "file": "dim-tilted-webcam-magazine.png",
+      "modality": "webcam_frame",
+      "scenario": "Element 119 Messy Webcam Stress",
+      "description": "Low-light, -11.5° tilted, tungsten-cast, glare-streaked physical magazine cover with CMOS sensor noise & thumb.",
+      "bytes": 2415387,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "chaos-01-swiss-minimal",
+      "file": "conflicting-chaos-set/01-swiss-minimal.png",
+      "modality": "moodboard_image",
+      "scenario": "Element 119 Conflicting Chaos Set (1/4)",
+      "description": "Ultra-sparse white Swiss minimal poster with 70% negative space and red dot.",
+      "bytes": 35105,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "chaos-02-neon-cyberpunk",
+      "file": "conflicting-chaos-set/02-neon-cyberpunk.png",
+      "modality": "moodboard_image",
+      "scenario": "Element 119 Conflicting Chaos Set (2/4)",
+      "description": "Pitch-black neon synthwave cyberpunk void with magenta/cyan/acid-lime saturation clash.",
+      "bytes": 415688,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "chaos-03-earthy-ceramic-craft",
+      "file": "conflicting-chaos-set/03-earthy-ceramic-craft.png",
+      "modality": "moodboard_image",
+      "scenario": "Element 119 Conflicting Chaos Set (3/4)",
+      "description": "Warm raw stoneware clay, terracotta vessel, unbleached linen craft.",
+      "bytes": 991581,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "chaos-04-corporate-blueprint",
+      "file": "conflicting-chaos-set/04-corporate-blueprint.png",
+      "modality": "moodboard_image",
+      "scenario": "Element 119 Conflicting Chaos Set (4/4)",
+      "description": "Prussian CAD engineering blueprint with millimeter grid and technical schematics.",
+      "bytes": 82970,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "high-contrast-photo-trap",
+      "file": "high-contrast-photo-trap.png",
+      "modality": "moodboard_image",
+      "scenario": "Element 119 Contrast Legibility Trap",
+      "description": "Obsidian dramatic photography slashed by bright daylight shafts + white-gold editorial layout testing contrast traps.",
+      "bytes": 754407,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "warm-botanical-atelier",
+      "file": "warm-botanical-atelier.png",
+      "modality": "moodboard_image",
+      "scenario": "5-Sigma Core Botanical Craft",
+      "description": "Organic heritage sage, sun-baked terracotta, woven unbleached linen grain, delicate serif display.",
+      "bytes": 1026588,
+      "dimensions": {
+        "width": 1200,
+        "height": 900
+      }
+    }
+  ]
+}

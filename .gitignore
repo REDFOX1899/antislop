@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 target-repo/node_modules/
+target-templates/*/node_modules/
 studio/node_modules/
 backend/node_modules/
 benchmarks/node_modules/
@@ -23,6 +24,7 @@ dist/
 build/
 coverage/
 target-repo/dist/
+target-templates/*/dist/
 studio/.next/
 studio/out/
 backend/dist/
@@ -35,5 +37,9 @@ tmp/
 backend/uploads/
 backend/screenshots/
 backend/.snapshots/
-target-repo/public/generated/
+backend/.workspaces/
+target-repo/public/generated/*
+!target-repo/public/generated/.gitkeep
+target-templates/*/public/generated/*
+!target-templates/*/public/generated/.gitkeep
 benchmarks/results/raw/
