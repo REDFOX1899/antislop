@@ -25,7 +25,7 @@
 - Created locked shared TypeScript contract in [shared/types.ts](../shared/types.ts) and isolated multi-agent ownership boundaries in [PARALLEL_BUILD_PLAN.md](PARALLEL_BUILD_PLAN.md) to enable conflict-free parallel execution.
 - Configured master secret template (`env/.env.example`) with strict `.gitignore` guards.
 
-### 12:50 PM ET · Phase 0.75 — Live 10-Point Gemini 4 & Environment Smoke Test (`9/10 PASS`)
+### 12:50 PM ET · Phase 0.75 — Live 10-Point Gemini 4 & Environment Smoke Test (`10/10 PASS`)
 - Bootstrapped `/backend` with official `@google/genai@^3.6.1`, `express`, `puppeteer`, `http-proxy`, `langsmith`, and `tsx`.
 - Executed live verification script (`scripts/smoke-test.mjs`) against all Gemini 4 models & external integrations:
   - **Dual Tier-3 Keys (`...1LuQ` & `...b2_8`)**: Both PASS on `gemini-4-hydrogen` (`1.98s` / `2.78s`).
@@ -36,7 +36,7 @@
   - **`gemini-nano-banana-2.1` (`v1beta`)**: PASS (`21.4s`, generated `1.04MB` base64 JPEG). *Discovery logged: `response_modalities` requires `apiVersion: "v1beta"`.*
   - **Managed Agents (`v1beta` `agents.list`)**: PASS (`73ms`, accessible).
   - **GitHub Token**: PASS (`421ms`, authenticated as `REDFOX1899`).
-  - **LangSmith Service Key (Optional)**: `403` on `/runs` (Service Keys require `LANGSMITH_WORKSPACE_ID` header or a `lsv2_pt_` personal key; `LANGSMITH_TRACING` remains `false`, non-blocking).
+  - **LangSmith Service Key (`LANGSMITH_TRACING=true`)**: PASS (`HTTP 202 Run created` after configuring `LANGSMITH_WORKSPACE_ID` via `X-Tenant-Id`).
 
 ---
 

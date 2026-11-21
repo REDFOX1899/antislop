@@ -177,19 +177,22 @@ await runCheck('GitHub Token (REST /user)', async () => {
   return `authenticated_as=${data.login}`;
 });
 
-// 10. Test LangSmith Service Key (POST /api/v1/runs ingest check or /api/v1/workspaces)
+// 10. Test LangSmith Service Key (POST /api/v1/runs ingest check with X-Tenant-Id workspace header)
 await runCheck('LangSmith Service Key (auth & ingest check)', async () => {
   const key = process.env.LANGSMITH_API_KEY?.trim();
+  const workspaceId = process.env.LANGSMITH_WORKSPACE_ID?.trim();
   if (!key) throw new Error('LANGSMITH_API_KEY missing');
-  // Service keys (lsv2_sk_...) authenticate on /api/v1/info & /runs/batch; test /api/v1/info first
-  const resp = await fetch('https://api.smith.langchain.com/api/v1/info', {
-    headers: { 'x-api-key': key },
-  });
+  const headers = {
+    'x-api-key': key,
+    'Content-Type': 'application/json',
+    ...(workspaceId ? { 'X-Tenant-Id': workspaceId } : {}),
+  };
+  const resp = await fetch('https://api.smith.langchain.com/api/v1/info', { headers });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const runId = crypto.randomUUID();
   const ingest = await fetch('https://api.smith.langchain.com/api/v1/runs', {
     method: 'POST',
-    headers: { 'x-api-key': key, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       id: runId,
       name: 'antislop-smoke-test',
@@ -205,7 +208,7 @@ await runCheck('LangSmith Service Key (auth & ingest check)', async () => {
     const txt = await ingest.text();
     throw new Error(`Ingest HTTP ${ingest.status}: ${txt.slice(0, 120)}`);
   }
-  return `ingest_ok=true, project=${process.env.LANGSMITH_PROJECT || 'default'} (tracing=${process.env.LANGSMITH_TRACING})`;
+  return `ingest_ok=true, workspace=${workspaceId?.slice(0, 8)}..., project=${process.env.LANGSMITH_PROJECT || 'default'} (tracing=${process.env.LANGSMITH_TRACING})`;
 });
 
 console.log('\n' + '='.repeat(60));
