@@ -280,6 +280,7 @@ gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --image="${DEPLOY_IMAGE}" \
   --memory=8Gi \
   --cpu=4 \
+  --no-cpu-throttling \
   --cpu-boost \
   --session-affinity \
   --timeout=900 \

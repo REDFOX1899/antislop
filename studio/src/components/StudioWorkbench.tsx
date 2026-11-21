@@ -16,6 +16,8 @@ import type {
 import { AlertCircle, CheckCircle2, ExternalLink, X } from 'lucide-react';
 import {
   DEFAULT_PREVIEW_URL,
+  captureReferenceUrl,
+  connectGitHubRepo,
   getHealth,
   getRunResult,
   getWorkspaces,
@@ -29,10 +31,14 @@ import {
 import {
   QUICK_TASTE_STARTERS,
   buildQuickStarterVisualAsset,
+  createAssetId,
+  extractDomainFromUrl,
   stripToMediaAssetInput,
   type LocalMediaAsset,
 } from '@/lib/media';
+import { useTheme } from '@/lib/useTheme';
 import { CriticRail, type QueuedEditSummary } from './CriticRail';
+import { LandingHub } from './LandingHub';
 import {
   LiveCanvas,
   type CanvasChangeSummary,
@@ -42,7 +48,7 @@ import { ManagedAgentPanel } from './ManagedAgentPanel';
 import { RepoModal } from './RepoModal';
 import { SigmaArena } from './SigmaArena';
 import { TasteTray } from './TasteTray';
-import { TopBar, type StudioTab } from './TopBar';
+import { TopBar, formatWorkspaceDisplay, type StudioTab } from './TopBar';
 
 interface StudioToast {
   id: string;
@@ -68,13 +74,13 @@ interface QueuedEditJob {
   generateBespokeAssets: boolean;
 }
 
-const DEFAULT_LEFT_WIDTH = 228;
-const DEFAULT_RIGHT_WIDTH = 272;
-const COLLAPSED_RAIL_WIDTH = 42;
+const DEFAULT_LEFT_WIDTH = 224;
+const DEFAULT_RIGHT_WIDTH = 304;
+const COLLAPSED_LEFT_WIDTH = 44;
 const MIN_LEFT_WIDTH = 196;
-const MAX_LEFT_WIDTH = 340;
-const MIN_RIGHT_WIDTH = 236;
-const MAX_RIGHT_WIDTH = 400;
+const MAX_LEFT_WIDTH = 320;
+const MIN_RIGHT_WIDTH = 264;
+const MAX_RIGHT_WIDTH = 420;
 
 function isFullRunResult(obj: unknown): obj is TransformRunResult {
   return (
@@ -85,12 +91,33 @@ function isFullRunResult(obj: unknown): obj is TransformRunResult {
   );
 }
 
+function isLikelyGitHubRepoInput(raw: string): boolean {
+  const s = raw.trim();
+  if (/^https?:\/\/(www\.)?github\.com\/[^/\s]+\/[^/\s]+/i.test(s)) return true;
+  if (/^(www\.)?github\.com\/[^/\s]+\/[^/\s]+/i.test(s)) return true;
+  // Shorthand owner/repo without a TLD dot in the first segment
+  if (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(s) && !s.split('/')[0].includes('.')) {
+    return true;
+  }
+  return false;
+}
+
 export function StudioWorkbench() {
+  const { theme, toggleTheme } = useTheme();
+
+  // 2-Page Code Wiki Flow: Landing Hub (default) <-> Studio Workspace (also supports /?view=studio or /?workspace=1)
+  const [viewMode, setViewMode] = useState<'landing' | 'studio'>('landing');
   const [activeTab, setActiveTab] = useState<StudioTab>('canvas');
   const [speedMode, setSpeedMode] = useState<ExecutionSpeedMode>('fast_demo');
   const [generateBespokeAssets, setGenerateBespokeAssets] = useState(false);
 
-  // Minimal 2 : 9 : 2 proportions — resizable hairline handles + collapsible rails
+  // Landing command bar busy state
+  const [landingCommandBusy, setLandingCommandBusy] = useState(false);
+  const [landingCommandStatus, setLandingCommandStatus] = useState<string | null>(
+    null
+  );
+
+  // 2 : 9 : 2 spatial proportions — resizable & collapsible rails
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftRailWidth, setLeftRailWidth] = useState(DEFAULT_LEFT_WIDTH);
@@ -171,6 +198,71 @@ export function StudioWorkbench() {
   const runStartScorecardRef = useRef<DecisionsScorecard | undefined>(undefined);
   const latestScorecardRef = useRef<DecisionsScorecard | undefined>(undefined);
 
+  // Hydrate initial view & tab from URL query params (/?view=studio, /?workspace=1, /?tab=arena)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view');
+    const workspaceParam = params.get('workspace');
+    const tabParam = params.get('tab');
+
+    if (
+      viewParam === 'studio' ||
+      workspaceParam === '1' ||
+      workspaceParam === 'true' ||
+      tabParam === 'arena' ||
+      tabParam === 'managed_agent'
+    ) {
+      setViewMode('studio');
+    }
+    if (tabParam === 'arena') {
+      setActiveTab('arena');
+    } else if (tabParam === 'managed_agent') {
+      setActiveTab('managed_agent');
+    }
+  }, []);
+
+  const syncUrlQuery = useCallback((nextView: 'landing' | 'studio', nextTab?: StudioTab) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (nextView === 'studio') {
+      url.searchParams.set('view', 'studio');
+      url.searchParams.delete('workspace');
+      if (nextTab && nextTab !== 'canvas') {
+        url.searchParams.set('tab', nextTab);
+      } else {
+        url.searchParams.delete('tab');
+      }
+    } else {
+      url.searchParams.delete('view');
+      url.searchParams.delete('workspace');
+      url.searchParams.delete('tab');
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  }, []);
+
+  const enterStudio = useCallback(
+    (tab: StudioTab = 'canvas') => {
+      setActiveTab(tab);
+      setViewMode('studio');
+      syncUrlQuery('studio', tab);
+    },
+    [syncUrlQuery]
+  );
+
+  const goToLanding = useCallback(() => {
+    setViewMode('landing');
+    syncUrlQuery('landing');
+  }, [syncUrlQuery]);
+
+  const handleTabChange = useCallback(
+    (tab: StudioTab) => {
+      setActiveTab(tab);
+      syncUrlQuery('studio', tab);
+    },
+    [syncUrlQuery]
+  );
+
   useEffect(() => {
     isRunningRef.current = isRunning;
   }, [isRunning]);
@@ -197,7 +289,6 @@ export function StudioWorkbench() {
     []
   );
 
-  // Auto-dismiss non-PR toasts cleanly after 6s
   useEffect(() => {
     if (!toast || toast.linkUrl) return;
     const t = setTimeout(() => setToast(null), 6000);
@@ -250,13 +341,12 @@ export function StudioWorkbench() {
     };
   }, [refreshWorkspaces]);
 
-  // Sync speed mode defaults cleanly
   const handleSpeedModeChange = (nextMode: ExecutionSpeedMode) => {
     setSpeedMode(nextMode);
     setGenerateBespokeAssets(nextMode === 'deep_atelier');
   };
 
-  // Pointer-capture column resize handlers for 2 : 9 : 2 rails
+  // Pointer-capture column resize handlers
   const startResize = (
     side: 'left' | 'right',
     e: React.PointerEvent<HTMLDivElement>
@@ -329,6 +419,103 @@ export function StudioWorkbench() {
       );
     } finally {
       setSwitchingWorkspace(false);
+    }
+  };
+
+  // Landing Hub starter card instant launch
+  const handleSelectStarterFromLanding = async (workspaceId: string) => {
+    enterStudio('canvas');
+    if (workspaceId && workspaceId !== activeWorkspaceId) {
+      await handleSwitchWorkspace(workspaceId);
+    }
+  };
+
+  // Landing Hub sculptural command bar smart router (GitHub repo OR live site URL capture)
+  const handleLandingCommandSubmit = async (rawInput: string) => {
+    const trimmed = rawInput.trim();
+    if (!trimmed) {
+      enterStudio('canvas');
+      return;
+    }
+
+    setLandingCommandBusy(true);
+    try {
+      if (isLikelyGitHubRepoInput(trimmed)) {
+        const normalizedRepoUrl = /^https?:\/\//i.test(trimmed)
+          ? trimmed
+          : /^github\.com\//i.test(trimmed)
+          ? `https://${trimmed}`
+          : `https://github.com/${trimmed}`;
+        setLandingCommandStatus('Booting repo…');
+        const res = await connectGitHubRepo(normalizedRepoUrl);
+        if (res.workspace?.id) setActiveWorkspaceId(res.workspace.id);
+        const resolvedNext = resolveBackendUrl(
+          res.previewUrl || res.workspace?.previewUrl
+        );
+        if (resolvedNext) setPreviewUrl(resolvedNext);
+        setDrawnCircles([]);
+        setLastAppliedCircles([]);
+        setLastRunSummary(null);
+        setReloadNonce((n) => n + 1);
+        setHmrPulseAt(Date.now());
+        void refreshWorkspaces();
+        enterStudio('canvas');
+        pushToast(
+          'success',
+          `Connected & booted ${res.workspace?.name || normalizedRepoUrl} live in Studio.`
+        );
+      } else {
+        const normalizedUrl = /^https?:\/\//i.test(trimmed)
+          ? trimmed
+          : `https://${trimmed}`;
+        const domain = extractDomainFromUrl(normalizedUrl);
+        setLandingCommandStatus(`Snapping ${domain}…`);
+        const res = await captureReferenceUrl(normalizedUrl);
+        const finalUrl = res.url || normalizedUrl;
+        const finalDomain = extractDomainFromUrl(finalUrl);
+        const mimeType = res.asset?.mimeType || 'image/png';
+        const shotPreviewUrl = res.asset?.dataBase64
+          ? `data:${mimeType};base64,${res.asset.dataBase64}`
+          : resolveBackendUrl(res.asset?.fileUrl || res.screenshotUrl) || '';
+
+        const cssSummary = res.extractedCssSummary?.trim();
+        const titleText = res.title?.trim() || finalDomain;
+        const combinedLabel = cssSummary
+          ? `${titleText} (${finalDomain}) · ${cssSummary}`
+          : `${titleText} (${finalDomain})`;
+
+        const capturedAsset: LocalMediaAsset = {
+          id: res.asset?.id || createAssetId('site'),
+          modality: res.asset?.modality || 'moodboard_image',
+          mimeType,
+          dataBase64: res.asset?.dataBase64,
+          fileUrl: res.asset?.fileUrl || res.screenshotUrl,
+          filename: res.asset?.filename || `${finalDomain}.png`,
+          label: combinedLabel,
+          previewUrl: shotPreviewUrl,
+          sourceUrl: finalUrl,
+          sourceDomain: finalDomain,
+          extractedCssSummary: cssSummary,
+        };
+
+        setAssets((prev) => [capturedAsset, ...prev].slice(0, 16));
+        enterStudio('canvas');
+        pushToast(
+          'success',
+          `Snapped ${finalDomain} — screenshot + CSS DNA loaded in References.`
+        );
+      }
+    } catch (err) {
+      pushToast(
+        'error',
+        err instanceof Error
+          ? err.message
+          : 'Could not launch that URL — opening Studio workspace.'
+      );
+      enterStudio('canvas');
+    } finally {
+      setLandingCommandBusy(false);
+      setLandingCommandStatus(null);
     }
   };
 
@@ -450,7 +637,6 @@ export function StudioWorkbench() {
     else if (result.mode === 'antislop') setAntislopResult(result);
     else if (result.mode === 'stress_test') setStressTestResult(result);
 
-    // Populate Fix-Glow regions & floating "What Changed" Pill
     setLastAppliedCircles(completedJob?.drawnCircles ?? []);
     setLastRunSummary({
       completedAt: Date.now(),
@@ -727,7 +913,7 @@ export function StudioWorkbench() {
     [finishRunWithError, hydrateRunResult]
   );
 
-  // Automatic seamless dequeue: the exact moment the active run finishes, launch the next queued edit!
+  // Automatic seamless dequeue
   useEffect(() => {
     if (isRunning || editQueue.length === 0) return;
     const [nextJob, ...rest] = editQueue;
@@ -743,7 +929,6 @@ export function StudioWorkbench() {
     ) => {
       let effectiveAssets = [...assets];
 
-      // Helpful safeguard for 5-Sigma Arena or empty full transform
       if (
         (mode === 'antislop' || mode === 'stress_test') &&
         effectiveAssets.length === 0 &&
@@ -825,7 +1010,6 @@ export function StudioWorkbench() {
         generateBespokeAssets,
       };
 
-      // Clear transient circle/voice draft right away so user can immediately queue another edit
       if (mode === 'circle_tweak' || isRunningRef.current) {
         setDrawnCircles([]);
         setVoiceTranscript('');
@@ -861,7 +1045,7 @@ export function StudioWorkbench() {
     ]
   );
 
-  // Right-rail Talk & Circle submit handler (automatically chooses surgical edit or full transform)
+  // Right-rail Talk & Circle submit handler
   const handleSubmitTalkEdit = useCallback(() => {
     if (drawnCircles.length > 0) {
       enqueueOrExecuteRun('circle_tweak');
@@ -886,13 +1070,20 @@ export function StudioWorkbench() {
   }, []);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const activeWorkspaceDisplay = activeWorkspace
+    ? formatWorkspaceDisplay(activeWorkspace)
+    : null;
+  const workspaceCardTitle = activeWorkspace?.repoUrl
+    ? activeWorkspace.repoUrl
+        .replace(/^https?:\/\/github\.com\//i, '')
+        .replace(/\.git$/i, '')
+        .replace('/', ' / ')
+    : `REDFOX1899 / ${activeWorkspaceDisplay?.slug || activeWorkspaceId}`;
 
-  const effectiveLeftWidth = leftCollapsed
-    ? COLLAPSED_RAIL_WIDTH
-    : leftRailWidth;
-  const effectiveRightWidth = rightCollapsed
-    ? COLLAPSED_RAIL_WIDTH
-    : rightRailWidth;
+  const effectiveLeftWidth = leftCollapsed ? COLLAPSED_LEFT_WIDTH : leftRailWidth;
+  const gridTemplateColumns = rightCollapsed
+    ? `${effectiveLeftWidth}px minmax(0, 1fr)`
+    : `${effectiveLeftWidth}px minmax(0, 1fr) ${rightRailWidth}px`;
 
   const queueSummaries: QueuedEditSummary[] = editQueue.map((j) => ({
     id: j.id,
@@ -902,12 +1093,101 @@ export function StudioWorkbench() {
     createdAt: j.createdAt,
   }));
 
+  const toastBanner = toast ? (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-4 right-4 z-50 flex max-w-md items-center gap-2.5 rounded-2xl border px-4 py-2.5 shadow-[var(--shadow-float)] ${
+        toast.tone === 'error'
+          ? 'border-[var(--vermilion-border)] bg-[var(--bg-card)] text-[var(--ink-primary)]'
+          : toast.tone === 'success'
+          ? 'border-[var(--emerald-border)] bg-[var(--bg-card)] text-[var(--ink-primary)]'
+          : 'border-[var(--sapphire-border)] bg-[var(--bg-card)] text-[var(--ink-primary)]'
+      }`}
+    >
+      {toast.tone === 'error' ? (
+        <AlertCircle className="h-4 w-4 shrink-0 text-[var(--vermilion)]" />
+      ) : (
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--emerald)]" />
+      )}
+      <span className="text-[12px] font-medium">{toast.message}</span>
+      {toast.linkUrl && (
+        <a
+          href={toast.linkUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--btn-primary-bg)] px-2.5 py-1 font-mono text-[10.5px] font-semibold text-white hover:bg-[var(--btn-primary-hover)]"
+        >
+          {toast.linkLabel || 'Open'}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+      <button
+        type="button"
+        onClick={() => setToast(null)}
+        aria-label="Dismiss notification"
+        className="ml-1 text-[var(--ink-muted)] hover:text-[var(--ink-primary)]"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  ) : null;
+
+  const repoModal = (
+    <RepoModal
+      open={repoModalOpen}
+      onClose={() => setRepoModalOpen(false)}
+      onRepoConnected={({ workspaceId, workspaceName, previewUrl: nextUrl }) => {
+        if (workspaceId) setActiveWorkspaceId(workspaceId);
+        const resolvedNext = resolveBackendUrl(nextUrl);
+        if (resolvedNext) setPreviewUrl(resolvedNext);
+        setDrawnCircles([]);
+        setLastAppliedCircles([]);
+        setLastRunSummary(null);
+        setReloadNonce((n) => n + 1);
+        setHmrPulseAt(Date.now());
+        void refreshWorkspaces();
+        enterStudio('canvas');
+        pushToast(
+          'success',
+          `Connected & booted ${workspaceName || 'GitHub repository'} live in Studio Canvas.`
+        );
+      }}
+    />
+  );
+
+  // VIEW 1 — CODE WIKI LANDING / LAUNCH HUB
+  if (viewMode === 'landing') {
+    return (
+      <>
+        <LandingHub
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          workspaces={workspaces}
+          backendHealthy={backendHealthy}
+          isSubmittingCommand={landingCommandBusy}
+          commandStatusText={landingCommandStatus}
+          onOpenStudio={() => enterStudio('canvas')}
+          onOpenArena={() => enterStudio('arena')}
+          onOpenRepoModal={() => setRepoModalOpen(true)}
+          onSelectStarterWorkspace={(id) =>
+            void handleSelectStarterFromLanding(id)
+          }
+          onSubmitCommand={handleLandingCommandSubmit}
+        />
+        {toastBanner}
+        {repoModal}
+      </>
+    );
+  }
+
+  // VIEW 2 — ANTISLOP STUDIO WORKSPACE (3 Spatial Columns on #000000 with 14px gutters)
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F5F3EE] text-[#141413]">
-      {/* Top 52px Studio Bar */}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--bg-void)] text-[var(--ink-primary)]">
+      {/* Uncluttered Single-Row 60px Top Bar */}
       <TopBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         speedMode={speedMode}
         onSpeedModeChange={handleSpeedModeChange}
         workspaces={workspaces}
@@ -920,18 +1200,21 @@ export function StudioWorkbench() {
         onOpenPr={() => void handleOpenPr()}
         openingPr={openingPr}
         backendHealthy={backendHealthy}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        directorOpen={!rightCollapsed}
+        onToggleDirector={() => setRightCollapsed((v) => !v)}
+        onGoLanding={goToLanding}
       />
 
       {/* Active Studio Surface */}
       <main className="relative flex min-h-0 flex-1 overflow-hidden">
         {activeTab === 'canvas' && (
           <div
-            style={{
-              gridTemplateColumns: `${effectiveLeftWidth}px minmax(0, 1fr) ${effectiveRightWidth}px`,
-            }}
-            className="relative grid h-full min-h-0 w-full flex-1"
+            style={{ gridTemplateColumns }}
+            className="relative grid h-full min-h-0 w-full flex-1 gap-[14px] px-[14px] pb-[14px] pt-[2px]"
           >
-            {/* LEFT 2 RAIL — Live Site URL + Moodboard + Webcam + Transform */}
+            {/* LEFT RAIL — Borderless References on #000000 void */}
             <div className="relative min-h-0 min-w-0">
               <TasteTray
                 collapsed={leftCollapsed}
@@ -958,9 +1241,11 @@ export function StudioWorkbench() {
                 queueCount={editQueue.length}
                 onRunTransform={() => enqueueOrExecuteRun('antislop')}
                 onRunCircleTweak={() => enqueueOrExecuteRun('circle_tweak')}
+                onResetBaseline={() => void handleResetBaseline()}
+                resettingBaseline={resettingBaseline}
               />
 
-              {/* Subtle Hairline Resize Handle (Left Rail <-> Center Canvas) */}
+              {/* Hairline Resize Handle nested cleanly inside the 14px gutter */}
               {!leftCollapsed && (
                 <div
                   role="separator"
@@ -972,17 +1257,19 @@ export function StudioWorkbench() {
                   onPointerUp={stopResize}
                   onPointerCancel={stopResize}
                   onDoubleClick={() => setLeftRailWidth(DEFAULT_LEFT_WIDTH)}
-                  title="Drag to resize · Double-click to reset 2:9:2"
-                  className="atelier-resize-handle -right-[3px]"
+                  title="Drag to resize · Double-click to reset"
+                  className="atelier-resize-handle -right-[14px]"
                 />
               )}
             </div>
 
-            {/* CENTER 9 CANVAS — Zero-Flicker Live Preview + Reveal Sweep + Fix-Glow */}
+            {/* CENTER STAGE — Floating 16px-radius Obsidian Live Preview Card */}
             <div className="min-h-0 min-w-0">
               <LiveCanvas
                 ref={liveCanvasRef}
                 previewUrl={previewUrl}
+                workspaceSlug={workspaceCardTitle}
+                workspaceRepoUrl={activeWorkspace?.repoUrl}
                 reloadNonce={reloadNonce}
                 hmrPulseAt={hmrPulseAt}
                 baselineScreenshotUrl={baselineScreenshotUrl}
@@ -1016,61 +1303,60 @@ export function StudioWorkbench() {
               />
             </div>
 
-            {/* RIGHT 2 RAIL — Continuous Talk + Live Queue + Visual Decisions API Graph */}
-            <div className="relative min-h-0 min-w-0">
-              {/* Subtle Hairline Resize Handle (Center Canvas <-> Right Rail) */}
-              {!rightCollapsed && (
+            {/* RIGHT DIRECTOR CARD — Floating 16px-radius Gemini Panel */}
+            {!rightCollapsed && (
+              <div className="relative min-h-0 min-w-0">
                 <div
                   role="separator"
                   aria-orientation="vertical"
-                  aria-label="Resize critic rail"
+                  aria-label="Resize director panel"
                   data-dragging={resizingSide === 'right' ? 'true' : 'false'}
                   onPointerDown={(e) => startResize('right', e)}
                   onPointerMove={(e) => handleResizeMove('right', e)}
                   onPointerUp={stopResize}
                   onPointerCancel={stopResize}
                   onDoubleClick={() => setRightRailWidth(DEFAULT_RIGHT_WIDTH)}
-                  title="Drag to resize · Double-click to reset 2:9:2"
-                  className="atelier-resize-handle -left-[3px]"
+                  title="Drag to resize · Double-click to reset"
+                  className="atelier-resize-handle -left-[14px]"
                 />
-              )}
 
-              <CriticRail
-                collapsed={rightCollapsed}
-                onToggleCollapse={() => setRightCollapsed((v) => !v)}
-                scorecard={scorecard}
-                manifest={manifest}
-                iterations={iterations}
-                events={events}
-                isRunning={isRunning}
-                activeModeRunning={activeModeRunning}
-                activeJobLabel={activeJob?.label}
-                thinkingBuffer={thinkingBuffer}
-                speedMode={speedMode}
-                assetsCount={assets.length}
-                drawMode={drawMode}
-                onToggleDrawMode={() => setDrawMode((v) => !v)}
-                drawnCirclesCount={drawnCircles.length}
-                voiceTranscript={voiceTranscript}
-                onVoiceTranscriptChange={setVoiceTranscript}
-                onVoiceRecorded={(out) => {
-                  setVoiceAudioBase64(out.audioBase64);
-                  setVoiceAudioMimeType(out.mimeType);
-                  if (out.transcript) {
-                    setVoiceTranscript(out.transcript);
-                  }
-                  pushToast(
-                    'info',
-                    out.transcript
-                      ? `Heard: "${out.transcript.slice(0, 80)}"`
-                      : 'Voice note captured — click Go or Queue.'
-                  );
-                }}
-                onSubmitTalkEdit={handleSubmitTalkEdit}
-                editQueue={queueSummaries}
-                onRemoveQueuedJob={handleRemoveQueuedJob}
-              />
-            </div>
+                <CriticRail
+                  collapsed={rightCollapsed}
+                  onToggleCollapse={() => setRightCollapsed((v) => !v)}
+                  scorecard={scorecard}
+                  manifest={manifest}
+                  iterations={iterations}
+                  events={events}
+                  isRunning={isRunning}
+                  activeModeRunning={activeModeRunning}
+                  activeJobLabel={activeJob?.label}
+                  thinkingBuffer={thinkingBuffer}
+                  speedMode={speedMode}
+                  assetsCount={assets.length}
+                  drawMode={drawMode}
+                  onToggleDrawMode={() => setDrawMode((v) => !v)}
+                  drawnCirclesCount={drawnCircles.length}
+                  voiceTranscript={voiceTranscript}
+                  onVoiceTranscriptChange={setVoiceTranscript}
+                  onVoiceRecorded={(out) => {
+                    setVoiceAudioBase64(out.audioBase64);
+                    setVoiceAudioMimeType(out.mimeType);
+                    if (out.transcript) {
+                      setVoiceTranscript(out.transcript);
+                    }
+                    pushToast(
+                      'info',
+                      out.transcript
+                        ? `Heard: "${out.transcript.slice(0, 80)}"`
+                        : 'Voice note captured — send or queue now.'
+                    );
+                  }}
+                  onSubmitTalkEdit={handleSubmitTalkEdit}
+                  editQueue={queueSummaries}
+                  onRemoveQueuedJob={handleRemoveQueuedJob}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1101,68 +1387,10 @@ export function StudioWorkbench() {
           />
         )}
 
-        {/* Crisp Paper Toast Notification */}
-        {toast && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`fixed bottom-4 right-4 z-50 flex max-w-md items-center gap-2.5 rounded-lg border px-3.5 py-2.5 shadow-lg ${
-              toast.tone === 'error'
-                ? 'border-[#E03E2D] bg-[#FDF1EF] text-[#141413]'
-                : toast.tone === 'success'
-                ? 'border-[#15803D] bg-[#EEF8F1] text-[#141413]'
-                : 'border-[#141413] bg-white text-[#141413]'
-            }`}
-          >
-            {toast.tone === 'error' ? (
-              <AlertCircle className="h-4 w-4 shrink-0 text-[#E03E2D]" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-[#15803D]" />
-            )}
-            <span className="text-[12px] font-medium">{toast.message}</span>
-            {toast.linkUrl && (
-              <a
-                href={toast.linkUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex shrink-0 items-center gap-1 rounded bg-[#141413] px-2 py-1 font-mono text-[10.5px] font-semibold text-white"
-              >
-                {toast.linkLabel || 'Open'}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              aria-label="Dismiss notification"
-              className="ml-1 text-[#64625D] hover:text-[#141413]"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
+        {toastBanner}
       </main>
 
-      {/* Connect GitHub Repository Modal */}
-      <RepoModal
-        open={repoModalOpen}
-        onClose={() => setRepoModalOpen(false)}
-        onRepoConnected={({ workspaceId, workspaceName, previewUrl: nextUrl }) => {
-          if (workspaceId) setActiveWorkspaceId(workspaceId);
-          const resolvedNext = resolveBackendUrl(nextUrl);
-          if (resolvedNext) setPreviewUrl(resolvedNext);
-          setDrawnCircles([]);
-          setLastAppliedCircles([]);
-          setLastRunSummary(null);
-          setReloadNonce((n) => n + 1);
-          setHmrPulseAt(Date.now());
-          void refreshWorkspaces();
-          pushToast(
-            'success',
-            `Connected & booted ${workspaceName || 'GitHub repository'} live in Studio Canvas.`
-          );
-        }}
-      />
+      {repoModal}
     </div>
   );
 }

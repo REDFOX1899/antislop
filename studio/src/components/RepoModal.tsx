@@ -112,13 +112,13 @@ export function RepoModal({ open, onClose, onRepoConnected }: RepoModalProps) {
             e.preventDefault();
             void handleConnect(manualUrl, manualBranch);
           }}
-          className="rounded-lg border border-[#E5E1D8] bg-[#FAF8F4] p-3.5"
+          className="rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] p-3.5"
         >
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[#141413]">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-primary)]">
               Paste Any Public GitHub URL
             </span>
-            <span className="font-mono text-[9.5px] text-[#64625D]">
+            <span className="font-mono text-[9.5px] text-[var(--ink-muted)]">
               POST /api/github/connect
             </span>
           </div>
@@ -131,19 +131,19 @@ export function RepoModal({ open, onClose, onRepoConnected }: RepoModalProps) {
               value={manualUrl}
               onChange={(e) => setManualUrl(e.target.value)}
               placeholder="https://github.com/owner/frontend-repo"
-              className="flex-1 rounded-md border border-[#E5E1D8] bg-white px-3 py-2 text-[12.5px] text-[#141413] placeholder:text-[#96928A] focus:border-[#141413] focus:outline-none"
+              className="flex-1 rounded-full border border-[var(--border-pill)] bg-[var(--bg-pill)] px-3.5 py-2 text-[12.5px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:border-[var(--border-pill-focus)] focus:outline-none"
             />
             <input
               type="text"
               value={manualBranch}
               onChange={(e) => setManualBranch(e.target.value)}
               placeholder="branch (optional)"
-              className="w-full rounded-md border border-[#E5E1D8] bg-white px-3 py-2 font-mono text-[12px] text-[#141413] placeholder:text-[#96928A] focus:border-[#141413] focus:outline-none sm:w-36"
+              className="w-full rounded-full border border-[var(--border-pill)] bg-[var(--bg-pill)] px-3.5 py-2 font-mono text-[12px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:border-[var(--border-pill-focus)] focus:outline-none sm:w-36"
             />
             <button
               type="submit"
               disabled={Boolean(connectingUrl) || !manualUrl.trim()}
-              className="flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-[#E03E2D] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#C53222] disabled:opacity-50"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--btn-primary-bg)] px-4 py-2 text-[12px] font-semibold text-[var(--btn-primary-ink)] transition-colors hover:bg-[var(--btn-primary-hover)] disabled:opacity-50"
             >
               {connectingUrl === manualUrl.trim() ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -156,69 +156,69 @@ export function RepoModal({ open, onClose, onRepoConnected }: RepoModalProps) {
         </form>
 
         {connectError && (
-          <div className="rounded-md border border-[#E03E2D]/35 bg-[#FDF1EF] px-3 py-2 text-[12px] text-[#E03E2D]">
+          <div className="rounded-xl border border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] px-3.5 py-2 text-[12px] text-[var(--vermilion)]">
             {connectError}
           </div>
         )}
 
         {/* Authenticated User GitHub Repositories */}
         <div>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[#64625D]">
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-secondary)]">
               Your GitHub Repositories ({repos.length})
             </span>
             <div className="relative w-56">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64625D]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-muted)]" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter repos…"
-                className="w-full rounded-md border border-[#E5E1D8] bg-[#FAF8F4] py-1 pl-8 pr-2.5 text-[11.5px] text-[#141413] focus:border-[#141413] focus:bg-white focus:outline-none"
+                className="w-full rounded-full border border-[var(--border-pill)] bg-[var(--bg-pill)] py-1.5 pl-8 pr-3 text-[11.5px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:border-[var(--border-pill-focus)] focus:outline-none"
               />
             </div>
           </div>
 
           {loadingRepos ? (
-            <div className="flex items-center justify-center gap-2 rounded-lg border border-[#E5E1D8] py-10 font-mono text-[11.5px] text-[#64625D]">
-              <Loader2 className="h-4 w-4 animate-spin text-[#E03E2D]" />
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] py-10 font-mono text-[11.5px] text-[var(--ink-secondary)]">
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--sapphire-ice)]" />
               Fetching repositories via GET /api/github/repos…
             </div>
           ) : reposError ? (
-            <div className="rounded-lg border border-[#E5E1D8] bg-[#FAF8F4] px-4 py-5 text-[12px] text-[#64625D]">
+            <div className="rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] px-4 py-5 text-[12px] text-[var(--ink-secondary)]">
               {reposError}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="rounded-lg border border-[#E5E1D8] bg-[#FAF8F4] px-4 py-6 text-center text-[12px] text-[#64625D]">
+            <div className="rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] px-4 py-6 text-center text-[12px] text-[var(--ink-secondary)]">
               No matching repositories found. Paste any public GitHub URL above.
             </div>
           ) : (
-            <div className="studio-scroll max-h-[290px] divide-y divide-[#E5E1D8] overflow-y-auto rounded-lg border border-[#E5E1D8]">
+            <div className="studio-scroll max-h-[290px] divide-y divide-[var(--border-subtle)] overflow-y-auto rounded-xl border border-[var(--border-card)]">
               {filtered.map((repo) => {
                 const isBusy = connectingUrl === repo.htmlUrl;
                 return (
                   <div
                     key={repo.fullName}
-                    className="flex items-center justify-between gap-3 bg-white px-3.5 py-2.5 transition-colors hover:bg-[#FAF8F4]"
+                    className="flex items-center justify-between gap-3 bg-[var(--bg-card)] px-3.5 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[#141413]" />
-                        <span className="truncate text-[12.5px] font-semibold text-[#141413]">
+                        <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--sapphire-ice)]" />
+                        <span className="truncate text-[12.5px] font-semibold text-[var(--ink-primary)]">
                           {repo.fullName}
                         </span>
                         {repo.private ? (
-                          <Lock className="h-3 w-3 shrink-0 text-[#64625D]" />
+                          <Lock className="h-3 w-3 shrink-0 text-[var(--ink-muted)]" />
                         ) : (
-                          <Globe className="h-3 w-3 shrink-0 text-[#64625D]" />
+                          <Globe className="h-3 w-3 shrink-0 text-[var(--ink-muted)]" />
                         )}
                       </div>
                       {repo.description && (
-                        <p className="mt-0.5 truncate text-[11px] text-[#64625D]">
+                        <p className="mt-0.5 truncate text-[11px] text-[var(--ink-secondary)]">
                           {repo.description}
                         </p>
                       )}
-                      <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-[#64625D]">
+                      <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-[var(--ink-muted)]">
                         {repo.language && <span>{repo.language}</span>}
                         <span className="inline-flex items-center gap-0.5">
                           <GitBranch className="h-2.5 w-2.5" />
@@ -233,7 +233,7 @@ export function RepoModal({ open, onClose, onRepoConnected }: RepoModalProps) {
                       onClick={() =>
                         void handleConnect(repo.htmlUrl, repo.defaultBranch)
                       }
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-[#141413] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#141413] transition-colors hover:bg-[#141413] hover:text-white disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1 rounded-full border border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] px-3 py-1.5 text-[11.5px] font-medium text-[var(--sapphire-ice)] transition-colors hover:bg-[var(--sapphire-soft)] disabled:opacity-50"
                     >
                       {isBusy ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />

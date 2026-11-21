@@ -1,31 +1,164 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-sans), "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: var(--font-sans), "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: var(--font-serif), "Instrument Serif", Georgia, serif;
   --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
-
-  --color-stone-canvas: #F5F3EE;
-  --color-stone-recessed: #ECE8DF;
-  --color-paper: #FFFFFF;
-  --color-ink: #141413;
-  --color-graphite: #64625D;
-  --color-hairline: #E5E1D8;
-  --color-vermilion: #E03E2D;
-  --color-emerald-gate: #15803D;
-  --color-amber-critique: #B45309;
 }
 
+/* ==========================================================================
+   AntiSlop Obsidian Spatial Design System (Code Wiki DNA) + Light Atelier
+   ========================================================================== */
 :root {
+  color-scheme: dark light;
+
+  /* Default: Pitch-Black Obsidian Spatial Theme */
+  --bg-void: #000000;
+  --bg-card: #0B0D10;
+  --bg-card-elevated: #12151C;
+  --bg-pill: #0A0F17;
+  --bg-pill-hover: #101826;
+  --bg-composer: #1A1D24;
+  --bg-subtle: rgba(255, 255, 255, 0.04);
+  --bg-subtle-hover: rgba(255, 255, 255, 0.08);
+  --bg-stage-grid: #06080B;
+  --stage-dot: rgba(255, 255, 255, 0.075);
+
+  --border-card: rgba(255, 255, 255, 0.11);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-pill: rgba(138, 180, 248, 0.22);
+  --border-pill-focus: #8AB4F8;
+
+  --ink-primary: #F1F3F4;
+  --ink-secondary: #9AA0A6;
+  --ink-muted: #70757A;
+
+  --sapphire: #4285F4;
+  --sapphire-deep: #1A73E8;
+  --sapphire-ice: #8AB4F8;
+  --sapphire-tint: rgba(26, 115, 232, 0.14);
+  --sapphire-border: rgba(138, 180, 248, 0.34);
+  --sapphire-soft: rgba(66, 133, 244, 0.22);
+
+  --emerald: #34D399;
+  --emerald-bg: rgba(52, 211, 153, 0.12);
+  --emerald-border: rgba(52, 211, 153, 0.32);
+
+  --vermilion: #FF5A4F;
+  --vermilion-hover: #FF4034;
+  --vermilion-bg: rgba(255, 90, 79, 0.14);
+  --vermilion-border: rgba(255, 90, 79, 0.38);
+
+  --amber: #FBBF24;
+  --amber-bg: rgba(251, 191, 36, 0.12);
+  --amber-border: rgba(251, 191, 36, 0.32);
+
+  --btn-primary-bg: #1A73E8;
+  --btn-primary-hover: #2B7DE9;
+  --btn-primary-ink: #FFFFFF;
+  --btn-contrast-bg: #F1F3F4;
+  --btn-contrast-hover: #FFFFFF;
+  --btn-contrast-ink: #0B0D10;
+
+  --shadow-card: 0 24px 60px -28px rgba(0, 0, 0, 0.85);
+  --shadow-float: 0 16px 40px -12px rgba(0, 0, 0, 0.9);
+  --backdrop-scrim: rgba(0, 0, 0, 0.72);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.22);
+  --scrollbar-track: transparent;
+
+  /* SVG Graph Tokens (Obsidian Dark) */
+  --svg-idle-fill: #12161E;
+  --svg-idle-stroke: rgba(255, 255, 255, 0.14);
+  --svg-idle-arrow: rgba(255, 255, 255, 0.28);
+  --svg-pass-fill: rgba(52, 211, 153, 0.13);
+  --svg-pass-stroke: #34D399;
+  --svg-active-fill: rgba(66, 133, 244, 0.16);
+  --svg-active-stroke: #8AB4F8;
+  --svg-loop-fill: rgba(251, 191, 36, 0.14);
+  --svg-loop-stroke: #FBBF24;
+  --svg-title-fill: #F1F3F4;
+  --svg-sub-fill: #9AA0A6;
+}
+
+:root[data-theme="dark"],
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"],
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
   color-scheme: light;
-  --studio-canvas: #F5F3EE;
-  --studio-paper: #FFFFFF;
-  --studio-ink: #141413;
-  --studio-graphite: #64625D;
-  --studio-hairline: #E5E1D8;
-  --studio-vermilion: #E03E2D;
-  --studio-emerald: #15803D;
-  --studio-amber: #B45309;
+
+  /* Warm Archival Stone Atelier Theme */
+  --bg-void: #F5F3EE;
+  --bg-card: #FFFFFF;
+  --bg-card-elevated: #FAF8F4;
+  --bg-pill: #FFFFFF;
+  --bg-pill-hover: #FAF8F4;
+  --bg-composer: #F5F3EE;
+  --bg-subtle: rgba(20, 20, 19, 0.045);
+  --bg-subtle-hover: rgba(20, 20, 19, 0.08);
+  --bg-stage-grid: #EFECE5;
+  --stage-dot: #D5CFC3;
+
+  --border-card: #E5E1D8;
+  --border-subtle: #EAE6DD;
+  --border-strong: #C9C3B7;
+  --border-pill: #D9D4C9;
+  --border-pill-focus: #1A73E8;
+
+  --ink-primary: #141413;
+  --ink-secondary: #5E5C57;
+  --ink-muted: #7C7972;
+
+  --sapphire: #1A73E8;
+  --sapphire-deep: #1557B0;
+  --sapphire-ice: #1A73E8;
+  --sapphire-tint: rgba(26, 115, 232, 0.08);
+  --sapphire-border: rgba(26, 115, 232, 0.34);
+  --sapphire-soft: rgba(26, 115, 232, 0.14);
+
+  --emerald: #15803D;
+  --emerald-bg: #EEF8F1;
+  --emerald-border: rgba(21, 128, 61, 0.3);
+
+  --vermilion: #E03E2D;
+  --vermilion-hover: #C53222;
+  --vermilion-bg: #FDF1EF;
+  --vermilion-border: rgba(224, 62, 45, 0.34);
+
+  --amber: #B45309;
+  --amber-bg: #FEF6EC;
+  --amber-border: rgba(180, 83, 9, 0.3);
+
+  --btn-primary-bg: #1A73E8;
+  --btn-primary-hover: #1557B0;
+  --btn-primary-ink: #FFFFFF;
+  --btn-contrast-bg: #141413;
+  --btn-contrast-hover: #2A2A28;
+  --btn-contrast-ink: #FFFFFF;
+
+  --shadow-card: 0 10px 30px -18px rgba(20, 20, 19, 0.14);
+  --shadow-float: 0 12px 30px -12px rgba(20, 20, 19, 0.22);
+  --backdrop-scrim: rgba(20, 20, 19, 0.44);
+
+  --scrollbar-thumb: #9A968D;
+  --scrollbar-track: transparent;
+
+  /* SVG Graph Tokens (Light Atelier) */
+  --svg-idle-fill: #FAF8F4;
+  --svg-idle-stroke: #DCD7CC;
+  --svg-idle-arrow: #B8B2A5;
+  --svg-pass-fill: #EEF8F1;
+  --svg-pass-stroke: #15803D;
+  --svg-active-fill: rgba(26, 115, 232, 0.09);
+  --svg-active-stroke: #1A73E8;
+  --svg-loop-fill: #FEF6EC;
+  --svg-loop-stroke: #B45309;
+  --svg-title-fill: #141413;
+  --svg-sub-fill: #5E5C57;
 }
 
 * {
@@ -36,15 +169,121 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--studio-canvas);
-  color: var(--studio-ink);
+  background-color: var(--bg-void);
+  color: var(--ink-primary);
 }
 
-/* Tactile subtle drafting grid used behind the live preview stage */
+/* Subtle sapphire ambient aura — strictly Google sapphire/ice-blue fading into #000000 */
+.codewiki-hero-aura {
+  background: radial-gradient(
+    ellipse 640px 240px at 50% 48%,
+    rgba(26, 115, 232, 0.18) 0%,
+    rgba(66, 133, 244, 0.08) 44%,
+    transparent 74%
+  );
+}
+
+:root[data-theme="light"] .codewiki-hero-aura {
+  background: radial-gradient(
+    ellipse 640px 240px at 50% 48%,
+    rgba(26, 115, 232, 0.10) 0%,
+    rgba(66, 133, 244, 0.04) 44%,
+    transparent 74%
+  );
+}
+
+/* Seamless radial halo behind Gemini sparkle inside Right Director Card (zero box edge) */
+.codewiki-sparkle-aura {
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(26, 115, 232, 0.18) 0%,
+    rgba(66, 133, 244, 0.06) 38%,
+    transparent 68%
+  );
+}
+
+:root[data-theme="light"] .codewiki-sparkle-aura {
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(26, 115, 232, 0.09) 0%,
+    rgba(66, 133, 244, 0.03) 38%,
+    transparent 68%
+  );
+}
+
+/* Sculptural pill bar mirroring codewiki.google */
+.codewiki-pill {
+  background-color: var(--bg-pill);
+  border: 1px solid var(--border-pill);
+  box-shadow:
+    inset 0 1px 0 rgba(138, 180, 248, 0.14),
+    0 0 34px -10px rgba(26, 115, 232, 0.28);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.codewiki-pill:hover {
+  background-color: var(--bg-pill-hover);
+  border-color: rgba(138, 180, 248, 0.36);
+}
+
+.codewiki-pill:focus-within {
+  border-color: var(--border-pill-focus);
+  box-shadow:
+    0 0 0 2px rgba(138, 180, 248, 0.24),
+    0 0 40px -8px rgba(26, 115, 232, 0.38);
+}
+
+:root[data-theme="light"] .codewiki-pill {
+  box-shadow:
+    0 2px 12px -4px rgba(20, 20, 19, 0.08),
+    0 1px 2px rgba(20, 20, 19, 0.04);
+}
+
+:root[data-theme="light"] .codewiki-pill:focus-within {
+  box-shadow:
+    0 0 0 3px rgba(26, 115, 232, 0.16),
+    0 6px 20px -6px rgba(26, 115, 232, 0.18);
+}
+
+/* Code Wiki dark sapphire floating starter cards */
+.codewiki-starter-card {
+  background: linear-gradient(
+    180deg,
+    rgba(24, 52, 102, 0.38) 0%,
+    rgba(11, 15, 24, 0.94) 100%
+  );
+  border: 1px solid rgba(138, 180, 248, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(138, 180, 248, 0.14),
+    0 16px 36px -22px rgba(0, 0, 0, 0.9);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.codewiki-starter-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(138, 180, 248, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(138, 180, 248, 0.26),
+    0 18px 42px -18px rgba(26, 115, 232, 0.42);
+}
+
+:root[data-theme="light"] .codewiki-starter-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAF8F4 100%);
+  border: 1px solid #E5E1D8;
+  box-shadow: 0 8px 24px -16px rgba(20, 20, 19, 0.14);
+}
+
+:root[data-theme="light"] .codewiki-starter-card:hover {
+  border-color: rgba(26, 115, 232, 0.45);
+  box-shadow: 0 14px 32px -16px rgba(26, 115, 232, 0.22);
+}
+
+/* Tactile subtle drafting grid behind the live preview stage */
 .atelier-stage-grid {
-  background-color: #EFECE5;
-  background-image:
-    radial-gradient(#D5CFC3 0.9px, transparent 0.9px);
+  background-color: var(--bg-stage-grid);
+  background-image: radial-gradient(var(--stage-dot) 0.9px, transparent 0.9px);
   background-size: 18px 18px;
 }
 
@@ -53,11 +292,11 @@ dialog:modal {
   overscroll-behavior: contain;
   margin: auto;
   padding: 0;
-  border: 1px solid #E5E1D8;
-  border-radius: 12px;
-  background-color: #FFFFFF;
-  color: #141413;
-  box-shadow: 0 24px 60px -20px rgba(20, 20, 19, 0.22), 0 4px 16px -4px rgba(20, 20, 19, 0.08);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  background-color: var(--bg-card);
+  color: var(--ink-primary);
+  box-shadow: var(--shadow-float);
   max-width: min(94vw, 720px);
   max-height: 88vh;
   overflow: hidden;
@@ -69,15 +308,13 @@ dialog[open] {
 }
 
 dialog::backdrop {
-  background: rgba(20, 20, 19, 0.42);
+  background: var(--backdrop-scrim);
   overflow: hidden;
   overscroll-behavior: contain;
 }
 
-/* Standard scrollbars with 3:1+ contrast & legacy WebKit fallback (modern-web-guidance) */
+/* Standard scrollbars with clean contrast & WebKit fallback */
 .studio-scroll {
-  --scrollbar-thumb: #8E8A82;
-  --scrollbar-track: #F5F3EE;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
@@ -113,7 +350,7 @@ dialog::backdrop {
 }
 
 .wipe-range-input:focus-visible {
-  outline: 2px solid #E03E2D;
+  outline: 2px solid var(--sapphire-ice);
   outline-offset: 2px;
 }
 
@@ -163,7 +400,7 @@ dialog::backdrop {
   }
 }
 
-/* Ultra-thin vermilion indeterminate progress bar along top edge of LiveCanvas while building */
+/* Ultra-thin indeterminate progress bar along top edge of LiveCanvas while building */
 @keyframes atelier-progress-sweep {
   0% {
     transform: translateX(-100%) scaleX(0.32);
@@ -208,7 +445,7 @@ dialog::backdrop {
   }
 }
 
-/* Smooth architectural fix-glow halo over circled regions or outer canvas perimeter (<1Hz safe) */
+/* Smooth architectural fix-glow halo over circled regions or outer canvas perimeter */
 @keyframes atelier-fix-glow {
   0% {
     opacity: 0;
@@ -294,7 +531,7 @@ dialog::backdrop {
   }
 }
 
-/* Native <details> accordion with progressive ::details-content reveal (modern-web-guidance: accordion) */
+/* Native <details> accordion with progressive ::details-content reveal */
 .atelier-details > summary {
   list-style: none;
   cursor: pointer;
@@ -332,12 +569,12 @@ dialog::backdrop {
   }
 }
 
-/* Subtle hairline column resize handle for 2:9:2 workspace */
+/* Subtle hairline column resize handle nested inside the 14px gutter */
 .atelier-resize-handle {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 7px;
+  top: 12px;
+  bottom: 12px;
+  width: 14px;
   cursor: col-resize;
   touch-action: none;
   z-index: 30;
@@ -346,17 +583,17 @@ dialog::backdrop {
 .atelier-resize-handle::after {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 16%;
+  bottom: 16%;
   left: 50%;
-  width: 1px;
+  width: 2px;
+  border-radius: 999px;
   transform: translateX(-50%);
   background-color: transparent;
-  transition: background-color 0.15s ease, width 0.15s ease;
+  transition: background-color 0.16s ease;
 }
 
 .atelier-resize-handle:hover::after,
 .atelier-resize-handle[data-dragging="true"]::after {
-  width: 2px;
-  background-color: #E03E2D;
+  background-color: var(--sapphire-ice);
 }

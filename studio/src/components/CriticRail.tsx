@@ -17,16 +17,14 @@ import {
   Award,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  CornerDownLeft,
   Cpu,
-  Gauge,
   Layers,
   Loader2,
   Mic,
+  PanelRightClose,
   Pencil,
   Plus,
+  SendHorizontal,
   ShieldCheck,
   Sparkles,
   Square,
@@ -34,6 +32,7 @@ import {
 } from 'lucide-react';
 import { resolveBackendUrl } from '@/lib/api';
 import { useVoiceRecorder } from '@/lib/useVoiceRecorder';
+import { GeminiSparkleMark } from './BrandMarks';
 import { NativeDialog } from './NativeDialog';
 
 export interface QueuedEditSummary {
@@ -78,48 +77,56 @@ function modelBadgeStyle(model?: string): { label: string; className: string } {
   if (m.includes('carbon')) {
     return {
       label: 'Carbon',
-      className: 'border-[#141413] bg-[#141413] text-white',
+      className:
+        'border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] text-[var(--sapphire-ice)]',
     };
   }
   if (m.includes('neon')) {
     return {
       label: 'Neon',
-      className: 'border-[#B45309]/40 bg-[#FEF6EC] text-[#B45309]',
+      className:
+        'border-[var(--amber-border)] bg-[var(--amber-bg)] text-[var(--amber)]',
     };
   }
   if (m.includes('hydrogen')) {
     return {
       label: 'Hydrogen',
-      className: 'border-[#E03E2D]/40 bg-[#FDF1EF] text-[#E03E2D]',
+      className:
+        'border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] text-[var(--vermilion)]',
     };
   }
   if (m.includes('decision')) {
     return {
       label: 'Decision-1',
-      className: 'border-[#15803D]/40 bg-[#EEF8F1] text-[#15803D]',
+      className:
+        'border-[var(--emerald-border)] bg-[var(--emerald-bg)] text-[var(--emerald)]',
     };
   }
   if (m.includes('banana')) {
     return {
       label: 'Banana 2.1',
-      className: 'border-[#B45309]/40 bg-[#FEF6EC] text-[#B45309]',
+      className:
+        'border-[var(--amber-border)] bg-[var(--amber-bg)] text-[var(--amber)]',
     };
   }
   if (m.includes('embed')) {
     return {
       label: 'Embed-2',
-      className: 'border-[#141413]/30 bg-[#F5F3EE] text-[#141413]',
+      className:
+        'border-[var(--border-strong)] bg-[var(--bg-subtle)] text-[var(--ink-primary)]',
     };
   }
   if (m.includes('transcribe') || m.includes('live')) {
     return {
       label: '3.5-Trans',
-      className: 'border-[#E03E2D]/30 bg-[#FDF1EF] text-[#E03E2D]',
+      className:
+        'border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] text-[var(--vermilion)]',
     };
   }
   return {
     label: model ? model.slice(0, 12) : 'Engine',
-    className: 'border-[#E5E1D8] bg-[#F5F3EE] text-[#64625D]',
+    className:
+      'border-[var(--border-card)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)]',
   };
 }
 
@@ -139,33 +146,33 @@ function nodeColors(state: NodeVisualState): {
 } {
   if (state === 'passed') {
     return {
-      fill: '#EEF8F1',
-      stroke: '#15803D',
-      titleFill: '#141413',
-      subFill: '#15803D',
+      fill: 'var(--svg-pass-fill)',
+      stroke: 'var(--svg-pass-stroke)',
+      titleFill: 'var(--svg-title-fill)',
+      subFill: 'var(--emerald)',
     };
   }
   if (state === 'active') {
     return {
-      fill: '#FDF1EF',
-      stroke: '#E03E2D',
-      titleFill: '#141413',
-      subFill: '#E03E2D',
+      fill: 'var(--svg-active-fill)',
+      stroke: 'var(--svg-active-stroke)',
+      titleFill: 'var(--svg-title-fill)',
+      subFill: 'var(--sapphire-ice)',
     };
   }
   if (state === 'looping') {
     return {
-      fill: '#FEF6EC',
-      stroke: '#B45309',
-      titleFill: '#141413',
-      subFill: '#B45309',
+      fill: 'var(--svg-loop-fill)',
+      stroke: 'var(--svg-loop-stroke)',
+      titleFill: 'var(--svg-title-fill)',
+      subFill: 'var(--amber)',
     };
   }
   return {
-    fill: '#FAF8F4',
-    stroke: '#DCD7CC',
-    titleFill: '#141413',
-    subFill: '#64625D',
+    fill: 'var(--svg-idle-fill)',
+    stroke: 'var(--svg-idle-stroke)',
+    titleFill: 'var(--svg-title-fill)',
+    subFill: 'var(--svg-sub-fill)',
   };
 }
 
@@ -209,7 +216,6 @@ function DecisionPipelineGraph({
     Boolean(scorecard?.passedAllGates) ||
     (!isRunning && eventTypes.has('run_completed') && Boolean(scorecard));
 
-  // Derive live node states
   const refState: NodeVisualState =
     isRunning &&
     (events.length === 0 ||
@@ -261,7 +267,6 @@ function DecisionPipelineGraph({
     ? 'looping'
     : 'idle';
 
-  // Real latencies for crisp sub-labels
   const latestIter = iterations[iterations.length - 1];
   const winnerCand =
     latestIter?.candidates?.find((c) => c.selectedAsWinner) ||
@@ -312,26 +317,26 @@ function DecisionPipelineGraph({
   return (
     <section
       aria-label="Live Decisions API pipeline graph"
-      className="rounded-[7px] border border-[#E5E1D8] bg-[#FFFFFF] p-2"
+      className="rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] p-2.5"
     >
-      <div className="mb-1 flex items-center justify-between">
-        <span className="font-mono text-[8.5px] font-semibold uppercase tracking-[0.11em] text-[#64625D]">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-secondary)]">
           Decisions API Pipeline
         </span>
         {loopActive ? (
-          <span className="rounded bg-[#FEF6EC] px-1.5 py-0.5 font-mono text-[8px] font-semibold text-[#B45309]">
+          <span className="rounded-full border border-[var(--amber-border)] bg-[var(--amber-bg)] px-1.5 py-0.5 font-mono text-[8.5px] font-semibold text-[var(--amber)]">
             Auto-Fix ↺
           </span>
         ) : hasPassed ? (
-          <span className="font-mono text-[8.5px] font-semibold text-[#15803D]">
+          <span className="font-mono text-[9px] font-semibold text-[var(--emerald)]">
             Verified ✓
           </span>
         ) : isRunning ? (
-          <span className="font-mono text-[8.5px] font-medium text-[#E03E2D]">
+          <span className="font-mono text-[9px] font-medium text-[var(--sapphire-ice)]">
             Live
           </span>
         ) : (
-          <span className="font-mono text-[8px] text-[#64625D]">
+          <span className="font-mono text-[8.5px] text-[var(--ink-muted)]">
             decision-1
           </span>
         )}
@@ -339,7 +344,7 @@ function DecisionPipelineGraph({
 
       <svg
         viewBox="0 0 248 122"
-        className="h-[122px] w-full overflow-visible"
+        className="h-[118px] w-full overflow-visible"
         role="img"
         aria-label="AntiSlop Gemini 4 and Decisions API pipeline flow graph"
       >
@@ -353,7 +358,7 @@ function DecisionPipelineGraph({
             markerHeight="5"
             orient="auto"
           >
-            <path d="M 0 1 L 7 4 L 0 7 z" fill="#BEB8AB" />
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--svg-idle-arrow)" />
           </marker>
           <marker
             id="as-arrow-ok"
@@ -364,7 +369,7 @@ function DecisionPipelineGraph({
             markerHeight="5"
             orient="auto"
           >
-            <path d="M 0 1 L 7 4 L 0 7 z" fill="#15803D" />
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--emerald)" />
           </marker>
           <marker
             id="as-arrow-active"
@@ -375,7 +380,7 @@ function DecisionPipelineGraph({
             markerHeight="5"
             orient="auto"
           >
-            <path d="M 0 1 L 7 4 L 0 7 z" fill="#E03E2D" />
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--sapphire-ice)" />
           </marker>
           <marker
             id="as-arrow-loop"
@@ -386,7 +391,7 @@ function DecisionPipelineGraph({
             markerHeight="5"
             orient="auto"
           >
-            <path d="M 0 1 L 7 4 L 0 7 z" fill="#B45309" />
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--amber)" />
           </marker>
         </defs>
 
@@ -398,10 +403,10 @@ function DecisionPipelineGraph({
           y2="22"
           stroke={
             directorState === 'active'
-              ? '#E03E2D'
+              ? 'var(--sapphire-ice)'
               : directorState === 'passed'
-              ? '#15803D'
-              : '#BEB8AB'
+              ? 'var(--emerald)'
+              : 'var(--svg-idle-arrow)'
           }
           strokeWidth="1.4"
           className={directorState === 'active' ? 'atelier-svg-flow' : undefined}
@@ -414,16 +419,16 @@ function DecisionPipelineGraph({
           }
         />
 
-        {/* Connector 2: Director -> Neon Coder (clean stepped spine, zero crossings) */}
+        {/* Connector 2: Director -> Neon Coder */}
         <path
           d="M 190 38 L 190 47 L 42 47 L 42 56"
           fill="none"
           stroke={
             coderState === 'active'
-              ? '#E03E2D'
+              ? 'var(--sapphire-ice)'
               : coderState === 'passed' || coderState === 'looping'
-              ? '#15803D'
-              : '#BEB8AB'
+              ? 'var(--emerald)'
+              : 'var(--svg-idle-arrow)'
           }
           strokeWidth="1.4"
           strokeLinejoin="round"
@@ -445,10 +450,10 @@ function DecisionPipelineGraph({
           y2="75"
           stroke={
             decisionState === 'active'
-              ? '#E03E2D'
+              ? 'var(--sapphire-ice)'
               : decisionState === 'passed' || decisionState === 'looping'
-              ? '#15803D'
-              : '#BEB8AB'
+              ? 'var(--emerald)'
+              : 'var(--svg-idle-arrow)'
           }
           strokeWidth="1.4"
           className={decisionState === 'active' ? 'atelier-svg-flow' : undefined}
@@ -461,25 +466,25 @@ function DecisionPipelineGraph({
           }
         />
 
-        {/* Connector 4: Decision-1 Gate -> Pass ✓ */}
+        {/* Connector 4: Decision-1 Gate -> Pass */}
         <line
           x1="174"
           y1="75"
           x2="184"
           y2="75"
-          stroke={passState === 'passed' ? '#15803D' : '#BEB8AB'}
+          stroke={passState === 'passed' ? 'var(--emerald)' : 'var(--svg-idle-arrow)'}
           strokeWidth="1.4"
           markerEnd={
             passState === 'passed' ? 'url(#as-arrow-ok)' : 'url(#as-arrow-idle)'
           }
         />
 
-        {/* Curved Loop-Back Arrow: Decision-1 Gate -> Neon Coder (Auto-Fix ↺) */}
+        {/* Curved Loop-Back Arrow */}
         <path
           d="M 133 93 C 133 114, 42 114, 42 95"
           fill="none"
-          stroke={loopActive ? '#B45309' : '#D8D2C5'}
-          strokeWidth={loopActive ? '1.7' : '1.2'}
+          stroke={loopActive ? 'var(--amber)' : 'var(--svg-idle-stroke)'}
+          strokeWidth={loopActive ? '1.6' : '1.2'}
           strokeDasharray={loopActive ? '4 3' : '3 3'}
           className={loopActive && isRunning ? 'atelier-svg-flow' : undefined}
           markerEnd={loopActive ? 'url(#as-arrow-loop)' : 'url(#as-arrow-idle)'}
@@ -490,17 +495,16 @@ function DecisionPipelineGraph({
           width="54"
           height="13"
           rx="6.5"
-          fill={loopActive ? '#FEF6EC' : '#FFFFFF'}
-          stroke={loopActive ? '#B45309' : '#E5E1D8'}
+          fill={loopActive ? 'var(--svg-loop-fill)' : 'var(--bg-card)'}
+          stroke={loopActive ? 'var(--amber)' : 'var(--svg-idle-stroke)'}
           strokeWidth="0.9"
         />
         <text
           x="88"
           y="113"
           textAnchor="middle"
-          className={`font-mono text-[7.5px] font-semibold ${
-            loopActive ? 'fill-[#B45309]' : 'fill-[#8A867E]'
-          }`}
+          fill={loopActive ? 'var(--amber)' : 'var(--ink-muted)'}
+          className="font-mono text-[7.5px] font-semibold"
         >
           Auto-Fix ↺
         </text>
@@ -512,13 +516,19 @@ function DecisionPipelineGraph({
             y="6"
             width="108"
             height="32"
-            rx="5"
+            rx="6"
             fill={cRef.fill}
             stroke={cRef.stroke}
-            strokeWidth={refState === 'active' ? '1.6' : '1.1'}
+            strokeWidth={refState === 'active' ? '1.5' : '1.1'}
           />
           {refState === 'active' && (
-            <circle cx="13" cy="15" r="2.5" fill="#E03E2D" className="animate-studio-pulse" />
+            <circle
+              cx="13"
+              cy="15"
+              r="2.4"
+              fill="var(--sapphire-ice)"
+              className="animate-studio-pulse"
+            />
           )}
           <text
             x="58"
@@ -547,13 +557,19 @@ function DecisionPipelineGraph({
             y="6"
             width="108"
             height="32"
-            rx="5"
+            rx="6"
             fill={cDir.fill}
             stroke={cDir.stroke}
-            strokeWidth={directorState === 'active' ? '1.6' : '1.1'}
+            strokeWidth={directorState === 'active' ? '1.5' : '1.1'}
           />
           {directorState === 'active' && (
-            <circle cx="145" cy="15" r="2.5" fill="#E03E2D" className="animate-studio-pulse" />
+            <circle
+              cx="145"
+              cy="15"
+              r="2.4"
+              fill="var(--sapphire-ice)"
+              className="animate-studio-pulse"
+            />
           )}
           <text
             x="190"
@@ -582,19 +598,19 @@ function DecisionPipelineGraph({
             y="58"
             width="76"
             height="34"
-            rx="5"
+            rx="6"
             fill={cCode.fill}
             stroke={cCode.stroke}
             strokeWidth={
-              coderState === 'active' || coderState === 'looping' ? '1.6' : '1.1'
+              coderState === 'active' || coderState === 'looping' ? '1.5' : '1.1'
             }
           />
           {(coderState === 'active' || coderState === 'looping') && (
             <circle
               cx="12"
               cy="67"
-              r="2.4"
-              fill={coderState === 'looping' ? '#B45309' : '#E03E2D'}
+              r="2.3"
+              fill={coderState === 'looping' ? 'var(--amber)' : 'var(--sapphire-ice)'}
               className="animate-studio-pulse"
             />
           )}
@@ -625,17 +641,23 @@ function DecisionPipelineGraph({
             y="58"
             width="82"
             height="34"
-            rx="5"
+            rx="6"
             fill={cDec.fill}
             stroke={cDec.stroke}
             strokeWidth={
               decisionState === 'active' || decisionState === 'looping'
-                ? '1.6'
+                ? '1.5'
                 : '1.1'
             }
           />
           {decisionState === 'active' && (
-            <circle cx="100" cy="67" r="2.4" fill="#E03E2D" className="animate-studio-pulse" />
+            <circle
+              cx="100"
+              cy="67"
+              r="2.3"
+              fill="var(--sapphire-ice)"
+              className="animate-studio-pulse"
+            />
           )}
           <text
             x="133"
@@ -657,17 +679,17 @@ function DecisionPipelineGraph({
           </text>
         </g>
 
-        {/* Node 5: Pass ✓ */}
+        {/* Node 5: Pass */}
         <g>
           <rect
             x="186"
             y="58"
             width="58"
             height="34"
-            rx="5"
+            rx="6"
             fill={cPass.fill}
             stroke={cPass.stroke}
-            strokeWidth={passState === 'passed' ? '1.6' : '1.1'}
+            strokeWidth={passState === 'passed' ? '1.5' : '1.1'}
           />
           <text
             x="215"
@@ -735,18 +757,18 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
     .join(' ');
 
   return (
-    <div className="rounded-[6px] border border-[#E5E1D8] bg-[#FAF8F4] p-2">
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2">
       <div className="mb-1 flex items-center justify-between">
-        <span className="font-mono text-[8.5px] font-semibold uppercase tracking-wider text-[#64625D]">
+        <span className="font-mono text-[8.5px] font-semibold uppercase tracking-wider text-[var(--ink-secondary)]">
           Convergence
         </span>
         <div className="flex items-center gap-2 font-mono text-[8.5px]">
-          <span className="flex items-center gap-1 text-[#15803D]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#15803D]" />
+          <span className="flex items-center gap-1 text-[var(--emerald)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--emerald)]" />
             Taste
           </span>
-          <span className="flex items-center gap-1 text-[#E03E2D]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#E03E2D]" />
+          <span className="flex items-center gap-1 text-[var(--vermilion)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--vermilion)]" />
             Slop
           </span>
         </div>
@@ -763,7 +785,7 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
           y1={padY}
           x2={width - padX}
           y2={padY}
-          stroke="#E5E1D8"
+          stroke="var(--svg-idle-stroke)"
           strokeDasharray="2 2"
         />
         <line
@@ -771,13 +793,13 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
           y1={padY + plotH}
           x2={width - padX}
           y2={padY + plotH}
-          stroke="#E5E1D8"
+          stroke="var(--svg-idle-stroke)"
         />
         {points.length > 1 && (
           <path
             d={slopPath}
             fill="none"
-            stroke="#E03E2D"
+            stroke="var(--vermilion)"
             strokeWidth="1.5"
             strokeDasharray="3 2"
           />
@@ -786,7 +808,7 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
           <path
             d={tastePath}
             fill="none"
-            stroke="#15803D"
+            stroke="var(--emerald)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -798,23 +820,24 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
               cx={xAt(i)}
               cy={ySlop(p.slop)}
               r="2.4"
-              fill="#FFFFFF"
-              stroke="#E03E2D"
+              fill="var(--bg-card)"
+              stroke="var(--vermilion)"
               strokeWidth="1.4"
             />
             <circle
               cx={xAt(i)}
               cy={yTaste(p.taste)}
               r="3"
-              fill={p.passed ? '#15803D' : '#FFFFFF'}
-              stroke="#15803D"
+              fill={p.passed ? 'var(--emerald)' : 'var(--bg-card)'}
+              stroke="var(--emerald)"
               strokeWidth="1.6"
             />
             <text
               x={xAt(i)}
               y={height - 2}
               textAnchor="middle"
-              className="fill-[#64625D] font-mono text-[8px]"
+              fill="var(--ink-secondary)"
+              className="font-mono text-[8px]"
             >
               {p.label}
             </text>
@@ -824,6 +847,12 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
     </div>
   );
 }
+
+const IDLE_QUICK_DIRECTIVES = [
+  'Elevate typography & generous editorial spacing',
+  'Remove AI-slop gradients and sharpen contrast',
+  'Match reference palette & hairline discipline',
+];
 
 export function CriticRail({
   collapsed,
@@ -858,60 +887,22 @@ export function CriticRail({
     });
   });
 
+  if (collapsed) {
+    return null;
+  }
+
   const latestRaceIteration = [...iterations]
     .reverse()
     .find((it) => it.candidates && it.candidates.length > 1);
   const raceCandidates = latestRaceIteration?.candidates ?? [];
 
   const totalQueueDisplay = (isRunning ? 1 : 0) + editQueue.length;
-
-  if (collapsed) {
-    return (
-      <aside className="flex h-full w-full flex-col items-center justify-between border-l border-[#E5E1D8] bg-[#FFFFFF] py-2.5">
-        <div className="flex flex-col items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            title="Expand Talk & Critic Rail"
-            aria-label="Expand Talk & Critic Rail"
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E5E1D8] bg-[#F5F3EE] text-[#141413] hover:border-[#141413]"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <div className="h-px w-5 bg-[#E5E1D8]" />
-          <button
-            type="button"
-            onClick={railVoice.toggleRecording}
-            title="Speak edit instruction"
-            className={`flex h-7 w-7 items-center justify-center rounded-md ${
-              railVoice.isRecording
-                ? 'bg-[#E03E2D] text-white'
-                : 'text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]'
-            }`}
-          >
-            <Mic className="h-3.5 w-3.5" />
-          </button>
-          <div className="flex flex-col items-center">
-            <span className="font-serif text-[19px] leading-none text-[#141413]">
-              {scorecard ? Math.round(scorecard.overallTasteScore) : '—'}
-            </span>
-            <span className="mt-0.5 font-mono text-[7.5px] uppercase text-[#64625D]">
-              TASTE
-            </span>
-          </div>
-          {totalQueueDisplay > 0 && (
-            <span
-              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E03E2D] px-1 font-mono text-[9px] font-bold text-white"
-              title={`${totalQueueDisplay} active/queued edit(s)`}
-            >
-              {totalQueueDisplay}
-            </span>
-          )}
-        </div>
-        <Gauge className="h-3.5 w-3.5 text-[#64625D]" />
-      </aside>
-    );
-  }
+  const isFreshIdle =
+    !isRunning &&
+    !scorecard &&
+    !manifest &&
+    editQueue.length === 0 &&
+    events.length === 0;
 
   const scoreMetrics: DecisionMetric[] = scorecard
     ? [
@@ -935,671 +926,704 @@ export function CriticRail({
 
   return (
     <>
-      <aside className="flex h-full w-full min-w-0 flex-col border-l border-[#E5E1D8] bg-[#FFFFFF]">
-        {/* Minimal Rail Header */}
-        <div className="flex h-9 shrink-0 items-center justify-between border-b border-[#E5E1D8] px-2.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#141413]">
-              Direct &amp; Critic
-            </span>
+      {/* Floating 16px-radius Obsidian Director Card mirroring Code Wiki's Gemini panel */}
+      <aside className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[var(--border-card)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+        {/* Top Header: Subtle Taste Index Pill + Code Wiki Collapse Icon (|▸) */}
+        <div className="flex h-[50px] shrink-0 items-center justify-between px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            {scorecard ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--emerald-border)] bg-[var(--emerald-bg)] px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[var(--emerald)]">
+                <span>{scorecard.overallTasteScore.toFixed(1)}</span>
+                <span className="opacity-70">/ 100</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--ink-secondary)]">
+                <GeminiSparkleMark className="h-3.5 w-3.5" />
+                <span>Director</span>
+              </span>
+            )}
             {isRunning && (
-              <span className="h-1.5 w-1.5 rounded-full bg-[#E03E2D] animate-studio-pulse" />
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--sapphire)] animate-studio-pulse" />
             )}
           </div>
+
           <button
             type="button"
             onClick={onToggleCollapse}
-            title="Collapse Critic Rail (expand canvas)"
-            aria-label="Collapse Critic Rail"
-            className="flex h-6 w-6 items-center justify-center rounded border border-[#E5E1D8] bg-[#FAF8F4] text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
+            title="Collapse Director panel"
+            aria-label="Collapse Director panel"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
           >
-            <ChevronRight className="h-3.5 w-3.5" />
+            <PanelRightClose className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Scrollable Right Rail Stack */}
-        <div className="studio-scroll flex-1 space-y-2.5 overflow-y-auto px-2.5 py-2.5">
-          {/* 1. ALWAYS-READY CONTINUOUS TALK / SPEAK & CIRCLE */}
-          <section
-            aria-label="Continuous talk and circle edit controls"
-            className="rounded-[7px] border border-[#E5E1D8] bg-[#FAF8F4] p-2"
-          >
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#64625D]">
-                Talk &amp; Circle
-              </span>
-              <span className="font-mono text-[8.5px] text-[#64625D]">
-                {isRunning ? 'queue ready' : '3.5-transcribe'}
-              </span>
+        {/* Middle Body: Iconic Code Wiki Calm Idle Sparkle OR Active Telemetry Stack */}
+        {isFreshIdle ? (
+          <div className="codewiki-sparkle-aura flex flex-1 flex-col items-center justify-center px-6 text-center">
+            <div className="flex flex-col items-center py-4">
+              <GeminiSparkleMark className="h-12 w-12" glow />
+              <h2 className="mt-5 text-[21px] font-medium tracking-[-0.02em] text-[var(--ink-primary)]">
+                Direct this interface
+              </h2>
+              <p className="mt-2 max-w-[235px] text-[13px] leading-relaxed text-[var(--ink-secondary)]">
+                Circle any element on the canvas, snap a reference URL, or speak your taste.
+              </p>
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={railVoice.toggleRecording}
-                className={`flex h-7 flex-1 items-center justify-center gap-1 rounded-[5px] text-[11px] font-medium transition-colors ${
-                  railVoice.isRecording
-                    ? 'bg-[#E03E2D] text-white'
-                    : 'border border-[#E5E1D8] bg-white text-[#141413] hover:border-[#141413]'
-                }`}
+            {/* Quiet clickable starter directions */}
+            <div className="mt-2 flex w-full flex-col gap-1.5">
+              {IDLE_QUICK_DIRECTIVES.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => onVoiceTranscriptChange(prompt)}
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-3 py-2 text-left text-[11.5px] text-[var(--ink-secondary)] transition-colors hover:border-[var(--sapphire-border)] hover:bg-[var(--sapphire-tint)] hover:text-[var(--ink-primary)]"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="studio-scroll flex-1 space-y-2.5 overflow-y-auto px-3.5 pb-3 pt-1">
+            {/* 1. Sleek Minimal Edit Queue Strip */}
+            {totalQueueDisplay > 0 && (
+              <section
+                aria-label="Live edit queue"
+                className="rounded-xl border border-[var(--sapphire-border)] bg-[var(--bg-card-elevated)] p-2.5"
               >
-                {railVoice.isRecording ? (
-                  <>
-                    <Square className="h-2.5 w-2.5 fill-current" />
-                    <span className="font-mono text-[10px]">
-                      0:{String(railVoice.durationSec).padStart(2, '0')}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="h-3 w-3 text-[#E03E2D]" />
-                    <span>Speak</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={onToggleDrawMode}
-                className={`flex h-7 flex-1 items-center justify-center gap-1 rounded-[5px] border text-[11px] font-medium transition-colors ${
-                  drawMode
-                    ? 'border-[#E03E2D] bg-[#E03E2D] text-white'
-                    : 'border-[#E5E1D8] bg-white text-[#141413] hover:border-[#141413]'
-                }`}
-                title="Circle regions directly on the live canvas"
-              >
-                <Pencil className="h-3 w-3" />
-                <span>Circle</span>
-                {drawnCirclesCount > 0 && (
-                  <span
-                    className={`rounded-full px-1 font-mono text-[9px] ${
-                      drawMode
-                        ? 'bg-white/25 text-white'
-                        : 'bg-[#FDF1EF] text-[#E03E2D]'
-                    }`}
-                  >
-                    {drawnCirclesCount}
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-primary)]">
+                    Queue ({totalQueueDisplay})
                   </span>
-                )}
-              </button>
-            </div>
-
-            {/* Live Waveform or Transcribing Indicator */}
-            {(railVoice.isRecording || railVoice.isTranscribing) && (
-              <div className="mt-1.5 flex h-5 items-center justify-center gap-[2px] rounded border border-[#E5E1D8] bg-white px-2">
-                {railVoice.isTranscribing ? (
-                  <span className="flex items-center gap-1 font-mono text-[9px] text-[#B45309]">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                    Transcribing voice…
-                  </span>
-                ) : (
-                  railVoice.levels.slice(0, 16).map((lvl, idx) => (
-                    <span
-                      key={idx}
-                      style={{ height: `${Math.round(lvl * 100)}%` }}
-                      className="w-[2.5px] rounded-full bg-[#E03E2D] transition-[height] duration-75"
-                    />
-                  ))
-                )}
-              </div>
-            )}
-
-            {railVoice.error && (
-              <p className="mt-1 text-[9.5px] text-[#E03E2D]">{railVoice.error}</p>
-            )}
-
-            {/* Instant Edit Prompt / Transcript + Apply or Queue */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmitTalkEdit();
-              }}
-              className="mt-1.5 flex items-center gap-1"
-            >
-              <input
-                type="text"
-                value={voiceTranscript}
-                onChange={(e) => onVoiceTranscriptChange(e.target.value)}
-                placeholder={
-                  isRunning
-                    ? 'Queue next edit while building…'
-                    : 'Speak or type an edit…'
-                }
-                aria-label="Edit instruction or voice transcript"
-                className="h-7 min-w-0 flex-1 rounded-[5px] border border-[#E5E1D8] bg-white px-2 text-[11px] text-[#141413] placeholder:text-[#96928A] focus:border-[#141413] focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!voiceTranscript.trim() && drawnCirclesCount === 0}
-                title={
-                  isRunning
-                    ? 'Add edit to live queue (auto-runs next)'
-                    : 'Apply surgical edit now'
-                }
-                className="flex h-7 shrink-0 items-center gap-1 rounded-[5px] bg-[#141413] px-2 font-mono text-[10px] font-medium text-white transition-colors hover:bg-[#E03E2D] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {isRunning ? (
-                  <>
-                    <Plus className="h-3 w-3" />
-                    <span>Queue</span>
-                  </>
-                ) : (
-                  <>
-                    <CornerDownLeft className="h-3 w-3" />
-                    <span>Go</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </section>
-
-          {/* 2. VISIBLE LIVE EDIT QUEUE STRIP */}
-          {totalQueueDisplay > 0 && (
-            <section
-              aria-label="Live edit queue"
-              className="rounded-[7px] border border-[#141413]/20 bg-[#FAF8F4] p-2"
-            >
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#141413]">
-                  Queue ({totalQueueDisplay})
-                </span>
-                <span className="font-mono text-[8.5px] text-[#64625D]">
-                  auto-dequeue
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                {isRunning && (
-                  <div className="flex items-center gap-1.5 rounded-[5px] border border-[#E03E2D]/30 bg-[#FDF1EF] px-2 py-1">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E03E2D] animate-studio-pulse" />
-                    <span className="shrink-0 font-mono text-[9px] font-semibold text-[#E03E2D]">
-                      #1 Active
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[10.5px] text-[#141413]">
-                      {activeJobLabel || 'Transforming live app'}
-                    </span>
-                  </div>
-                )}
-
-                {editQueue.map((job, idx) => (
-                  <div
-                    key={job.id}
-                    className="flex items-center gap-1.5 rounded-[5px] border border-[#E5E1D8] bg-white px-2 py-1"
-                  >
-                    <span className="shrink-0 font-mono text-[9px] font-semibold text-[#64625D]">
-                      #{idx + (isRunning ? 2 : 1)}
-                    </span>
-                    <span
-                      title={job.label}
-                      className="min-w-0 flex-1 truncate text-[10.5px] text-[#141413]"
-                    >
-                      &ldquo;{job.label}&rdquo;
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onRemoveQueuedJob(job.id)}
-                      aria-label={`Remove queued edit ${job.label}`}
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#E03E2D]"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* 3. COMPACT HEADLINE TASTE INDEX CARD */}
-          <section
-            aria-label="AntiSlop Taste Index summary"
-            className="rounded-[7px] border border-[#E5E1D8] bg-[#FAF8F4] p-2.5"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-mono text-[8.5px] font-semibold uppercase tracking-[0.1em] text-[#64625D]">
-                  Taste Index
-                </div>
-                <div className="mt-0.5 flex items-baseline gap-1">
-                  <span className="font-serif text-[38px] leading-none tracking-[-0.03em] text-[#141413]">
-                    {scorecard ? Math.round(scorecard.overallTasteScore) : '—'}
-                  </span>
-                  <span className="font-mono text-[10px] text-[#64625D]">
-                    /100
+                  <span className="font-mono text-[8.5px] text-[var(--ink-muted)]">
+                    auto-dequeue
                   </span>
                 </div>
-              </div>
 
-              <div className="flex flex-col items-end gap-1">
-                {scorecard ? (
-                  scorecard.passedAllGates ? (
-                    <span className="inline-flex items-center gap-1 rounded border border-[#15803D]/30 bg-[#EEF8F1] px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#15803D]">
-                      <CheckCircle2 className="h-2.5 w-2.5" />
-                      PASS
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded border border-[#B45309]/30 bg-[#FEF6EC] px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#B45309]">
-                      <AlertTriangle className="h-2.5 w-2.5" />
-                      REFINING
-                    </span>
-                  )
-                ) : (
-                  <span className="rounded border border-[#E5E1D8] bg-white px-1.5 py-0.5 font-mono text-[9px] text-[#64625D]">
-                    READY
-                  </span>
-                )}
-                <span className="font-mono text-[8.5px] text-[#64625D]">
-                  {scorecard ? `${Math.round(scorecard.latencyMs)}ms` : '0 out tok'}
-                </span>
-              </div>
-            </div>
+                <div className="space-y-1">
+                  {isRunning && (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] px-2 py-1.5">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--sapphire-ice)] animate-studio-pulse" />
+                      <span className="shrink-0 font-mono text-[9px] font-semibold text-[var(--sapphire-ice)]">
+                        #1
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--ink-primary)]">
+                        {activeJobLabel || 'Transforming live app'}
+                      </span>
+                    </div>
+                  )}
 
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
-              <div className="rounded-[5px] border border-[#E5E1D8] bg-white px-2 py-1.5">
-                <div className="font-mono text-[8.5px] uppercase tracking-wider text-[#64625D]">
-                  Slop ↓
-                </div>
-                <div className="mt-0.5 flex items-baseline justify-between">
-                  <span
-                    className={`font-mono text-[15px] font-semibold ${
-                      !scorecard
-                        ? 'text-[#64625D]'
-                        : scorecard.metrics.slopPenalty.passed
-                        ? 'text-[#15803D]'
-                        : 'text-[#E03E2D]'
-                    }`}
-                  >
-                    {scorecard
-                      ? scorecard.metrics.slopPenalty.value.toFixed(1)
-                      : '—'}
-                  </span>
-                  <span className="font-mono text-[8.5px] text-[#64625D]">/10</span>
-                </div>
-              </div>
-
-              <div className="rounded-[5px] border border-[#E5E1D8] bg-white px-2 py-1.5">
-                <div className="font-mono text-[8.5px] uppercase tracking-wider text-[#64625D]">
-                  Match ↑
-                </div>
-                <div className="mt-0.5 flex items-baseline justify-between">
-                  <span
-                    className={`font-mono text-[15px] font-semibold ${
-                      !scorecard
-                        ? 'text-[#64625D]'
-                        : scorecard.metrics.aestheticMatch.passed
-                        ? 'text-[#15803D]'
-                        : 'text-[#B45309]'
-                    }`}
-                  >
-                    {scorecard
-                      ? scorecard.metrics.aestheticMatch.value.toFixed(1)
-                      : '—'}
-                  </span>
-                  <span className="font-mono text-[8.5px] text-[#64625D]">/10</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-1.5 flex items-center justify-between gap-1 font-mono text-[8.5px] text-[#64625D]">
-              <span className="inline-flex items-center gap-1 truncate">
-                <Cpu className="h-2.5 w-2.5 text-[#15803D]" />
-                decision-1
-              </span>
-              <span className="inline-flex items-center gap-1 truncate">
-                <Sparkles className="h-2.5 w-2.5 text-[#E03E2D]" />
-                embed-2:{' '}
-                {typeof scorecard?.embeddingSimilarity === 'number'
-                  ? scorecard.embeddingSimilarity.toFixed(2)
-                  : '—'}
-              </span>
-            </div>
-          </section>
-
-          {/* 4. VISUAL DECISIONS API PIPELINE GRAPH */}
-          <DecisionPipelineGraph
-            events={events}
-            isRunning={isRunning}
-            activeModeRunning={activeModeRunning}
-            manifest={manifest}
-            scorecard={scorecard}
-            iterations={iterations}
-            assetsCount={assetsCount}
-            drawnCirclesCount={drawnCirclesCount}
-          />
-
-          {/* 5. COLLAPSIBLE 12-PROBE RUBRIC & 4-WAY CANDIDATE RACE */}
-          <details className="atelier-details rounded-[7px] border border-[#E5E1D8] bg-[#FFFFFF]">
-            <summary className="flex items-center justify-between gap-2 px-2.5 py-2 select-none hover:bg-[#FAF8F4]">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <ChevronDown className="atelier-chevron h-3.5 w-3.5 shrink-0 text-[#64625D]" />
-                <span className="truncate font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#141413]">
-                  12-Probe Rubric
-                </span>
-              </div>
-              <span className="shrink-0 font-mono text-[8.5px] text-[#64625D]">
-                {raceCandidates.length > 1
-                  ? `${raceCandidates.length}× Race`
-                  : scorecard
-                  ? `${scorecard.passedAllGates ? '12/12' : 'inspect'}`
-                  : 'details'}
-              </span>
-            </summary>
-
-            <div className="space-y-2.5 border-t border-[#E5E1D8] px-2.5 py-2.5">
-              {/* 4-Way Parallel Candidate Race Thumbnails */}
-              {raceCandidates.length > 1 && (
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 font-mono text-[8.5px] font-semibold uppercase tracking-wider text-[#141413]">
-                      <Layers className="h-3 w-3" />
-                      {raceCandidates.length}× Candidate Race
-                    </span>
-                    <span className="font-mono text-[8px] text-[#64625D]">
-                      tap to inspect
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {raceCandidates.map((cand) => {
-                      const thumb = resolveBackendUrl(cand.screenshotUrl);
-                      return (
-                        <button
-                          key={cand.candidateId}
-                          type="button"
-                          onClick={() => setInspectCandidate(cand)}
-                          className={`overflow-hidden rounded-[5px] border bg-white text-left transition-colors ${
-                            cand.selectedAsWinner
-                              ? 'border-[#15803D] ring-1 ring-[#15803D]/30'
-                              : 'border-[#E5E1D8] hover:border-[#141413]'
-                          }`}
-                        >
-                          <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#EFECE5]">
-                            {thumb ? (
-                              <img
-                                src={thumb}
-                                alt={cand.strategyLabel}
-                                className="h-full w-full object-cover object-top"
-                              />
-                            ) : (
-                              <div className="flex h-full items-center justify-center font-mono text-[8.5px] text-[#64625D]">
-                                No preview
-                              </div>
-                            )}
-                            {cand.selectedAsWinner && (
-                              <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-[#15803D] px-1 py-0.5 font-mono text-[7.5px] font-bold uppercase text-white">
-                                <Award className="h-2.5 w-2.5" />
-                                WIN
-                              </span>
-                            )}
-                            <span className="absolute bottom-1 right-1 rounded bg-[#141413]/85 px-1 py-0.5 font-mono text-[8.5px] font-semibold text-white">
-                              {Math.round(cand.scorecard.overallTasteScore)}
-                            </span>
-                          </div>
-                          <div className="px-1.5 py-1">
-                            <div className="truncate text-[9.5px] font-medium text-[#141413]">
-                              {cand.strategyLabel}
-                            </div>
-                            <div className="flex items-center justify-between font-mono text-[8px] text-[#64625D]">
-                              <span>
-                                slop {cand.scorecard.metrics.slopPenalty.value.toFixed(1)}
-                              </span>
-                              <span>{(cand.latencyMs / 1000).toFixed(1)}s</span>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Convergence Sparkline */}
-              <ConvergenceSparkline iterations={iterations} />
-
-              {/* Deterministic Puppeteer DOM Audit */}
-              {scorecard?.domAudit && (
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    {
-                      label: `${scorecard.domAudit.horizontalOverflowPx}px ovf`,
-                      ok: scorecard.domAudit.horizontalOverflowPx <= 2,
-                    },
-                    {
-                      label: `${scorecard.domAudit.overlappingTextNodes} overlap`,
-                      ok: scorecard.domAudit.overlappingTextNodes === 0,
-                    },
-                    {
-                      label: `${scorecard.domAudit.brokenImageCount} img err`,
-                      ok: scorecard.domAudit.brokenImageCount === 0,
-                    },
-                    {
-                      label: `${scorecard.domAudit.consoleErrorCount} console`,
-                      ok: scorecard.domAudit.consoleErrorCount === 0,
-                    },
-                  ].map((pill) => (
+                  {editQueue.map((job, idx) => (
                     <div
-                      key={pill.label}
-                      className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] ${
-                        pill.ok
-                          ? 'border-[#15803D]/25 bg-[#EEF8F1] text-[#15803D]'
-                          : 'border-[#E03E2D]/30 bg-[#FDF1EF] text-[#E03E2D]'
-                      }`}
+                      key={job.id}
+                      className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1"
                     >
-                      <ShieldCheck className="h-2.5 w-2.5 shrink-0" />
-                      <span className="truncate">{pill.label}</span>
+                      <span className="shrink-0 font-mono text-[9px] font-semibold text-[var(--ink-muted)]">
+                        #{idx + (isRunning ? 2 : 1)}
+                      </span>
+                      <span
+                        title={job.label}
+                        className="min-w-0 flex-1 truncate text-[11px] text-[var(--ink-primary)]"
+                      >
+                        &ldquo;{job.label}&rdquo;
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveQueuedJob(job.id)}
+                        aria-label={`Remove queued edit ${job.label}`}
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--vermilion)]"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </div>
                   ))}
                 </div>
-              )}
+              </section>
+            )}
 
-              {/* 6 Calibrated Score Probe Bars */}
-              {scorecard ? (
-                <>
-                  <div className="space-y-1.5">
-                    {scoreMetrics.map((m) => {
-                      const pct = Math.max(0, Math.min(100, (m.value / 10) * 100));
-                      const isInverse = m.id.toLowerCase().includes('slop');
-                      return (
-                        <div key={m.id} className="space-y-0.5">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="truncate font-medium text-[#141413]">
-                              {m.label}
-                            </span>
-                            <span className="shrink-0 font-mono text-[9.5px]">
-                              <strong
-                                className={
-                                  m.passed ? 'text-[#15803D]' : 'text-[#E03E2D]'
-                                }
-                              >
-                                {m.value.toFixed(1)}
-                              </strong>
-                              <span className="text-[#64625D]">
-                                /10 · {Math.round(m.confidence * 100)}%
-                              </span>
-                            </span>
-                          </div>
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EFECE5]">
-                            <div
-                              style={{ width: `${pct}%` }}
-                              className={`h-full rounded-full transition-all duration-300 ${
-                                m.passed
-                                  ? 'bg-[#15803D]'
-                                  : isInverse
-                                  ? 'bg-[#E03E2D]'
-                                  : 'bg-[#B45309]'
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+            {/* 2. Compact Taste & Slop Score Row */}
+            <section
+              aria-label="AntiSlop Taste Index summary"
+              className="rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)]">
+                    Taste Index
                   </div>
+                  <div className="mt-0.5 flex items-baseline gap-1">
+                    <span className="font-serif text-[34px] leading-none tracking-[-0.02em] text-[var(--ink-primary)]">
+                      {scorecard ? scorecard.overallTasteScore.toFixed(1) : '—'}
+                    </span>
+                    <span className="font-mono text-[10.5px] text-[var(--ink-muted)]">
+                      /100
+                    </span>
+                  </div>
+                </div>
 
-                  {/* 4 Noul Probability Gates */}
-                  <div className="grid grid-cols-2 gap-1">
-                    {noulMetrics.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`rounded border px-1.5 py-1 ${
-                          m.passed
-                            ? 'border-[#E5E1D8] bg-[#FAF8F4]'
-                            : 'border-[#E03E2D]/35 bg-[#FDF1EF]'
-                        }`}
-                      >
-                        <div className="truncate text-[9px] font-medium text-[#141413]">
-                          {m.label}
-                        </div>
-                        <div className="flex items-baseline justify-between font-mono">
-                          <span
-                            className={`text-[11px] font-semibold ${
-                              m.passed ? 'text-[#15803D]' : 'text-[#E03E2D]'
+                <div className="flex flex-col items-end gap-1">
+                  {scorecard ? (
+                    scorecard.passedAllGates ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--emerald-border)] bg-[var(--emerald-bg)] px-2 py-0.5 font-mono text-[9px] font-semibold text-[var(--emerald)]">
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        PASS
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--amber-border)] bg-[var(--amber-bg)] px-2 py-0.5 font-mono text-[9px] font-semibold text-[var(--amber)]">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        REFINING
+                      </span>
+                    )
+                  ) : (
+                    <span className="rounded-full border border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] px-2 py-0.5 font-mono text-[9px] text-[var(--sapphire-ice)]">
+                      SCORING
+                    </span>
+                  )}
+                  <span className="font-mono text-[9px] text-[var(--ink-muted)]">
+                    {scorecard ? `${Math.round(scorecard.latencyMs)}ms` : 'decision-1'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5">
+                  <div className="font-mono text-[8.5px] uppercase tracking-wider text-[var(--ink-muted)]">
+                    Slop ↓
+                  </div>
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span
+                      className={`font-mono text-[15px] font-semibold ${
+                        !scorecard
+                          ? 'text-[var(--ink-muted)]'
+                          : scorecard.metrics.slopPenalty.passed
+                          ? 'text-[var(--emerald)]'
+                          : 'text-[var(--vermilion)]'
+                      }`}
+                    >
+                      {scorecard
+                        ? scorecard.metrics.slopPenalty.value.toFixed(1)
+                        : '—'}
+                    </span>
+                    <span className="font-mono text-[8.5px] text-[var(--ink-muted)]">
+                      /10
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5">
+                  <div className="font-mono text-[8.5px] uppercase tracking-wider text-[var(--ink-muted)]">
+                    Match ↑
+                  </div>
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span
+                      className={`font-mono text-[15px] font-semibold ${
+                        !scorecard
+                          ? 'text-[var(--ink-muted)]'
+                          : scorecard.metrics.aestheticMatch.passed
+                          ? 'text-[var(--emerald)]'
+                          : 'text-[var(--amber)]'
+                      }`}
+                    >
+                      {scorecard
+                        ? scorecard.metrics.aestheticMatch.value.toFixed(1)
+                        : '—'}
+                    </span>
+                    <span className="font-mono text-[8.5px] text-[var(--ink-muted)]">
+                      /10
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-1 font-mono text-[9px] text-[var(--ink-muted)]">
+                <span className="inline-flex items-center gap-1 truncate">
+                  <Cpu className="h-2.5 w-2.5 text-[var(--emerald)]" />
+                  decision-1
+                </span>
+                <span className="inline-flex items-center gap-1 truncate">
+                  <Sparkles className="h-2.5 w-2.5 text-[var(--sapphire-ice)]" />
+                  embed-2:{' '}
+                  {typeof scorecard?.embeddingSimilarity === 'number'
+                    ? scorecard.embeddingSimilarity.toFixed(2)
+                    : '—'}
+                </span>
+              </div>
+            </section>
+
+            {/* 3. Compact Inline SVG Decisions API Pipeline Graph */}
+            <DecisionPipelineGraph
+              events={events}
+              isRunning={isRunning}
+              activeModeRunning={activeModeRunning}
+              manifest={manifest}
+              scorecard={scorecard}
+              iterations={iterations}
+              assetsCount={assetsCount}
+              drawnCirclesCount={drawnCirclesCount}
+            />
+
+            {/* 4. Collapsed-by-Default Native <details>: 12-Probe Rubric */}
+            <details className="atelier-details rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)]">
+              <summary className="flex select-none items-center justify-between gap-2 px-3 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <ChevronDown className="atelier-chevron h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />
+                  <span className="truncate font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-primary)]">
+                    12-Probe Rubric
+                  </span>
+                </div>
+                <span className="shrink-0 font-mono text-[9px] text-[var(--ink-muted)]">
+                  {raceCandidates.length > 1
+                    ? `${raceCandidates.length}× Race`
+                    : scorecard
+                    ? `${scorecard.passedAllGates ? '12/12' : 'inspect'}`
+                    : 'details'}
+                </span>
+              </summary>
+
+              <div className="space-y-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5">
+                {/* 4-Way Candidate Race */}
+                {raceCandidates.length > 1 && (
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 font-mono text-[9px] font-semibold uppercase tracking-wider text-[var(--ink-primary)]">
+                        <Layers className="h-3 w-3 text-[var(--sapphire-ice)]" />
+                        {raceCandidates.length}× Candidate Race
+                      </span>
+                      <span className="font-mono text-[8.5px] text-[var(--ink-muted)]">
+                        tap to inspect
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {raceCandidates.map((cand) => {
+                        const thumb = resolveBackendUrl(cand.screenshotUrl);
+                        return (
+                          <button
+                            key={cand.candidateId}
+                            type="button"
+                            onClick={() => setInspectCandidate(cand)}
+                            className={`overflow-hidden rounded-lg border bg-[var(--bg-card)] text-left transition-colors ${
+                              cand.selectedAsWinner
+                                ? 'border-[var(--emerald)] ring-1 ring-[var(--emerald-border)]'
+                                : 'border-[var(--border-card)] hover:border-[var(--sapphire-border)]'
                             }`}
                           >
-                            {Math.round(m.value * 100)}%
-                          </span>
-                          <span className="text-[8px] text-[#64625D]">
-                            {Math.round(m.confidence * 100)}%c
-                          </span>
-                        </div>
+                            <div className="relative aspect-[16/10] w-full overflow-hidden bg-black/40">
+                              {thumb ? (
+                                <img
+                                  src={thumb}
+                                  alt={cand.strategyLabel}
+                                  className="h-full w-full object-cover object-top"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center font-mono text-[8.5px] text-[var(--ink-muted)]">
+                                  No preview
+                                </div>
+                              )}
+                              {cand.selectedAsWinner && (
+                                <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-[var(--emerald)] px-1 py-0.5 font-mono text-[7.5px] font-bold uppercase text-[#0B0D10]">
+                                  <Award className="h-2.5 w-2.5" />
+                                  WIN
+                                </span>
+                              )}
+                              <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 font-mono text-[8.5px] font-semibold text-white">
+                                {Math.round(cand.scorecard.overallTasteScore)}
+                              </span>
+                            </div>
+                            <div className="px-1.5 py-1">
+                              <div className="truncate text-[9.5px] font-medium text-[var(--ink-primary)]">
+                                {cand.strategyLabel}
+                              </div>
+                              <div className="flex items-center justify-between font-mono text-[8px] text-[var(--ink-muted)]">
+                                <span>
+                                  slop {cand.scorecard.metrics.slopPenalty.value.toFixed(1)}
+                                </span>
+                                <span>{(cand.latencyMs / 1000).toFixed(1)}s</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <ConvergenceSparkline iterations={iterations} />
+
+                {/* Deterministic DOM Audit */}
+                {scorecard?.domAudit && (
+                  <div className="grid grid-cols-2 gap-1">
+                    {[
+                      {
+                        label: `${scorecard.domAudit.horizontalOverflowPx}px ovf`,
+                        ok: scorecard.domAudit.horizontalOverflowPx <= 2,
+                      },
+                      {
+                        label: `${scorecard.domAudit.overlappingTextNodes} overlap`,
+                        ok: scorecard.domAudit.overlappingTextNodes === 0,
+                      },
+                      {
+                        label: `${scorecard.domAudit.brokenImageCount} img err`,
+                        ok: scorecard.domAudit.brokenImageCount === 0,
+                      },
+                      {
+                        label: `${scorecard.domAudit.consoleErrorCount} console`,
+                        ok: scorecard.domAudit.consoleErrorCount === 0,
+                      },
+                    ].map((pill) => (
+                      <div
+                        key={pill.label}
+                        className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[9px] ${
+                          pill.ok
+                            ? 'border-[var(--emerald-border)] bg-[var(--emerald-bg)] text-[var(--emerald)]'
+                            : 'border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] text-[var(--vermilion)]'
+                        }`}
+                      >
+                        <ShieldCheck className="h-2.5 w-2.5 shrink-0" />
+                        <span className="truncate">{pill.label}</span>
                       </div>
                     ))}
                   </div>
+                )}
 
-                  {/* 2 Choice Classifications */}
-                  <div className="grid grid-cols-2 gap-1">
-                    <div className="rounded border border-[#E5E1D8] bg-[#FAF8F4] px-1.5 py-1">
-                      <div className="font-mono text-[8px] uppercase text-[#64625D]">
-                        Class
+                {/* 6 Score Probe Bars */}
+                {scorecard ? (
+                  <>
+                    <div className="space-y-1.5">
+                      {scoreMetrics.map((m) => {
+                        const pct = Math.max(0, Math.min(100, (m.value / 10) * 100));
+                        const isInverse = m.id.toLowerCase().includes('slop');
+                        return (
+                          <div key={m.id} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="truncate font-medium text-[var(--ink-primary)]">
+                                {m.label}
+                              </span>
+                              <span className="shrink-0 font-mono text-[9.5px]">
+                                <strong
+                                  className={
+                                    m.passed
+                                      ? 'text-[var(--emerald)]'
+                                      : 'text-[var(--vermilion)]'
+                                  }
+                                >
+                                  {m.value.toFixed(1)}
+                                </strong>
+                                <span className="text-[var(--ink-muted)]">
+                                  /10 · {Math.round(m.confidence * 100)}%
+                                </span>
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle-hover)]">
+                              <div
+                                style={{ width: `${pct}%` }}
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  m.passed
+                                    ? 'bg-[var(--emerald)]'
+                                    : isInverse
+                                    ? 'bg-[var(--vermilion)]'
+                                    : 'bg-[var(--amber)]'
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 4 Noul Probability Gates */}
+                    <div className="grid grid-cols-2 gap-1">
+                      {noulMetrics.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`rounded-md border px-1.5 py-1 ${
+                            m.passed
+                              ? 'border-[var(--border-subtle)] bg-[var(--bg-card)]'
+                              : 'border-[var(--vermilion-border)] bg-[var(--vermilion-bg)]'
+                          }`}
+                        >
+                          <div className="truncate text-[9px] font-medium text-[var(--ink-primary)]">
+                            {m.label}
+                          </div>
+                          <div className="flex items-baseline justify-between font-mono">
+                            <span
+                              className={`text-[11px] font-semibold ${
+                                m.passed
+                                  ? 'text-[var(--emerald)]'
+                                  : 'text-[var(--vermilion)]'
+                              }`}
+                            >
+                              {Math.round(m.value * 100)}%
+                            </span>
+                            <span className="text-[8px] text-[var(--ink-muted)]">
+                              {Math.round(m.confidence * 100)}%c
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 2 Choice Classifications */}
+                    <div className="grid grid-cols-2 gap-1">
+                      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-1">
+                        <div className="font-mono text-[8px] uppercase text-[var(--ink-muted)]">
+                          Class
+                        </div>
+                        <div className="truncate font-mono text-[9.5px] font-semibold text-[var(--ink-primary)]">
+                          {scorecard.metrics.dominantAestheticClass.choiceLabel || '—'}
+                        </div>
                       </div>
-                      <div className="truncate font-mono text-[9.5px] font-semibold text-[#141413]">
-                        {scorecard.metrics.dominantAestheticClass.choiceLabel || '—'}
+                      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-1">
+                        <div className="font-mono text-[8px] uppercase text-[var(--ink-muted)]">
+                          Defect
+                        </div>
+                        <div
+                          className={`truncate font-mono text-[9.5px] font-semibold ${
+                            scorecard.metrics.primaryDefectClass.choiceLabel === 'none'
+                              ? 'text-[var(--emerald)]'
+                              : 'text-[var(--amber)]'
+                          }`}
+                        >
+                          {scorecard.metrics.primaryDefectClass.choiceLabel || '—'}
+                        </div>
                       </div>
                     </div>
-                    <div className="rounded border border-[#E5E1D8] bg-[#FAF8F4] px-1.5 py-1">
-                      <div className="font-mono text-[8px] uppercase text-[#64625D]">
-                        Defect
-                      </div>
-                      <div
-                        className={`truncate font-mono text-[9.5px] font-semibold ${
-                          scorecard.metrics.primaryDefectClass.choiceLabel === 'none'
-                            ? 'text-[#15803D]'
-                            : 'text-[#B45309]'
-                        }`}
-                      >
-                        {scorecard.metrics.primaryDefectClass.choiceLabel || '—'}
-                      </div>
-                    </div>
-                  </div>
 
-                  {scorecard.criticActionDirective && (
-                    <p className="rounded border border-[#E5E1D8] bg-[#FAF8F4] px-2 py-1.5 text-[10px] leading-snug text-[#141413]">
-                      <strong className="font-mono text-[8.5px] uppercase text-[#64625D]">
-                        Directive:{' '}
-                      </strong>
-                      {scorecard.criticActionDirective}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="py-2 text-center font-mono text-[9.5px] text-[#64625D]">
-                  Run Transform or Circle-to-Tweak to populate all 12 calibrated probes.
-                </p>
-              )}
-            </div>
-          </details>
-
-          {/* 6. COLLAPSIBLE MANIFEST & LIVE TELEMETRY FEED */}
-          <details className="atelier-details rounded-[7px] border border-[#E5E1D8] bg-[#FFFFFF]">
-            <summary className="flex items-center justify-between gap-2 px-2.5 py-2 select-none hover:bg-[#FAF8F4]">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <ChevronDown className="atelier-chevron h-3.5 w-3.5 shrink-0 text-[#64625D]" />
-                <span className="truncate font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#141413]">
-                  Manifest &amp; Stream
-                </span>
+                    {scorecard.criticActionDirective && (
+                      <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1.5 text-[10px] leading-snug text-[var(--ink-secondary)]">
+                        <strong className="font-mono text-[8.5px] uppercase text-[var(--ink-primary)]">
+                          Directive:{' '}
+                        </strong>
+                        {scorecard.criticActionDirective}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="py-2 text-center font-mono text-[9.5px] text-[var(--ink-muted)]">
+                    Calibrated 12-probe scores populate live as each render finishes.
+                  </p>
+                )}
               </div>
-              <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[8.5px] text-[#64625D]">
-                <Activity className="h-2.5 w-2.5" />
-                {events.length} ev
-              </span>
-            </summary>
+            </details>
 
-            <div className="space-y-2 border-t border-[#E5E1D8] px-2.5 py-2.5">
-              {manifest && (
-                <div className="rounded-[6px] border border-[#E5E1D8] bg-[#FAF8F4] p-2">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-serif text-[16px] leading-tight text-[#141413]">
+            {/* 5. Collapsed-by-Default Native <details>: Manifest & Stream */}
+            <details className="atelier-details rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)]">
+              <summary className="flex select-none items-center justify-between gap-2 px-3 py-2.5 transition-colors hover:bg-[var(--bg-subtle)]">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <ChevronDown className="atelier-chevron h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />
+                  <span className="truncate font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-primary)]">
+                    Manifest &amp; Stream
+                  </span>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[9px] text-[var(--ink-muted)]">
+                  <Activity className="h-2.5 w-2.5" />
+                  {events.length} ev
+                </span>
+              </summary>
+
+              <div className="space-y-2 border-t border-[var(--border-subtle)] px-3 py-2.5">
+                {manifest && (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2">
+                    <span className="font-serif text-[16px] leading-tight text-[var(--ink-primary)]">
                       {manifest.vibeTitle}
                     </span>
+                    <div className="mt-1.5 flex items-center gap-1">
+                      {[
+                        manifest.tokens.palette.canvas,
+                        manifest.tokens.palette.surface,
+                        manifest.tokens.palette.inkPrimary,
+                        manifest.tokens.palette.accent,
+                        manifest.tokens.palette.borderSubtle,
+                      ].map((hex, i) => (
+                        <span
+                          key={`${hex}-${i}`}
+                          title={hex}
+                          style={{ backgroundColor: hex }}
+                          className="h-3.5 flex-1 rounded-[3px] border border-white/15"
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-1 truncate font-mono text-[8.5px] text-[var(--ink-muted)]">
+                      {manifest.tokens.typography.displayFont} +{' '}
+                      {manifest.tokens.typography.bodyFont}
+                    </div>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-1">
-                    {[
-                      manifest.tokens.palette.canvas,
-                      manifest.tokens.palette.surface,
-                      manifest.tokens.palette.inkPrimary,
-                      manifest.tokens.palette.accent,
-                      manifest.tokens.palette.borderSubtle,
-                    ].map((hex, i) => (
+                )}
+
+                {thinkingBuffer && (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1.5 font-mono text-[9.5px] leading-relaxed text-[var(--ink-secondary)]">
+                    <div className="mb-0.5 text-[8.5px] font-semibold uppercase text-[var(--sapphire-ice)]">
+                      Director Thinking
+                    </div>
+                    <p className="line-clamp-4 whitespace-pre-wrap">
+                      {thinkingBuffer}
+                    </p>
+                  </div>
+                )}
+
+                <div className="studio-scroll max-h-[180px] space-y-1 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+                  {events.length === 0 ? (
+                    <p className="py-3 text-center font-mono text-[9.5px] text-[var(--ink-muted)]">
+                      Live Gemini 4 stream idle.
+                    </p>
+                  ) : (
+                    [...events].reverse().map((ev, idx) => {
+                      const badge = modelBadgeStyle(ev.model);
+                      return (
+                        <div
+                          key={`${ev.timestamp}-${idx}`}
+                          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card-elevated)] px-2 py-1"
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span
+                              className={`rounded border px-1 font-mono text-[8px] font-medium ${badge.className}`}
+                            >
+                              {badge.label}
+                            </span>
+                            <span className="font-mono text-[8px] text-[var(--ink-muted)]">
+                              {new Date(ev.timestamp).toLocaleTimeString([], {
+                                hour12: false,
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[9.5px] leading-snug text-[var(--ink-primary)]">
+                            {ev.message}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+
+        {/* Bottom-Anchored Code Wiki Pill Input + Voice Bar */}
+        <div className="shrink-0 px-3.5 pb-3.5 pt-2">
+          {/* Live Voice Waveform Strip right above Pill when recording/transcribing */}
+          {(railVoice.isRecording || railVoice.isTranscribing) && (
+            <div className="mb-2 flex h-7 items-center justify-between gap-2 rounded-full border border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] px-3">
+              {railVoice.isTranscribing ? (
+                <span className="flex items-center gap-1.5 font-mono text-[10px] text-[var(--amber)]">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Transcribing with gemini-3.5-transcribe…
+                </span>
+              ) : (
+                <>
+                  <span className="font-mono text-[10px] font-medium text-[var(--vermilion)]">
+                    REC 0:{String(railVoice.durationSec).padStart(2, '0')}
+                  </span>
+                  <div className="flex h-3.5 items-center gap-[2px]">
+                    {railVoice.levels.slice(0, 14).map((lvl, idx) => (
                       <span
-                        key={`${hex}-${i}`}
-                        title={hex}
-                        style={{ backgroundColor: hex }}
-                        className="h-3.5 flex-1 rounded-[2px] border border-[#141413]/15"
+                        key={idx}
+                        style={{ height: `${Math.round(lvl * 100)}%` }}
+                        className="w-[2px] rounded-full bg-[var(--vermilion)] transition-[height] duration-75"
                       />
                     ))}
                   </div>
-                  <div className="mt-1 truncate font-mono text-[8.5px] text-[#64625D]">
-                    {manifest.tokens.typography.displayFont} +{' '}
-                    {manifest.tokens.typography.bodyFont}
-                  </div>
-                </div>
+                </>
               )}
-
-              {thinkingBuffer && (
-                <div className="rounded-[6px] border border-[#141413]/15 bg-[#FAF8F4] px-2 py-1.5 font-mono text-[9.5px] leading-relaxed text-[#64625D]">
-                  <div className="mb-0.5 text-[8.5px] font-semibold uppercase text-[#141413]">
-                    Director Thinking
-                  </div>
-                  <p className="line-clamp-4 whitespace-pre-wrap">
-                    {thinkingBuffer}
-                  </p>
-                </div>
-              )}
-
-              <div className="studio-scroll max-h-[180px] space-y-1 overflow-y-auto rounded-[6px] border border-[#E5E1D8] bg-[#FAF8F4] p-1.5">
-                {events.length === 0 ? (
-                  <p className="py-3 text-center font-mono text-[9.5px] text-[#64625D]">
-                    Live Gemini 4 stream idle.
-                  </p>
-                ) : (
-                  [...events].reverse().map((ev, idx) => {
-                    const badge = modelBadgeStyle(ev.model);
-                    return (
-                      <div
-                        key={`${ev.timestamp}-${idx}`}
-                        className="rounded border border-[#E5E1D8] bg-white px-2 py-1"
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span
-                            className={`rounded border px-1 font-mono text-[8px] font-medium ${badge.className}`}
-                          >
-                            {badge.label}
-                          </span>
-                          <span className="font-mono text-[8px] text-[#64625D]">
-                            {new Date(ev.timestamp).toLocaleTimeString([], {
-                              hour12: false,
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-[9.5px] leading-snug text-[#141413]">
-                          {ev.message}
-                        </p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </div>
-          </details>
+          )}
+
+          {railVoice.error && (
+            <p className="mb-1.5 px-2 text-[10px] text-[var(--vermilion)]">
+              {railVoice.error}
+            </p>
+          )}
+
+          {/* Sculptural Bottom Pill Composer (Code Wiki exact aesthetic) */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmitTalkEdit();
+            }}
+            className="flex items-center gap-1 rounded-full border border-[var(--border-card)] bg-[var(--bg-composer)] py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-[var(--sapphire-ice)]"
+          >
+            <input
+              type="text"
+              value={voiceTranscript}
+              onChange={(e) => onVoiceTranscriptChange(e.target.value)}
+              placeholder={
+                isRunning
+                  ? 'Queue next edit while building…'
+                  : 'Speak or direct a change…'
+              }
+              aria-label="Speak or direct a change"
+              className="h-7 min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:outline-none"
+            />
+
+            {/* Live Mic Button */}
+            <button
+              type="button"
+              onClick={railVoice.toggleRecording}
+              aria-label={railVoice.isRecording ? 'Stop recording voice' : 'Record voice direction'}
+              title={
+                railVoice.isRecording
+                  ? 'Stop recording'
+                  : 'Speak naturally (gemini-3.5-transcribe)'
+              }
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+                railVoice.isRecording
+                  ? 'bg-[var(--vermilion)] text-white'
+                  : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--vermilion)]'
+              }`}
+            >
+              {railVoice.isRecording ? (
+                <Square className="h-2.5 w-2.5 fill-current" />
+              ) : (
+                <Mic className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            {/* Circle Mode Toggle */}
+            <button
+              type="button"
+              onClick={onToggleDrawMode}
+              aria-label="Toggle draw circle mode"
+              title="Circle elements on the live canvas"
+              className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+                drawMode
+                  ? 'bg-[var(--vermilion)] text-white'
+                  : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
+              }`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {drawnCirclesCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--vermilion)] px-1 font-mono text-[8px] font-bold text-white ring-1 ring-[var(--bg-composer)]">
+                  {drawnCirclesCount}
+                </span>
+              )}
+            </button>
+
+            {/* Send / Queue Button */}
+            <button
+              type="submit"
+              disabled={!voiceTranscript.trim() && drawnCirclesCount === 0}
+              aria-label={isRunning ? 'Queue edit' : 'Apply edit'}
+              title={
+                isRunning
+                  ? 'Add edit to live queue (auto-runs next)'
+                  : 'Apply direction now'
+              }
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--btn-primary-bg)] text-white transition-colors hover:bg-[var(--btn-primary-hover)] disabled:cursor-not-allowed disabled:bg-transparent disabled:text-[var(--ink-muted)]"
+            >
+              {isRunning ? (
+                <Plus className="h-3.5 w-3.5" />
+              ) : (
+                <SendHorizontal className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </form>
+
+          <p className="mt-2 text-center text-[10px] text-[var(--ink-muted)]">
+            Gemini 4 + calibrated Decisions API · Voice via 3.5-transcribe
+          </p>
         </div>
       </aside>
 
@@ -1623,7 +1647,7 @@ export function CriticRail({
       >
         {inspectCandidate && (
           <div className="space-y-3">
-            <div className="overflow-hidden rounded-lg border border-[#E5E1D8] bg-[#F5F3EE]">
+            <div className="overflow-hidden rounded-xl border border-[var(--border-card)] bg-black/30">
               {resolveBackendUrl(inspectCandidate.screenshotUrl) ? (
                 <img
                   src={resolveBackendUrl(inspectCandidate.screenshotUrl)}
@@ -1632,7 +1656,7 @@ export function CriticRail({
                 />
               ) : null}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-[#64625D]">
+            <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-[var(--ink-secondary)]">
               <span>
                 Files: {inspectCandidate.filesModified.join(', ') || '—'}
               </span>

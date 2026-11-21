@@ -51,6 +51,8 @@ interface TasteTrayProps {
   queueCount: number;
   onRunTransform: () => void;
   onRunCircleTweak: () => void;
+  onResetBaseline?: () => void;
+  resettingBaseline?: boolean;
 }
 
 export function TasteTray({
@@ -70,10 +72,13 @@ export function TasteTray({
   queueCount,
   onRunTransform,
   onRunCircleTweak,
+  onResetBaseline,
+  resettingBaseline = false,
 }: TasteTrayProps) {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [activeSection, setActiveSection] = useState<'url' | 'moodboard' | 'webcam'>('url');
   const [siteUrlInput, setSiteUrlInput] = useState('');
   const [capturingUrl, setCapturingUrl] = useState<string | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -103,6 +108,7 @@ export function TasteTray({
 
       setCaptureError(null);
       setCapturingUrl(domain);
+      setActiveSection('url');
 
       try {
         const res = await captureReferenceUrl(normalizedUrl);
@@ -179,6 +185,7 @@ export function TasteTray({
         nextAssets.push(...parsedVideos);
       }
       if (nextAssets.length > 0) {
+        setActiveSection('moodboard');
         onAddAssets(nextAssets);
       }
     },
@@ -187,6 +194,7 @@ export function TasteTray({
 
   const handleStarterClick = (starter: QuickTasteStarter) => {
     const asset = buildQuickStarterVisualAsset(starter);
+    setActiveSection('moodboard');
     onAddAssets([asset]);
     onSeedVoiceHint?.(starter.voiceHint);
   };
@@ -288,6 +296,7 @@ export function TasteTray({
       second: '2-digit',
     });
 
+    setActiveSection('webcam');
     onAddAssets([
       {
         id: createAssetId('webcam'),
@@ -304,25 +313,25 @@ export function TasteTray({
 
   if (collapsed) {
     return (
-      <aside className="flex h-full w-full flex-col items-center justify-between border-r border-[#E5E1D8] bg-[#FFFFFF] py-2.5">
+      <aside className="flex h-full w-full flex-col items-center justify-between bg-transparent py-2">
         <div className="flex flex-col items-center gap-2">
           <button
             type="button"
             onClick={onToggleCollapse}
-            title="Expand Reference Rail"
-            aria-label="Expand Reference Rail"
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E5E1D8] bg-[#F5F3EE] text-[#141413] hover:border-[#141413]"
+            title="Expand References rail"
+            aria-label="Expand References rail"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--ink-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--ink-primary)]"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
-          <div className="h-px w-5 bg-[#E5E1D8]" />
+          <div className="h-px w-5 bg-[var(--border-subtle)]" />
           <button
             type="button"
             onClick={onToggleCollapse}
-            title="Capture Live Reference URL"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+            title="Snap live reference URL"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--sapphire-ice)]"
           >
-            <Globe className="h-3.5 w-3.5" />
+            <Globe className="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -331,11 +340,11 @@ export function TasteTray({
               setTimeout(() => imageInputRef.current?.click(), 80);
             }}
             title={`Moodboard references (${imageAssets.length}/14)`}
-            className="relative flex h-7 w-7 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+            className="relative flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--sapphire-ice)]"
           >
-            <ImagePlus className="h-3.5 w-3.5" />
+            <ImagePlus className="h-4 w-4" />
             {assets.length > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#141413] px-1 font-mono text-[8.5px] text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--sapphire-deep)] px-1 font-mono text-[8.5px] font-semibold text-white">
                 {assets.length}
               </span>
             )}
@@ -344,9 +353,9 @@ export function TasteTray({
             type="button"
             onClick={() => setWebcamOpen(true)}
             title="Capture physical object via Webcam"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--sapphire-ice)]"
           >
-            <Camera className="h-3.5 w-3.5" />
+            <Camera className="h-4 w-4" />
           </button>
         </div>
 
@@ -360,12 +369,16 @@ export function TasteTray({
               ? 'Apply Circle Tweak'
               : 'Transform Live App'
           }
-          className="flex h-8 w-8 items-center justify-center rounded-md bg-[#E03E2D] text-white transition-colors hover:bg-[#C53222]"
+          className={`flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors ${
+            drawnCirclesCount > 0
+              ? 'bg-[var(--vermilion)] hover:bg-[var(--vermilion-hover)]'
+              : 'bg-[var(--btn-primary-bg)] hover:bg-[var(--btn-primary-hover)]'
+          }`}
         >
           {isRunning ? (
             <Plus className="h-4 w-4" />
           ) : (
-            <Sparkles className="h-3.5 w-3.5" />
+            <Sparkles className="h-4 w-4" />
           )}
         </button>
       </aside>
@@ -374,16 +387,19 @@ export function TasteTray({
 
   return (
     <>
-      <aside className="flex h-full w-full min-w-0 flex-col border-r border-[#E5E1D8] bg-[#FFFFFF]">
+      {/* Borderless transparent Left Rail directly on #000000 void (Code Wiki "On this page" elegance) */}
+      <aside className="flex h-full w-full min-w-0 flex-col bg-transparent px-1">
         {/* Minimal Rail Header */}
-        <div className="flex h-9 shrink-0 items-center justify-between border-b border-[#E5E1D8] px-2.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#141413]">
+        <div className="flex h-9 shrink-0 items-center justify-between px-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-[13px] font-medium tracking-[-0.01em] text-[var(--ink-primary)]">
               References
             </span>
-            <span className="rounded bg-[#F5F3EE] px-1.5 py-0.5 font-mono text-[9px] text-[#64625D]">
-              {assets.length}
-            </span>
+            {assets.length > 0 && (
+              <span className="rounded-full border border-[var(--sapphire-border)] bg-[var(--sapphire-tint)] px-1.5 py-0.5 font-mono text-[9.5px] font-medium text-[var(--sapphire-ice)]">
+                {assets.length}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-0.5">
             {assets.length > 0 && (
@@ -392,7 +408,7 @@ export function TasteTray({
                 onClick={onClearAssets}
                 title="Clear all references"
                 aria-label="Clear all references"
-                className="flex h-6 w-6 items-center justify-center rounded text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#E03E2D]"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--vermilion)]"
               >
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -400,26 +416,39 @@ export function TasteTray({
             <button
               type="button"
               onClick={onToggleCollapse}
-              title="Collapse Reference Rail (expand canvas)"
-              aria-label="Collapse Reference Rail"
-              className="flex h-6 w-6 items-center justify-center rounded border border-[#E5E1D8] bg-[#FAF8F4] text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
+              title="Collapse References rail"
+              aria-label="Collapse References rail"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Compact Atelier Inputs */}
-        <div className="studio-scroll flex-1 space-y-3 overflow-y-auto px-2.5 py-2.5">
-          {/* 1. LIVE SITE REFERENCE URL CAPTURE */}
-          <section aria-label="Live Site Reference">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#64625D]">
-                <Globe className="h-2.5 w-2.5 text-[#E03E2D]" />
-                Live Site Reference
+        {/* Scrollable Calm Vertical Guide Rail */}
+        <div className="studio-scroll flex-1 space-y-4 overflow-y-auto py-2 pl-1 pr-1">
+          {/* 1. LIVE URL SNAP PILL */}
+          <section
+            aria-label="Live Site Reference"
+            onClick={() => setActiveSection('url')}
+            className={`border-l pl-3 transition-colors ${
+              activeSection === 'url'
+                ? 'border-[var(--sapphire-ice)]'
+                : 'border-[var(--border-card)]'
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <span
+                className={`text-[12px] font-medium ${
+                  activeSection === 'url'
+                    ? 'text-[var(--ink-primary)]'
+                    : 'text-[var(--ink-secondary)]'
+                }`}
+              >
+                Live URL Snap
               </span>
               {capturingUrl && (
-                <span className="font-mono text-[8.5px] text-[#E03E2D]">
+                <span className="font-mono text-[9.5px] text-[var(--sapphire-ice)]">
                   snapping…
                 </span>
               )}
@@ -430,7 +459,7 @@ export function TasteTray({
                 e.preventDefault();
                 void handleCaptureSiteUrl(siteUrlInput);
               }}
-              className="flex items-center gap-1"
+              className="codewiki-pill flex h-[34px] items-center gap-1 rounded-full pl-3 pr-1"
             >
               <input
                 type="text"
@@ -439,15 +468,16 @@ export function TasteTray({
                   setSiteUrlInput(e.target.value);
                   if (captureError) setCaptureError(null);
                 }}
-                placeholder="Paste URL (stripe.com)"
+                onFocus={() => setActiveSection('url')}
+                placeholder="connorhyatt.com"
                 disabled={Boolean(capturingUrl)}
                 aria-label="Live reference website URL"
-                className="h-7 min-w-0 flex-1 rounded-[5px] border border-[#E5E1D8] bg-[#FAF8F4] px-2 text-[11px] text-[#141413] placeholder:text-[#96928A] focus:border-[#141413] focus:bg-white focus:outline-none disabled:opacity-60"
+                className="min-w-0 flex-1 bg-transparent text-[11.5px] text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:outline-none disabled:opacity-60"
               />
               <button
                 type="submit"
                 disabled={!siteUrlInput.trim() || Boolean(capturingUrl)}
-                className="flex h-7 shrink-0 items-center justify-center gap-1 rounded-[5px] bg-[#141413] px-2 font-mono text-[10px] font-medium text-white transition-colors hover:bg-[#E03E2D] disabled:cursor-not-allowed disabled:opacity-45"
+                className="flex h-[26px] shrink-0 items-center justify-center rounded-full bg-[var(--sapphire-tint)] px-2.5 font-mono text-[10px] font-medium text-[var(--sapphire-ice)] transition-colors hover:bg-[var(--sapphire-soft)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {capturingUrl ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -458,7 +488,7 @@ export function TasteTray({
             </form>
 
             {/* 1-Click Quick Reference Chips */}
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {QUICK_SITE_REFS.map((site) => {
                 const isBusy = capturingUrl === site.label;
                 return (
@@ -470,13 +500,13 @@ export function TasteTray({
                       setSiteUrlInput(site.label);
                       void handleCaptureSiteUrl(site.url);
                     }}
-                    className="inline-flex items-center gap-1 rounded border border-[#E5E1D8] bg-[#FAF8F4] px-1.5 py-0.5 font-mono text-[9.5px] text-[#141413] transition-colors hover:border-[#141413] hover:bg-white disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2 py-0.5 font-mono text-[10px] text-[var(--sapphire-ice)] transition-colors hover:border-[var(--sapphire-border)] hover:bg-[var(--sapphire-tint)] disabled:opacity-50"
                     title={`Capture live screenshot + CSS DNA from ${site.url}`}
                   >
                     {isBusy ? (
-                      <Loader2 className="h-2.5 w-2.5 animate-spin text-[#E03E2D]" />
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
                     ) : (
-                      <Globe className="h-2.5 w-2.5 text-[#64625D]" />
+                      <Globe className="h-2.5 w-2.5 opacity-80" />
                     )}
                     <span>{site.label}</span>
                   </button>
@@ -485,31 +515,46 @@ export function TasteTray({
             </div>
 
             {captureError && (
-              <p className="mt-1 text-[10px] leading-snug text-[#E03E2D]">
+              <p className="mt-1.5 text-[10.5px] leading-snug text-[var(--vermilion)]">
                 {captureError}
               </p>
             )}
           </section>
 
-          <div className="h-px bg-[#E5E1D8]" />
-
-          {/* 2. MOODBOARD STRIP + COMPACT IMAGE/VIDEO DROPZONE */}
-          <section aria-label="Moodboard references">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#64625D]">
+          {/* 2. MOODBOARD & MOTION */}
+          <section
+            aria-label="Moodboard references"
+            onClick={() => setActiveSection('moodboard')}
+            className={`border-l pl-3 transition-colors ${
+              activeSection === 'moodboard'
+                ? 'border-[var(--sapphire-ice)]'
+                : 'border-[var(--border-card)]'
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <span
+                className={`text-[12px] font-medium ${
+                  activeSection === 'moodboard'
+                    ? 'text-[var(--ink-primary)]'
+                    : 'text-[var(--ink-secondary)]'
+                }`}
+              >
                 Moodboard &amp; Motion
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => videoInputRef.current?.click()}
-                  className="inline-flex items-center gap-0.5 font-mono text-[9px] text-[#64625D] hover:text-[#141413]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    videoInputRef.current?.click();
+                  }}
+                  className="inline-flex items-center gap-0.5 font-mono text-[9.5px] text-[var(--ink-muted)] transition-colors hover:text-[var(--sapphire-ice)]"
                   title="Attach motion/hover video (MP4/WebM)"
                 >
                   <Film className="h-2.5 w-2.5" />
                   <span>+Vid</span>
                 </button>
-                <span className="font-mono text-[9px] text-[#64625D]">
+                <span className="font-mono text-[9.5px] text-[var(--ink-muted)]">
                   {imageAssets.length}/14
                 </span>
               </div>
@@ -542,7 +587,7 @@ export function TasteTray({
               }}
             />
 
-            {/* Thumbnail Strip (live URL captures + uploads + webcam) */}
+            {/* Thumbnail Strip */}
             {imageAssets.length > 0 && (
               <div className="mb-2 grid grid-cols-2 gap-1.5">
                 {imageAssets.map((img) => {
@@ -554,7 +599,7 @@ export function TasteTray({
                     <div
                       key={img.id}
                       title={tooltipText}
-                      className="group relative aspect-[4/3] overflow-hidden rounded-[5px] border border-[#E5E1D8] bg-[#F5F3EE]"
+                      className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-[var(--border-card)] bg-[var(--bg-card)]"
                     >
                       <img
                         src={img.previewUrl}
@@ -562,21 +607,19 @@ export function TasteTray({
                         className="h-full w-full object-cover object-top"
                       />
 
-                      {/* Domain / Modality Micro-Badge */}
                       {img.sourceDomain ? (
-                        <span className="absolute bottom-1 left-1 right-1 inline-flex max-w-[calc(100%-8px)] items-center gap-0.5 truncate rounded bg-[#141413]/88 px-1 py-0.5 font-mono text-[8px] font-medium text-white">
-                          <span aria-hidden="true">🌐</span>
+                        <span className="absolute bottom-1 left-1 right-1 inline-flex max-w-[calc(100%-8px)] items-center gap-0.5 truncate rounded bg-black/80 px-1 py-0.5 font-mono text-[8px] font-medium text-[#F1F3F4]">
+                          <Globe className="h-2 w-2 shrink-0 text-[#8AB4F8]" />
                           <span className="truncate">{img.sourceDomain}</span>
                         </span>
                       ) : (
-                        <span className="absolute bottom-1 left-1 rounded bg-[#141413]/80 px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white">
+                        <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider text-[#F1F3F4]">
                           {img.modality === 'webcam_frame' ? 'CAM' : 'REF'}
                         </span>
                       )}
 
-                      {/* Extracted CSS DNA hover bar for captured sites */}
                       {img.extractedCssSummary && (
-                        <div className="pointer-events-none absolute inset-x-0 top-0 bg-[#141413]/90 px-1.5 py-1 text-[8.5px] leading-tight text-[#F5F3EE] opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="pointer-events-none absolute inset-x-0 top-0 bg-black/88 px-1.5 py-1 text-[8px] leading-tight text-[#F1F3F4] opacity-0 transition-opacity group-hover:opacity-100">
                           <span className="line-clamp-2 font-mono">
                             {img.extractedCssSummary}
                           </span>
@@ -590,7 +633,7 @@ export function TasteTray({
                           onRemoveAsset(img.id);
                         }}
                         aria-label={`Remove ${img.sourceDomain || img.label || 'reference'}`}
-                        className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#141413]/85 text-white opacity-0 transition-opacity hover:bg-[#E03E2D] group-hover:opacity-100"
+                        className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white opacity-0 transition-opacity hover:bg-[var(--vermilion)] group-hover:opacity-100"
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
@@ -600,7 +643,7 @@ export function TasteTray({
               </div>
             )}
 
-            {/* Ultra-Compact Unified Dropzone */}
+            {/* Clean Minimal Drop Zone */}
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -615,28 +658,28 @@ export function TasteTray({
                 }
               }}
               onClick={() => imageInputRef.current?.click()}
-              className={`group cursor-pointer rounded-[6px] border border-dashed px-2.5 py-2.5 text-center transition-colors ${
+              className={`group cursor-pointer rounded-xl border border-dashed px-2.5 py-3 text-center transition-colors ${
                 isDraggingMedia
-                  ? 'border-[#E03E2D] bg-[#FDF1EF]'
-                  : 'border-[#CFC9BC] bg-[#FAF8F4] hover:border-[#141413] hover:bg-[#F5F3EE]'
+                  ? 'border-[var(--sapphire-ice)] bg-[var(--sapphire-tint)]'
+                  : 'border-[var(--border-card)] bg-[var(--bg-subtle)] hover:border-[var(--sapphire-border)] hover:bg-[var(--bg-subtle-hover)]'
               }`}
             >
-              <Upload className="mx-auto mb-1 h-3.5 w-3.5 text-[#64625D] group-hover:text-[#141413]" />
-              <p className="text-[10.5px] font-medium text-[#141413]">
-                Drop images or motion video
+              <Upload className="mx-auto mb-1 h-3.5 w-3.5 text-[var(--ink-muted)] transition-colors group-hover:text-[var(--sapphire-ice)]" />
+              <p className="text-[11px] font-medium text-[var(--ink-primary)]">
+                Drop images or video
               </p>
-              <p className="font-mono text-[9px] text-[#64625D]">
+              <p className="mt-0.5 font-mono text-[9px] text-[var(--ink-muted)]">
                 PNG · JPG · MP4 · WEBM
               </p>
             </div>
 
-            {/* Compact Attached Video Chips */}
+            {/* Attached Video Chips */}
             {videoAssets.length > 0 && (
               <div className="mt-1.5 space-y-1">
                 {videoAssets.map((vid) => (
                   <div
                     key={vid.id}
-                    className="flex items-center gap-1.5 rounded-[5px] border border-[#E5E1D8] bg-[#FAF8F4] p-1"
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border-card)] bg-[var(--bg-card)] p-1"
                   >
                     <video
                       src={vid.previewUrl}
@@ -644,13 +687,13 @@ export function TasteTray({
                       playsInline
                       autoPlay
                       loop
-                      className="h-7 w-10 shrink-0 rounded border border-[#E5E1D8] bg-[#141413] object-cover"
+                      className="h-7 w-10 shrink-0 rounded bg-black object-cover"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[10px] font-medium text-[#141413]">
+                      <div className="truncate text-[10px] font-medium text-[var(--ink-primary)]">
                         {vid.filename || vid.label}
                       </div>
-                      <div className="font-mono text-[8.5px] text-[#64625D]">
+                      <div className="font-mono text-[8.5px] text-[var(--ink-muted)]">
                         motion · {formatBytes(vid.sizeBytes)}
                       </div>
                     </div>
@@ -658,7 +701,7 @@ export function TasteTray({
                       type="button"
                       onClick={() => onRemoveAsset(vid.id)}
                       aria-label="Remove video"
-                      className="flex h-5 w-5 items-center justify-center rounded text-[#64625D] hover:text-[#E03E2D]"
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--ink-muted)] hover:text-[var(--vermilion)]"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -667,7 +710,7 @@ export function TasteTray({
               </div>
             )}
 
-            {/* Minimal 1-Row Quick Swatch Starters */}
+            {/* 3 Tiny Taste Chips */}
             <div className="mt-2 flex items-center gap-1">
               {QUICK_TASTE_STARTERS.map((starter) => (
                 <button
@@ -675,11 +718,11 @@ export function TasteTray({
                   type="button"
                   onClick={() => handleStarterClick(starter)}
                   title={`${starter.title} — ${starter.subtitle}`}
-                  className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded border border-[#E5E1D8] bg-white px-1.5 py-1 text-[9.5px] font-medium text-[#141413] transition-colors hover:border-[#141413] hover:bg-[#FAF8F4]"
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--ink-secondary)] transition-colors hover:border-[var(--sapphire-border)] hover:text-[var(--ink-primary)]"
                 >
                   <span
                     style={{ backgroundColor: starter.swatches[2] }}
-                    className="h-2 w-2 shrink-0 rounded-full border border-[#141413]/20"
+                    className="h-2 w-2 shrink-0 rounded-full"
                   />
                   <span className="truncate">
                     {starter.id === 'swiss_atelier'
@@ -693,89 +736,122 @@ export function TasteTray({
             </div>
           </section>
 
-          <div className="h-px bg-[#E5E1D8]" />
-
-          {/* 3. COMPACT WEBCAM SHUTTER BUTTON */}
-          <section aria-label="Live webcam reference capture">
+          {/* 3. COMPACT SNAP WEBCAM + NANO BANANA 2.1 TOGGLE */}
+          <section
+            aria-label="Physical webcam reference and bespoke art"
+            onClick={() => setActiveSection('webcam')}
+            className={`space-y-2.5 border-l pl-3 transition-colors ${
+              activeSection === 'webcam'
+                ? 'border-[var(--sapphire-ice)]'
+                : 'border-[var(--border-card)]'
+            }`}
+          >
             <button
               type="button"
               onClick={() => setWebcamOpen(true)}
-              className="flex w-full items-center justify-between rounded-[6px] border border-[#E5E1D8] bg-[#FAF8F4] px-2.5 py-2 text-left transition-colors hover:border-[#141413] hover:bg-[#F5F3EE]"
+              className="flex w-full items-center justify-between rounded-xl border border-[var(--border-card)] bg-[var(--bg-subtle)] px-2.5 py-2 text-left transition-colors hover:border-[var(--sapphire-border)] hover:bg-[var(--bg-subtle-hover)]"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[#E5E1D8] bg-white text-[#E03E2D]">
-                  <Camera className="h-3.5 w-3.5" />
-                </span>
+                <Camera className="h-3.5 w-3.5 shrink-0 text-[var(--sapphire-ice)]" />
                 <div className="min-w-0">
-                  <div className="truncate text-[11px] font-medium text-[#141413]">
-                    Webcam Object
+                  <div className="truncate text-[11.5px] font-medium text-[var(--ink-primary)]">
+                    Snap Webcam
                   </div>
-                  <div className="truncate text-[9.5px] text-[#64625D]">
+                  <div className="truncate text-[9.5px] text-[var(--ink-muted)]">
                     Book, print, mug
                   </div>
                 </div>
               </div>
-              <span className="shrink-0 font-mono text-[9.5px] font-semibold text-[#141413]">
-                SNAP
+              <span className="shrink-0 font-mono text-[9px] font-medium text-[var(--sapphire-ice)]">
+                CAM
               </span>
+            </button>
+
+            {/* Nano Banana 2.1 Art Toggle */}
+            <label className="flex cursor-pointer items-center justify-between gap-2 px-0.5 py-0.5">
+              <div className="min-w-0">
+                <div className="truncate text-[11px] font-medium text-[var(--ink-primary)]">
+                  Nano Banana 2.1
+                </div>
+                <div className="truncate font-mono text-[9px] text-[var(--ink-muted)]">
+                  {generateBespokeAssets ? 'Bespoke hero ON' : 'Hero art OFF'}
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={generateBespokeAssets}
+                onChange={(e) => onToggleBespokeAssets(e.target.checked)}
+                className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--sapphire)]"
+              />
+            </label>
+
+            {/* Primary Transform CTA */}
+            <button
+              type="button"
+              onClick={drawnCirclesCount > 0 ? onRunCircleTweak : onRunTransform}
+              className={`flex w-full items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold text-white transition-colors ${
+                drawnCirclesCount > 0
+                  ? 'bg-[var(--vermilion)] hover:bg-[var(--vermilion-hover)]'
+                  : 'bg-[var(--btn-primary-bg)] hover:bg-[var(--btn-primary-hover)]'
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>
+                    {drawnCirclesCount > 0
+                      ? `Queue Circle (${drawnCirclesCount})`
+                      : 'Queue Transform'}
+                  </span>
+                  {queueCount > 0 && (
+                    <span className="rounded-full bg-black/25 px-1.5 py-0.5 font-mono text-[9.5px]">
+                      +{queueCount}
+                    </span>
+                  )}
+                </>
+              ) : drawnCirclesCount > 0 ? (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Apply Circle ({drawnCirclesCount})</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Transform</span>
+                  <span className="rounded-full bg-black/20 px-1.5 py-0.5 font-mono text-[9.5px]">
+                    {speedMode === 'fast_demo' ? '~35s' : '4×'}
+                  </span>
+                </>
+              )}
             </button>
           </section>
         </div>
 
-        {/* Sticky Minimal Bottom Bar: Nano Banana 2.1 Toggle + Transform CTA */}
-        <div className="shrink-0 border-t border-[#E5E1D8] bg-[#FAF8F4] px-2.5 py-2.5">
-          <label className="mb-2 flex cursor-pointer items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="truncate text-[10.5px] font-medium text-[#141413]">
-                Nano Banana 2.1 Art
-              </div>
-              <div className="truncate font-mono text-[8.5px] text-[#64625D]">
-                {generateBespokeAssets ? 'Bespoke hero ON' : 'Hero art OFF'}
-              </div>
+        {/* Bottom Pinned Metadata Footer (matching Code Wiki's Updated on / Commit footer!) */}
+        <footer className="shrink-0 space-y-1.5 border-t border-[var(--border-subtle)] px-1 pb-1 pt-3 text-[11px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[var(--ink-muted)]">Models</span>
+            <span className="font-mono text-[10.5px] text-[var(--ink-secondary)]">
+              G4 + Decision-1
+            </span>
+          </div>
+          {onResetBaseline && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[var(--ink-muted)]">Baseline</span>
+              <button
+                type="button"
+                disabled={resettingBaseline}
+                onClick={onResetBaseline}
+                className="font-mono text-[10.5px] text-[var(--sapphire-ice)] underline decoration-[var(--sapphire-border)] underline-offset-2 transition-colors hover:text-[var(--ink-primary)] disabled:opacity-50"
+              >
+                {resettingBaseline ? 'Resetting…' : 'Reset Baseline'}
+              </button>
             </div>
-            <input
-              type="checkbox"
-              checked={generateBespokeAssets}
-              onChange={(e) => onToggleBespokeAssets(e.target.checked)}
-              className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#E03E2D]"
-            />
-          </label>
-
-          <button
-            type="button"
-            onClick={drawnCirclesCount > 0 ? onRunCircleTweak : onRunTransform}
-            className="flex w-full items-center justify-center gap-1.5 rounded-[6px] bg-[#E03E2D] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#C53222]"
-          >
-            {isRunning ? (
-              <>
-                <Plus className="h-3.5 w-3.5" />
-                <span>
-                  {drawnCirclesCount > 0
-                    ? `Queue Circle (${drawnCirclesCount})`
-                    : 'Queue Transform'}
-                </span>
-                {queueCount > 0 && (
-                  <span className="rounded bg-black/20 px-1 py-0.5 font-mono text-[9.5px]">
-                    +{queueCount}
-                  </span>
-                )}
-              </>
-            ) : drawnCirclesCount > 0 ? (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Apply Circle ({drawnCirclesCount})</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Transform</span>
-                <span className="rounded bg-black/20 px-1 py-0.5 font-mono text-[9.5px]">
-                  {speedMode === 'fast_demo' ? '<25s' : '4×'}
-                </span>
-              </>
-            )}
-          </button>
-        </div>
+          )}
+          <p className="pt-1 text-[10px] leading-snug text-[var(--ink-muted)]">
+            Calibrated by gemini-decision-1. Zero AI slop.
+          </p>
+        </footer>
       </aside>
 
       {/* Native <dialog> Live Webcam Viewfinder */}
@@ -787,7 +863,7 @@ export function TasteTray({
         widthClass="w-[min(94vw,640px)]"
       >
         <div className="space-y-3">
-          <div className="relative aspect-video overflow-hidden rounded-lg border border-[#E5E1D8] bg-[#141413]">
+          <div className="relative aspect-video overflow-hidden rounded-xl border border-[var(--border-card)] bg-black">
             <video
               ref={videoRef}
               autoPlay
@@ -797,18 +873,16 @@ export function TasteTray({
                 mirrorCamera ? '-scale-x-100' : ''
               }`}
             />
-
-            {/* Subtle atelier registration frame */}
             <div className="pointer-events-none absolute inset-4 border border-white/25">
-              <span className="absolute -left-px -top-px h-3 w-3 border-l-2 border-t-2 border-[#E03E2D]" />
-              <span className="absolute -right-px -top-px h-3 w-3 border-r-2 border-t-2 border-[#E03E2D]" />
-              <span className="absolute -bottom-px -left-px h-3 w-3 border-b-2 border-l-2 border-[#E03E2D]" />
-              <span className="absolute -bottom-px -right-px h-3 w-3 border-b-2 border-r-2 border-[#E03E2D]" />
+              <span className="absolute -left-px -top-px h-3 w-3 border-l-2 border-t-2 border-[var(--sapphire-ice)]" />
+              <span className="absolute -right-px -top-px h-3 w-3 border-r-2 border-t-2 border-[var(--sapphire-ice)]" />
+              <span className="absolute -bottom-px -left-px h-3 w-3 border-b-2 border-l-2 border-[var(--sapphire-ice)]" />
+              <span className="absolute -bottom-px -right-px h-3 w-3 border-b-2 border-r-2 border-[var(--sapphire-ice)]" />
             </div>
 
             {!webcamReady && !webcamError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#141413]/80 text-white">
-                <Loader2 className="h-5 w-5 animate-spin text-[#E03E2D]" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-white">
+                <Loader2 className="h-5 w-5 animate-spin text-[var(--sapphire-ice)]" />
                 <span className="font-mono text-[11px]">
                   Initializing live camera viewfinder…
                 </span>
@@ -816,8 +890,8 @@ export function TasteTray({
             )}
 
             {webcamError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#141413]/90 px-6 text-center text-white">
-                <Camera className="h-6 w-6 text-[#E03E2D]" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/90 px-6 text-center text-white">
+                <Camera className="h-6 w-6 text-[var(--vermilion)]" />
                 <p className="text-[13px] font-medium">{webcamError}</p>
                 <p className="text-[11px] text-white/70">
                   Check browser camera permissions or upload a photo in the References rail.
@@ -827,12 +901,12 @@ export function TasteTray({
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#64625D]">
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[var(--ink-secondary)]">
               <input
                 type="checkbox"
                 checked={mirrorCamera}
                 onChange={(e) => setMirrorCamera(e.target.checked)}
-                className="accent-[#141413]"
+                className="accent-[var(--sapphire)]"
               />
               Mirror preview
             </label>
@@ -841,7 +915,7 @@ export function TasteTray({
               <button
                 type="button"
                 onClick={() => setWebcamOpen(false)}
-                className="rounded-md border border-[#E5E1D8] bg-white px-3 py-1.5 text-[12px] font-medium text-[#141413] hover:border-[#141413]"
+                className="rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--ink-primary)] hover:border-[var(--border-strong)]"
               >
                 Cancel
               </button>
@@ -849,7 +923,7 @@ export function TasteTray({
                 type="button"
                 disabled={!webcamReady}
                 onClick={snapPhysicalReference}
-                className="flex items-center gap-1.5 rounded-md bg-[#E03E2D] px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#C53222] disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-full bg-[var(--btn-primary-bg)] px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-[var(--btn-primary-hover)] disabled:opacity-50"
               >
                 <Camera className="h-3.5 w-3.5" />
                 Snap Physical Reference

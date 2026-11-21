@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Instrument_Serif, JetBrains_Mono } from 'next/font/google';
+import {
+  Instrument_Serif,
+  JetBrains_Mono,
+  Plus_Jakarta_Sans,
+} from 'next/font/google';
 import './globals.css';
 
-const dmSans = DM_Sans({
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
@@ -25,10 +29,24 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'AntiSlop Studio — Multimodal Taste IDE powered by Gemini 4',
+  title: 'AntiSlop — Multimodal Visual Editor powered by Gemini 4',
   description:
-    'Drop moodboards, hold physical print up to your webcam, draw circles, speak naturally, and let Gemini 4 + calibrated Decisions API eliminate AI UI slop live.',
+    'A multimodal visual editor for live frontends. Powered by Gemini 4 & calibrated Decisions API — zero AI slop.',
 };
+
+const THEME_INIT_SCRIPT = `
+(function(){
+  try {
+    var saved = localStorage.getItem('antislop-theme');
+    var t = (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    document.documentElement.dataset.theme = t;
+    var m = document.querySelector('meta[name="color-scheme"]');
+    if (m) m.content = t;
+  } catch (e) {
+    document.documentElement.dataset.theme = 'dark';
+  }
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -38,9 +56,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
+      data-theme="dark"
+      suppressHydrationWarning
+      className={`${plusJakartaSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="bg-[#F5F3EE] text-[#141413] font-sans antialiased selection:bg-[#E03E2D]/15 selection:text-[#141413]">
+      <head>
+        <meta name="color-scheme" content="dark light" />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="bg-[var(--bg-void)] text-[var(--ink-primary)] font-sans antialiased selection:bg-[var(--sapphire-soft)] selection:text-[var(--ink-primary)]">
         {children}
       </body>
     </html>

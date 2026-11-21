@@ -128,6 +128,5 @@ HEALTHCHECK --interval=30s --timeout=8s --start-period=25s --retries=3 \
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-# Prefer flat compiled dist/server.js when emitted there; otherwise launch via tsx
-# so __dirname-relative REPO_ROOT resolution in src/config/env.ts always resolves to /app.
-CMD ["sh", "-c", "if [ -f /app/backend/dist/server.js ]; then exec node /app/backend/dist/server.js; else exec /app/backend/node_modules/.bin/tsx /app/backend/src/server.ts; fi"]
+# Prefer compiled pure-tsc dist/backend/src/server.js (avoids tsx/esbuild __name helper inside Puppeteer page.evaluate)
+CMD ["sh", "-c", "if [ -f /app/backend/dist/backend/src/server.js ]; then exec node /app/backend/dist/backend/src/server.js; elif [ -f /app/backend/dist/server.js ]; then exec node /app/backend/dist/server.js; else exec /app/backend/node_modules/.bin/tsx /app/backend/src/server.ts; fi"]
