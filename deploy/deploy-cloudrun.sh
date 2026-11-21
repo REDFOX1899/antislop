@@ -296,9 +296,9 @@ gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --cpu-boost \
   --session-affinity \
   --timeout=900 \
-  --concurrency=20 \
+  --concurrency=80 \
   --min-instances=1 \
-  --max-instances=3 \
+  --max-instances=5 \
   --port=8080 \
   --allow-unauthenticated \
   --env-vars-file="${ENV_YAML}"
