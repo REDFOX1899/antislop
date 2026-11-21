@@ -284,6 +284,7 @@ gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --session-affinity \
   --timeout=900 \
   --concurrency=20 \
+  --min-instances=1 \
   --max-instances=3 \
   --port=8080 \
   --allow-unauthenticated \

@@ -1,0 +1,20 @@
+# Same ultra-slim ignore rules for gcloud builds submit
+.git
+.gitignore
+.DS_Store
+.en
+env/
+.env
+.env.*
+**/node_modules
+**/dist
+studio/
+benchmarks/
+docs/
+backend/uploads/
+backend/screenshots/
+backend/.snapshots/
+backend/.workspaces/
+target-repo/public/generated/*
+target-templates/*/public/generated/*
+*.log
