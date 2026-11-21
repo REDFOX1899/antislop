@@ -25,6 +25,19 @@
 - Created locked shared TypeScript contract in [shared/types.ts](../shared/types.ts) and isolated multi-agent ownership boundaries in [PARALLEL_BUILD_PLAN.md](PARALLEL_BUILD_PLAN.md) to enable conflict-free parallel execution.
 - Configured master secret template (`env/.env.example`) with strict `.gitignore` guards.
 
+### 12:50 PM ET · Phase 0.75 — Live 10-Point Gemini 4 & Environment Smoke Test (`9/10 PASS`)
+- Bootstrapped `/backend` with official `@google/genai@^3.6.1`, `express`, `puppeteer`, `http-proxy`, `langsmith`, and `tsx`.
+- Executed live verification script (`scripts/smoke-test.mjs`) against all Gemini 4 models & external integrations:
+  - **Dual Tier-3 Keys (`...1LuQ` & `...b2_8`)**: Both PASS on `gemini-4-hydrogen` (`1.98s` / `2.78s`).
+  - **`gemini-4-carbon` (Design Director)**: PASS (`2.72s`).
+  - **`gemini-4-neon` (Parallel Code Architect)**: PASS (`2.83s`).
+  - **`gemini-decision-1` (`v1beta` Decisions API)**: PASS in **`310ms`** with calibrated probabilities (`is_ai_slop: 0.960`, `slop_level: 1.93/2.0`, `style_class: ai_slop @ 0.998`).
+  - **`gemini-embedding-2`**: PASS (`515ms`, `3072` dimensions).
+  - **`gemini-nano-banana-2.1` (`v1beta`)**: PASS (`21.4s`, generated `1.04MB` base64 JPEG). *Discovery logged: `response_modalities` requires `apiVersion: "v1beta"`.*
+  - **Managed Agents (`v1beta` `agents.list`)**: PASS (`73ms`, accessible).
+  - **GitHub Token**: PASS (`421ms`, authenticated as `REDFOX1899`).
+  - **LangSmith Service Key (Optional)**: `403` on `/runs` (Service Keys require `LANGSMITH_WORKSPACE_ID` header or a `lsv2_pt_` personal key; `LANGSMITH_TRACING` remains `false`, non-blocking).
+
 ---
 
 *(Subsequent phases will append real commit hashes, live latency metrics, Decisions API calibration logs, and deployment URLs as each parallel wave lands.)*
