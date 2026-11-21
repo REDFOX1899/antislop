@@ -1,5 +1,6 @@
 # Exclude local deps, secrets, frontend build, git history, and runtime artifacts from Docker/Cloud Build
 .git
+.gcloud
 .gitignore
 .DS_Store
 .en

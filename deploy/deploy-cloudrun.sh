@@ -204,31 +204,43 @@ if [[ "${DRY_RUN}" == "true" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# 3. Verify gcloud CLI, account, project, and required APIs
+# 3. Verify gcloud CLI, account (auto-uses env/gcp-service-account.json if present)
 # -----------------------------------------------------------------------------
 if ! command -v gcloud >/dev/null 2>&1; then
   echo "❌ gcloud CLI is not installed. Install Google Cloud SDK first." >&2
   exit 1
 fi
 
-ACTIVE_ACCOUNT="$(gcloud config get-value account 2>/dev/null || true)"
-if [[ "${ACTIVE_ACCOUNT}" != "${EXPECTED_ACCOUNT}" ]]; then
-  echo "🔄 Switching gcloud account from '${ACTIVE_ACCOUNT:-none}' to '${EXPECTED_ACCOUNT}'..."
-  if ! gcloud config set account "${EXPECTED_ACCOUNT}" >/dev/null 2>&1; then
-    echo "❌ Account ${EXPECTED_ACCOUNT} is not authenticated in gcloud." >&2
-    echo "   Run: gcloud auth login ${EXPECTED_ACCOUNT}" >&2
-    exit 1
+SA_KEY_FILE="${REPO_ROOT}/env/gcp-service-account.json"
+USING_SA=false
+if [[ -f "${SA_KEY_FILE}" ]]; then
+  USING_SA=true
+  export CLOUDSDK_CONFIG="${REPO_ROOT}/.gcloud"
+  mkdir -p "${CLOUDSDK_CONFIG}"
+  echo "🔑 Activating workspace service account (${SA_KEY_FILE})..."
+  gcloud auth activate-service-account --key-file="${SA_KEY_FILE}" >/dev/null
+else
+  ACTIVE_ACCOUNT="$(gcloud config get-value account 2>/dev/null || true)"
+  if [[ "${ACTIVE_ACCOUNT}" != "${EXPECTED_ACCOUNT}" ]]; then
+    echo "🔄 Switching gcloud account from '${ACTIVE_ACCOUNT:-none}' to '${EXPECTED_ACCOUNT}'..."
+    if ! gcloud config set account "${EXPECTED_ACCOUNT}" >/dev/null 2>&1; then
+      echo "❌ Account ${EXPECTED_ACCOUNT} is not authenticated in gcloud." >&2
+      echo "   Run: gcloud auth login ${EXPECTED_ACCOUNT}" >&2
+      exit 1
+    fi
   fi
 fi
 
 gcloud config set project "${GCP_PROJECT_ID}" >/dev/null
 
-echo "🔧 Ensuring Cloud Build & Cloud Run APIs are enabled on ${GCP_PROJECT_ID}..."
-gcloud services enable \
-  cloudbuild.googleapis.com \
-  run.googleapis.com \
-  containerregistry.googleapis.com \
-  --project="${GCP_PROJECT_ID}" >/dev/null
+if [[ "${USING_SA}" != "true" ]]; then
+  echo "🔧 Ensuring Cloud Build & Cloud Run APIs are enabled on ${GCP_PROJECT_ID}..."
+  gcloud services enable \
+    cloudbuild.googleapis.com \
+    run.googleapis.com \
+    containerregistry.googleapis.com \
+    --project="${GCP_PROJECT_ID}" >/dev/null
+fi
 
 # -----------------------------------------------------------------------------
 # 4. Build & Push container image via Cloud Build (never bundles env/.env)

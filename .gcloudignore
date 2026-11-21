@@ -1,5 +1,6 @@
 # Same ultra-slim ignore rules for gcloud builds submit
 .git
+.gcloud
 .gitignore
 .DS_Store
 .en

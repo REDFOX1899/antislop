@@ -18,6 +18,8 @@ env/.env.*
 *.key
 *service-account*.json
 *credentials*.json
+env/*.json
+.gcloud/
 
 # Build Outputs
 dist/
