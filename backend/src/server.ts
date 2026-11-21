@@ -154,7 +154,7 @@ async function bootstrap(): Promise<void> {
       const candidate = path.resolve(active.localPath, cleanRel);
       if (candidate.startsWith(path.resolve(active.localPath)) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
         res.setHeader('Cache-Control', 'no-cache');
-        res.sendFile(candidate);
+        res.sendFile(cleanRel, { root: active.localPath, dotfiles: 'ignore' });
         return;
       }
       next();
