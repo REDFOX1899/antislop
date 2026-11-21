@@ -16,6 +16,7 @@ import type {
   SurgicalPatchResult,
 } from './contracts.js';
 import { traceSpan, withV1Client } from './clientPool.js';
+import { ANTISLOP_DESIGN_CRAFT_DISTILLED } from './designSkill.js';
 import { normalizeManifest } from './director.js';
 import {
   estimateBase64Bytes,
@@ -120,7 +121,9 @@ HARD TECHNICAL RULES (NON-NEGOTIABLE):
    - ZERO broken images: if generated bespoke asset paths are provided (e.g. \`/generated/hero-primary.jpg\`), showcase them prominently in crisp editorial frames with \`object-cover\`. NEVER invent unverified external image URLs (no unsplash/example.com guesses that could 404).
    - STRICT WCAG AA CONTRAST: ALWAYS maintain >= 4.5:1 contrast between ALL readable text (headlines, body copy, captions, muted metadata, navigation links, inputs, and buttons) and their background canvas/surface/button fills! Never use pale washed-out grey ink on cream/white or dark muted ink on dark surfaces.
    - Preserve the real product/brand domain, core interactive functionality (tabs, interactive controls, forms, navigation), and authentic content while elevating copy away from generic AI buzzwords.
-   - Strictly enforce the manifest's antiSlopBanList: NO purple/indigo AI gradients, NO glowing neon cards, NO generic dark-slate glassmorphism, NO sparkle emoji spam.`;
+   - Strictly enforce the manifest's antiSlopBanList: NO purple/indigo AI gradients, NO glowing neon cards, NO generic dark-slate glassmorphism, NO sparkle emoji spam.
+
+${ANTISLOP_DESIGN_CRAFT_DISTILLED}`;
 
 const FAST_SINGLE_PASS_SYSTEM_INSTRUCTION = `You are AntiSlop's Single-Pass Creative Director + Principal Frontend Design Engineer.
 In ONE single ultra-fast pass, inspect the raw visual taste references (moodboards/website captures/webcam frames) and any spoken/written direction, synthesize a cohesive editorial DesignManifest, and rewrite the target React + TypeScript + Tailwind CSS UI into museum-grade craft with ZERO generic "AI slop".
@@ -180,7 +183,9 @@ HARD TECHNICAL & SPEED RULES (NON-NEGOTIABLE):
 3. STRICT WCAG AA CONTRAST (>= 4.5:1): ALWAYS guarantee >= 4.5:1 foreground-to-background contrast across ALL text, eyebrows, captions, nav links, and buttons! Ensure \`inkPrimary\` and \`inkSecondary\` are decisively dark on light canvases (or decisively bright on dark canvases), and \`accentContrast\` has >= 4.5:1 contrast on \`accent\` buttons.
 4. NEVER invent npm packages! Only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Use only standard lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
 5. Preserve \`@import "tailwindcss";\` on line 1 of \`src/index.css\` if present in original, and preserve \`<div id="root"></div>\` + \`<script type="module" src="/src/main.tsx"></script>\` in \`index.html\`.
-6. ZERO broken images (NEVER invent external image URLs), ZERO horizontal overflow at 1440px desktop and 390px mobile, and preserve the real product/brand domain and core interactive controls while purging all AI slop clichés.`;
+6. ZERO broken images (NEVER invent external image URLs), ZERO horizontal overflow at 1440px desktop and 390px mobile, and preserve the real product/brand domain and core interactive controls while purging all AI slop clichés.
+
+${ANTISLOP_DESIGN_CRAFT_DISTILLED}`;
 
 const BASELINE_SYSTEM_INSTRUCTION = `You are a frontend developer updating a React + TypeScript + Tailwind CSS application based on the user's text request.
 Return ONLY a strictly valid JSON object with the exact shape:

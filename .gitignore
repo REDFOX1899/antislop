@@ -45,3 +45,5 @@ target-repo/public/generated/*
 target-templates/*/public/generated/*
 !target-templates/*/public/generated/.gitkeep
 benchmarks/results/raw/
+*.tsbuildinfo
+.en

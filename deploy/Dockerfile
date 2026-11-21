@@ -110,6 +110,7 @@ COPY --from=builder /app/backend/package.json /app/backend/tsconfig.json /app/ba
 COPY --from=builder /app/backend/src /app/backend/src
 COPY --from=builder /app/backend/dist /app/backend/dist
 COPY --from=builder /app/backend-prod/node_modules /app/backend/node_modules
+COPY skills/ /app/skills/
 
 # Create runtime directories for uploads, screenshots, baseline snapshots, and cloned GitHub repos
 RUN mkdir -p \

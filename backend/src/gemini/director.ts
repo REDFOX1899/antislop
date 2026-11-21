@@ -12,6 +12,7 @@ import type {
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
 import { traceSpan, withV1Client } from './clientPool.js';
+import { ANTISLOP_DESIGN_CRAFT_DISTILLED } from './designSkill.js';
 import {
   extractInteractionText,
   extractJsonObject,
@@ -43,6 +44,8 @@ Your mission:
 5. Provide a REAL, valid Google Fonts CSS2 URL (https://fonts.googleapis.com/css2?family=...&display=swap) matching displayFont, bodyFont, and monoFont.
 6. When multiple conflicting visual styles are present (e.g. brutalist concrete + delicate Japanese calligraphy + warm terracotta + cyber telemetry), do NOT average them into muddy grey — resolve them into a disciplined hierarchy (dominant ground + structural typographic voice + surgical accent) and document your synthesis clearly in "conflictResolutionNotes".
 7. Craft bespoke editorial photography/artwork prompts in "bespokeAssets" (using slotId "hero_primary" at "/generated/hero-primary.jpg" and optionally "editorial_secondary" at "/generated/editorial-secondary.jpg") that visually harmonize with the moodboard palette and lighting — NO text inside generated imagery.
+
+${ANTISLOP_DESIGN_CRAFT_DISTILLED}
 
 Output ONLY a single valid JSON object matching the exact schema requested. No markdown prose outside the JSON.`;
 

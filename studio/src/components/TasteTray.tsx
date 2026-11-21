@@ -31,8 +31,8 @@ import { NativeDialog } from './NativeDialog';
 import type { StudioTab } from './TopBar';
 
 const QUICK_SITE_REFS: Array<{ label: string; url: string }> = [
+  { label: 'anthropic.com', url: 'https://www.anthropic.com' },
   { label: 'linear.app', url: 'https://linear.app' },
-  { label: 'are.na', url: 'https://www.are.na' },
 ];
 
 interface TasteTrayProps {
@@ -628,7 +628,7 @@ export function TasteTray({
                           onRemoveAsset(img.id);
                         }}
                         aria-label={`Remove ${img.sourceDomain || img.label || 'reference'}`}
-                        className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white opacity-0 transition-opacity hover:bg-[var(--vermilion)] group-hover:opacity-100"
+                        className="hover-reveal-action absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-white hover:bg-[var(--vermilion)]"
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
@@ -789,9 +789,15 @@ export function TasteTray({
             )}
           </nav>
 
-          <p className="font-mono text-[10px] text-[var(--ink-muted)]">
-            Gemini 4 · Decision-1
-          </p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 font-mono text-[9.5px] text-[var(--cobalt-ice)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--cobalt-bright)]" />
+              <span>Design Craft Skill v1</span>
+            </div>
+            <p className="font-mono text-[10px] text-[var(--ink-muted)]">
+              Gemini 4 · Decision-1 · Antigravity
+            </p>
+          </div>
         </footer>
       </aside>
 

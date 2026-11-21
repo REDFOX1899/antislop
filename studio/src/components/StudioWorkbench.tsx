@@ -37,7 +37,11 @@ import {
   type LocalMediaAsset,
 } from '@/lib/media';
 import { useTheme } from '@/lib/useTheme';
-import { CriticRail, type QueuedEditSummary } from './CriticRail';
+import {
+  CriticRail,
+  type QueuedEditSummary,
+  type TechnicalMissionId,
+} from './CriticRail';
 import { LandingHub } from './LandingHub';
 import {
   LiveCanvas,
@@ -133,6 +137,8 @@ export function StudioWorkbench() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRepoInfo[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('novaflow-slop');
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
+  const [loadingMissionId, setLoadingMissionId] =
+    useState<TechnicalMissionId | null>(null);
   const [repoModalOpen, setRepoModalOpen] = useState(false);
 
   // Multimodal References, Continuous Talk & Canvas Annotations
@@ -1069,6 +1075,85 @@ export function StudioWorkbench() {
     setEditQueue((prev) => prev.filter((j) => j.id !== jobId));
   }, []);
 
+  const handleSelectDemoMission = async (missionId: TechnicalMissionId) => {
+    if (loadingMissionId) return;
+    setLoadingMissionId(missionId);
+    try {
+      if (missionId === 'url_transfer') {
+        if (activeWorkspaceId !== 'novaflow-slop') {
+          await handleSwitchWorkspace('novaflow-slop');
+        }
+        const res = await captureReferenceUrl('https://www.anthropic.com');
+        const finalUrl = res.url || 'https://www.anthropic.com';
+        const finalDomain = extractDomainFromUrl(finalUrl);
+        const mimeType = res.asset?.mimeType || 'image/png';
+        const shotPreviewUrl = res.asset?.dataBase64
+          ? `data:${mimeType};base64,${res.asset.dataBase64}`
+          : resolveBackendUrl(res.asset?.fileUrl || res.screenshotUrl) || '';
+        const cssSummary = res.extractedCssSummary?.trim();
+        const titleText = res.title?.trim() || finalDomain;
+        const capturedAsset: LocalMediaAsset = {
+          id: res.asset?.id || createAssetId('site'),
+          modality: res.asset?.modality || 'moodboard_image',
+          mimeType,
+          dataBase64: res.asset?.dataBase64,
+          fileUrl: res.asset?.fileUrl || res.screenshotUrl,
+          filename: res.asset?.filename || `${finalDomain}.png`,
+          label: cssSummary
+            ? `${titleText} (${finalDomain}) · ${cssSummary}`
+            : `${titleText} (${finalDomain})`,
+          previewUrl: shotPreviewUrl,
+          sourceUrl: finalUrl,
+          sourceDomain: finalDomain,
+          extractedCssSummary: cssSummary,
+        };
+        setAssets((prev) => [capturedAsset, ...prev].slice(0, 16));
+        setVoiceTranscript(
+          'Transfer anthropic.com warm alabaster editorial palette, serif display typography, and crisp high-contrast hierarchy — zero neon AI slop.'
+        );
+        pushToast(
+          'success',
+          'Staged Mission 1: anthropic.com CSS DNA captured — click Transform!'
+        );
+      } else if (missionId === 'shader_surgery') {
+        setDrawMode(true);
+        setVoiceTranscript(
+          'Surgically transform ONLY the circled visual into a prowling cobalt tiger while preserving the surrounding layout, typography, and shader loop.'
+        );
+        pushToast(
+          'info',
+          'Staged Mission 2: Circle mode active — circle any region on the canvas, then click Apply!'
+        );
+      } else if (missionId === 'luxury_store') {
+        if (activeWorkspaceId !== 'shopcraft-store') {
+          await handleSwitchWorkspace('shopcraft-store');
+        }
+        const kyotoStarter = QUICK_TASTE_STARTERS.find(
+          (s) => s.id === 'kyoto_ceramic'
+        );
+        if (kyotoStarter) {
+          const starterAsset = buildQuickStarterVisualAsset(kyotoStarter);
+          setAssets((prev) => [starterAsset, ...prev].slice(0, 16));
+        }
+        setGenerateBespokeAssets(true);
+        setVoiceTranscript(
+          'Transform Kova Goods into a tactile Monolith Ceramic & Plaster luxury editorial flagship with a bespoke Nano Banana stoneware hero photo and preserve all interactive cart & filter states.'
+        );
+        pushToast(
+          'success',
+          'Staged Mission 3: Kova Goods + Nano Banana 2.1 ON — click Transform!'
+        );
+      }
+    } catch (err) {
+      pushToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to stage mission'
+      );
+    } finally {
+      setLoadingMissionId(null);
+    }
+  };
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const activeWorkspaceDisplay = activeWorkspace
     ? formatWorkspaceDisplay(activeWorkspace)
@@ -1352,6 +1437,8 @@ export function StudioWorkbench() {
                     );
                   }}
                   onSubmitTalkEdit={handleSubmitTalkEdit}
+                  onSelectMission={(id) => void handleSelectDemoMission(id)}
+                  loadingMissionId={loadingMissionId}
                   editQueue={queueSummaries}
                   onRemoveQueuedJob={handleRemoveQueuedJob}
                 />

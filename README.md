@@ -1,8 +1,7 @@
 # AntiSlop 🎨⚡
 > **Taste-Driven Real-Time Frontend Editor & Self-Refining Design Critic Loop**  
-> 🚀 **Live Studio (Vercel Production):** [`https://portfolio-starter-livid-pi.vercel.app`](https://portfolio-starter-livid-pi.vercel.app)  
+> 🌐 **Live Custom Domain (Vercel Production):** [`https://ui-ux.fun`](https://ui-ux.fun) (fallback: [`https://portfolio-starter-livid-pi.vercel.app`](https://portfolio-starter-livid-pi.vercel.app))  
 > ☁️ **Live Engine & Vite HMR Preview (Google Cloud Run):** [`https://antislop-engine-a53petnlfa-uc.a.run.app`](https://antislop-engine-a53petnlfa-uc.a.run.app)  
-> 🌐 **Custom Domain Registered Live (12:56 PM ET):** `antislop.live`  
 > Built for the **Gemini 4 NYC Hackathon** (November 21, 2026)  
 > *Target Tracks: Element 119 (Multimodal Core) · 5 Sigma (Reliability & Baseline Evaluation) · Best Use of Managed Agents*
 
@@ -88,6 +87,8 @@ We document every architectural decision, benchmark, failure mode, and parallel 
 - **[System Architecture](docs/ARCHITECTURE.md)** — Multi-model Gemini 4 choreography, 12-probe `gemini-decision-1` rubric, and Cloud Run + Vercel production topology
 - **[Parallel Build Plan](docs/PARALLEL_BUILD_PLAN.md)** — Multi-agent swarm ownership boundaries & hackathon execution schedule
 - **[Engineering Build Log](docs/BUILD_LOG.md)** — Timestamped build journal from ideation to live deployment
+- **[Design Craft Skill Standard](skills/antislop-design-craft/SKILL.md)** — Swiss typographic, contrast math, modern web & anti-slop engineering rubric injected into Gemini 4 & Managed Agents
+- **[Live Demo & Judge Playbook](docs/DEMO_PLAYBOOK.md)** — Pre-demo checklist, 1-min video script, 3-min live flow & Judge Q&A
 - **[Breaking Points & Failure Analysis](docs/BREAKING_POINTS.md)** — Honest Element 119 stress-test failures and architectural fixes
 - **[Shared Type Contract](shared/types.ts)** — Locked TypeScript API & Decisions Scorecard schema across `/backend`, `/studio`, and `/benchmarks`
 - **[Environment Setup](env/README.md)** — How to configure `env/.env` safely (all secrets strictly gitignored)

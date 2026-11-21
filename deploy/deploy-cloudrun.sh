@@ -84,7 +84,7 @@ GCP_REGION="${GCP_REGION:-us-central1}"
 CLOUD_RUN_SERVICE="${CLOUD_RUN_SERVICE:-antislop-engine}"
 
 # Ensure production domain origins are always permitted by CORS (deduplicated)
-PROD_ORIGINS="https://antislop.live,https://www.antislop.live,http://localhost:3000"
+PROD_ORIGINS="https://ui-ux.fun,https://www.ui-ux.fun,https://portfolio-starter-livid-pi.vercel.app,https://antislop.live,https://www.antislop.live,http://localhost:3000"
 RAW_ORIGINS="${PROD_ORIGINS}${CORS_ORIGIN:+,${CORS_ORIGIN}}"
 EFFECTIVE_CORS_ORIGIN="$(
   IFS=',' read -r -a raw_arr <<< "${RAW_ORIGINS}"

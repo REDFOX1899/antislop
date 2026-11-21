@@ -131,6 +131,348 @@ export async function resetBaselineSnapshot(): Promise<{
   });
 }
 
+export interface WorkspaceFilesResponse {
+  editableFiles: string[];
+  files: Record<string, string>;
+  diff: string;
+  workspaceId?: string;
+}
+
+interface SimpleDiffEntry {
+  file: string;
+  added: number;
+  removed: number;
+  status: 'added' | 'modified' | 'deleted';
+}
+
+interface SimpleDiffPayload {
+  filesChanged?: string[];
+  linesAdded?: number;
+  linesRemoved?: number;
+  summary?: string;
+  perFile?: SimpleDiffEntry[];
+}
+
+interface RawWorkspaceFilesPayload {
+  workspaceId?: string;
+  editableFiles?: string[];
+  fileList?: string[];
+  files?: Record<string, string>;
+  baselineFiles?: Record<string, string>;
+  diff?: string | SimpleDiffPayload;
+  unifiedDiff?: string;
+}
+
+const workspaceBaselineFilesCache = new Map<string, Record<string, string>>();
+
+function getSessionBaselineKey(workspaceId: string): string {
+  return `antislop:baseline-files:${workspaceId}`;
+}
+
+function readCachedBaseline(workspaceId?: string): Record<string, string> | undefined {
+  if (!workspaceId) return undefined;
+  const mem = workspaceBaselineFilesCache.get(workspaceId);
+  if (mem) return mem;
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.sessionStorage.getItem(getSessionBaselineKey(workspaceId));
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    if (parsed && typeof parsed === 'object') {
+      workspaceBaselineFilesCache.set(workspaceId, parsed);
+      return parsed;
+    }
+  } catch {
+    // Ignore storage read errors
+  }
+  return undefined;
+}
+
+function writeCachedBaseline(workspaceId: string | undefined, files: Record<string, string>): void {
+  if (!workspaceId) return;
+  const clone = { ...files };
+  workspaceBaselineFilesCache.set(workspaceId, clone);
+  if (typeof window === 'undefined') return;
+  try {
+    const serialized = JSON.stringify(clone);
+    if (serialized.length < 400_000) {
+      window.sessionStorage.setItem(getSessionBaselineKey(workspaceId), serialized);
+    }
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function splitDiffLines(text: string): string[] {
+  if (!text) return [];
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+  return lines;
+}
+
+function buildUnifiedDiff(filePath: string, beforeText: string, afterText: string): string {
+  if (beforeText === afterText) return '';
+  const a = splitDiffLines(beforeText);
+  const b = splitDiffLines(afterText);
+
+  let prefix = 0;
+  while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) {
+    prefix++;
+  }
+
+  let suffix = 0;
+  while (
+    suffix < a.length - prefix &&
+    suffix < b.length - prefix &&
+    a[a.length - 1 - suffix] === b[b.length - 1 - suffix]
+  ) {
+    suffix++;
+  }
+
+  const midA = a.slice(prefix, a.length - suffix);
+  const midB = b.slice(prefix, b.length - suffix);
+  if (midA.length === 0 && midB.length === 0) return '';
+
+  type DiffOp = { type: 'equal' | 'delete' | 'insert'; line: string };
+  const midOps: DiffOp[] = [];
+
+  const m = midA.length;
+  const n = midB.length;
+  if (m * n <= 250_000) {
+    const cols = n + 1;
+    const dp = new Int32Array((m + 1) * cols);
+    for (let i = m - 1; i >= 0; i--) {
+      const row = i * cols;
+      const nextRow = (i + 1) * cols;
+      for (let j = n - 1; j >= 0; j--) {
+        if (midA[i] === midB[j]) {
+          dp[row + j] = dp[nextRow + j + 1] + 1;
+        } else {
+          const down = dp[nextRow + j];
+          const right = dp[row + j + 1];
+          dp[row + j] = down >= right ? down : right;
+        }
+      }
+    }
+
+    let i = 0;
+    let j = 0;
+    while (i < m && j < n) {
+      if (midA[i] === midB[j]) {
+        midOps.push({ type: 'equal', line: midA[i] });
+        i++;
+        j++;
+      } else if (dp[(i + 1) * cols + j] >= dp[i * cols + (j + 1)]) {
+        midOps.push({ type: 'delete', line: midA[i] });
+        i++;
+      } else {
+        midOps.push({ type: 'insert', line: midB[j] });
+        j++;
+      }
+    }
+    while (i < m) midOps.push({ type: 'delete', line: midA[i++] });
+    while (j < n) midOps.push({ type: 'insert', line: midB[j++] });
+  } else {
+    for (const line of midA) midOps.push({ type: 'delete', line });
+    for (const line of midB) midOps.push({ type: 'insert', line });
+  }
+
+  const ops: DiffOp[] = [];
+  for (let i = 0; i < prefix; i++) ops.push({ type: 'equal', line: a[i] });
+  for (const op of midOps) ops.push(op);
+  for (let i = a.length - suffix; i < a.length; i++) {
+    ops.push({ type: 'equal', line: a[i] });
+  }
+
+  const oldLineAt: number[] = new Array(ops.length);
+  const newLineAt: number[] = new Array(ops.length);
+  let oldCursor = 0;
+  let newCursor = 0;
+  const changeIndices: number[] = [];
+
+  for (let idx = 0; idx < ops.length; idx++) {
+    oldLineAt[idx] = oldCursor;
+    newLineAt[idx] = newCursor;
+    const op = ops[idx];
+    if (op.type === 'equal') {
+      oldCursor++;
+      newCursor++;
+    } else if (op.type === 'delete') {
+      oldCursor++;
+      changeIndices.push(idx);
+    } else {
+      newCursor++;
+      changeIndices.push(idx);
+    }
+  }
+
+  if (changeIndices.length === 0) return '';
+
+  const CONTEXT = 3;
+  const ranges: Array<[number, number]> = [];
+  for (const changeIdx of changeIndices) {
+    const start = Math.max(0, changeIdx - CONTEXT);
+    const end = Math.min(ops.length - 1, changeIdx + CONTEXT);
+    const prev = ranges[ranges.length - 1];
+    if (prev && start <= prev[1] + 1) {
+      prev[1] = Math.max(prev[1], end);
+    } else {
+      ranges.push([start, end]);
+    }
+  }
+
+  const out: string[] = [`--- a/${filePath}`, `+++ b/${filePath}`];
+  for (const [start, end] of ranges) {
+    let oldCount = 0;
+    let newCount = 0;
+    for (let idx = start; idx <= end; idx++) {
+      if (ops[idx].type !== 'insert') oldCount++;
+      if (ops[idx].type !== 'delete') newCount++;
+    }
+    const oldStart = oldCount === 0 ? oldLineAt[start] : oldLineAt[start] + 1;
+    const newStart = newCount === 0 ? newLineAt[start] : newLineAt[start] + 1;
+    out.push(`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`);
+    for (let idx = start; idx <= end; idx++) {
+      const op = ops[idx];
+      const prefixChar = op.type === 'insert' ? '+' : op.type === 'delete' ? '-' : ' ';
+      out.push(`${prefixChar}${op.line}`);
+    }
+  }
+
+  return out.join('\n');
+}
+
+function synthesizeUnifiedDiffFromSimple(
+  simple: SimpleDiffPayload,
+  files: Record<string, string>,
+  baseline?: Record<string, string>
+): string {
+  const entries: SimpleDiffEntry[] =
+    Array.isArray(simple.perFile) && simple.perFile.length > 0
+      ? simple.perFile
+      : (simple.filesChanged ?? []).map((file) => ({
+          file,
+          added: 0,
+          removed: 0,
+          status: 'modified' as const,
+        }));
+
+  if (entries.length === 0) return '';
+
+  const blocks: string[] = [];
+  for (const entry of entries) {
+    const after = files[entry.file];
+    const before = baseline?.[entry.file];
+
+    if (entry.status === 'added' && typeof after === 'string') {
+      const lines = splitDiffLines(after);
+      blocks.push(
+        [
+          '--- /dev/null',
+          `+++ b/${entry.file}`,
+          `@@ -0,0 +1,${lines.length} @@`,
+          ...lines.map((line) => `+${line}`),
+        ].join('\n')
+      );
+      continue;
+    }
+
+    if (entry.status === 'deleted') {
+      if (typeof before === 'string') {
+        const lines = splitDiffLines(before);
+        blocks.push(
+          [
+            `--- a/${entry.file}`,
+            '+++ /dev/null',
+            `@@ -1,${lines.length} +0,0 @@`,
+            ...lines.map((line) => `-${line}`),
+          ].join('\n')
+        );
+      } else {
+        blocks.push(
+          [
+            `--- a/${entry.file}`,
+            '+++ /dev/null',
+            `@@ -1,${entry.removed} +0,0 @@`,
+            `- (${entry.removed} lines removed)`,
+          ].join('\n')
+        );
+      }
+      continue;
+    }
+
+    if (typeof before === 'string' && typeof after === 'string') {
+      const patch = buildUnifiedDiff(entry.file, before, after);
+      if (patch) {
+        blocks.push(patch);
+        continue;
+      }
+    }
+
+    const previewLines = typeof after === 'string' ? splitDiffLines(after).slice(0, 80) : [];
+    const suffixNote =
+      typeof after === 'string' && splitDiffLines(after).length > 80
+        ? [` ... (${splitDiffLines(after).length - 80} more lines in Source Files tab)`]
+        : [];
+    blocks.push(
+      [
+        `--- a/${entry.file}`,
+        `+++ b/${entry.file}`,
+        `@@ modified (+${entry.added} / -${entry.removed} lines vs baseline) @@`,
+        ...previewLines.map((line) => ` ${line}`),
+        ...suffixNote,
+      ].join('\n')
+    );
+  }
+
+  return blocks.join('\n');
+}
+
+export async function getWorkspaceFiles(): Promise<WorkspaceFilesResponse> {
+  const raw = await fetchJson<RawWorkspaceFilesPayload>('/api/files', {
+    cache: 'no-store',
+  });
+
+  const files = raw.files && typeof raw.files === 'object' ? raw.files : {};
+  const editableFiles = Array.isArray(raw.editableFiles)
+    ? raw.editableFiles
+    : Array.isArray(raw.fileList)
+    ? raw.fileList
+    : Object.keys(files);
+  const workspaceId = raw.workspaceId;
+
+  let diff = '';
+  if (typeof raw.diff === 'string') {
+    diff = raw.diff.trim();
+    if (!diff) {
+      writeCachedBaseline(workspaceId, files);
+    }
+  } else if (typeof raw.unifiedDiff === 'string') {
+    diff = raw.unifiedDiff.trim();
+    if (!diff) {
+      writeCachedBaseline(workspaceId, files);
+    }
+  } else if (raw.diff && typeof raw.diff === 'object') {
+    const changed = raw.diff.filesChanged ?? raw.diff.perFile?.map((p) => p.file) ?? [];
+    if (changed.length === 0) {
+      writeCachedBaseline(workspaceId, files);
+      diff = '';
+    } else {
+      const baseline = raw.baselineFiles ?? readCachedBaseline(workspaceId);
+      diff = synthesizeUnifiedDiffFromSimple(raw.diff, files, baseline);
+    }
+  }
+
+  return {
+    editableFiles,
+    files,
+    diff,
+    workspaceId,
+  };
+}
+
 export async function transcribeVoiceAudio(
   audioBase64: string,
   mimeType: string

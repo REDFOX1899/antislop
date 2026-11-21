@@ -354,8 +354,59 @@ body {
 /* Tactile subtle drafting grid behind the live preview stage */
 .atelier-stage-grid {
   background-color: var(--bg-stage-grid);
-  background-image: radial-gradient(var(--stage-dot) 0.85px, transparent 0.85px);
-  background-size: 18px 18px;
+  background-image:
+    radial-gradient(ellipse 75% 42% at 50% 0%, rgba(26, 115, 232, 0.08), transparent 70%),
+    radial-gradient(var(--stage-dot) 0.9px, transparent 0.9px);
+  background-size: 100% 100%, 18px 18px;
+}
+
+:root[data-theme="light"] .atelier-stage-grid {
+  background-image:
+    radial-gradient(ellipse 75% 42% at 50% 0%, rgba(26, 115, 232, 0.05), transparent 70%),
+    radial-gradient(var(--stage-dot) 0.9px, transparent 0.9px);
+}
+
+/* Sculptural macOS / Code Wiki browser bezel framing dark and light target apps */
+.studio-browser-bezel {
+  border: 1px solid rgba(138, 180, 248, 0.16);
+  box-shadow:
+    0 28px 64px -26px rgba(0, 0, 0, 0.92),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+:root[data-theme="light"] .studio-browser-bezel {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 20px 44px -22px rgba(15, 23, 42, 0.18),
+    0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+/* Natural interaction feedback: visible keyboard focus rings, press scale & touch-friendly card actions */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--cobalt-ice);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :where(button):active:not(:disabled) {
+    scale: 0.98;
+  }
+}
+
+.hover-reveal-action {
+  opacity: 0;
+  transition: opacity 0.16s ease, background-color 0.16s ease;
+}
+
+.group:hover .hover-reveal-action,
+.group:focus-within .hover-reveal-action {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .hover-reveal-action {
+    opacity: 1;
+  }
 }
 
 /* Native <dialog> top-layer modal best practices */

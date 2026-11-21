@@ -87,3 +87,16 @@
 ---
 
 *(Subsequent phases will append real commit hashes, live latency metrics, Decisions API calibration logs, and deployment URLs as each parallel wave lands.)*
+
+---
+
+## Wave 6: Flagship Cobalt Studio Polish, Design Craft Skill, Live Managed Agent Validation & `ui-ux.fun` Domain (3:15 PM – 3:50 PM ET)
+- **Flagship Cobalt Studio UI Upgrades**:
+  - Added architectural dot-grid stage mat, sculptural Code-Wiki macOS browser bezel (`1440×900` / `390×844`), `</> Diff` source & unified diff inspector ([`CodeDiffModal.tsx`](../studio/src/components/CodeDiffModal.tsx)), auto-dismissing 3-step whisper, [`icon.svg`](../studio/src/app/icon.svg) favicon, and 3 one-click Technical Missions + 5-model stack telemetry in [`CriticRail.tsx`](../studio/src/components/CriticRail.tsx).
+- **Open-Source Design Craft Skill & Repo-Isolated Managed Agent**:
+  - Created [`skills/antislop-design-craft/SKILL.md`](../skills/antislop-design-craft/SKILL.md) and [`backend/src/gemini/designSkill.ts`](../backend/src/gemini/designSkill.ts), wired into `director.ts` and `coder.ts`.
+  - Upgraded [`backend/src/gemini/managedAgent.ts`](../backend/src/gemini/managedAgent.ts) with deterministic repo+skill-hash agent IDs (`antislop-surgeon-<slug>-<hash8>`) and native `inline` mounting of `.agents/skills/antislop-design-craft/SKILL.md` + `.agents/AGENTS.md` alongside the GitHub repo in Google's remote Linux sandbox (`antigravity-preview-09-2026` `v1beta`).
+  - Live Managed Agent verification streamed **91 real SSE events** (`buildPassed: true`, `npm run build` exit 0 inside Google's Linux sandbox).
+- **3 Live-Tested Before → After Technical Scenarios + Automated E2E Suite**:
+  - [`scripts/functional-e2e-test.mjs`](../scripts/functional-e2e-test.mjs) verified **8/8 PASS**.
+  - Updated [`deploy/Dockerfile`](../deploy/Dockerfile) to package `skills/`, attached custom domain **`ui-ux.fun`** (`+ www.ui-ux.fun`) to Vercel project `prj_5Go6HmY5xn2pyAQqxALrdxRaJB74`, updated CORS in [`deploy/deploy-cloudrun.sh`](../deploy/deploy-cloudrun.sh), and shipped to GitHub, Vercel, and Google Cloud Run.

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { DrawnCircleAnnotation, TransformRunRequest } from '@shared/types';
 import {
+  Code2,
   Columns2,
   Loader2,
   Mic,
@@ -24,9 +25,10 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { resolveBackendUrl } from '@/lib/api';
+import { getWorkspaceFiles, resolveBackendUrl } from '@/lib/api';
 import { useVoiceRecorder } from '@/lib/useVoiceRecorder';
 import { GeminiSparkleMark } from './BrandMarks';
+import { CodeDiffModal } from './CodeDiffModal';
 
 export interface LiveCanvasHandle {
   /** Exports current freehand vermilion circles + numbered pins as transparent PNG base64 */
@@ -110,6 +112,9 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
     const [manualReload, setManualReload] = useState(0);
     const [editingCircleId, setEditingCircleId] = useState<string | null>(null);
     const [showHmrBadge, setShowHmrBadge] = useState(false);
+    const [diffModalOpen, setDiffModalOpen] = useState(false);
+    const [hasRunOnce, setHasRunOnce] = useState(false);
+    const [dismissedHint, setDismissedHint] = useState(false);
 
     // Zero-flicker double-buffered iframe state: keeps previous site visible until new frame paints
     const [slotUrls, setSlotUrls] = useState<[string, string | null]>(() => [
@@ -219,6 +224,26 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
         setCompareMode(false);
       }
     }, [drawMode, compareMode]);
+
+    useEffect(() => {
+      if (isRunning || lastRunSummary !== null || Boolean(finalScreenshotUrl)) {
+        setHasRunOnce(true);
+      }
+    }, [isRunning, lastRunSummary, finalScreenshotUrl]);
+
+    useEffect(() => {
+      if (drawMode || drawnCircles.length > 0) {
+        setDismissedHint(true);
+      }
+    }, [drawMode, drawnCircles.length]);
+
+    useEffect(() => {
+      if (isRunning) return;
+      if (lastRunSummary !== null && reloadNonce > 1) return;
+      void getWorkspaceFiles().catch(() => {
+        // Silently seed client baseline diff cache when backend is reachable
+      });
+    }, [workspaceSlug, previewUrl, isRunning, lastRunSummary, reloadNonce]);
 
     // Render all saved circles + in-progress freehand stroke on HTML5 canvas
     const redrawCanvas = useCallback(
@@ -648,7 +673,22 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               )}
             </div>
 
-            {/* 3. Before / After Ghost Toggle (shown ONLY when baseline exists!) */}
+            {/* 3. </> Diff Ghost Control */}
+            <button
+              type="button"
+              onClick={() => setDiffModalOpen(true)}
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors ${
+                diffModalOpen
+                  ? 'bg-[var(--cobalt-tint)] text-[var(--cobalt-ice)]'
+                  : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
+              }`}
+              title="Inspect live code diff and source files"
+            >
+              <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Diff</span>
+            </button>
+
+            {/* 4. Before / After Ghost Toggle (shown ONLY when baseline exists!) */}
             {canCompare && (
               <button
                 type="button"
@@ -751,14 +791,40 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
           </div>
         )}
 
-        {/* Pure Unobstructed Interactive Live Website Stage */}
-        <div className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2">
+        {/* Pure Unobstructed Interactive Live Website Stage inside Sculptural Browser Bezel */}
+        <div className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
           <div
             ref={stageRef}
-            className={`relative flex h-full flex-col overflow-hidden rounded-[12px] border border-[var(--border-subtle)] bg-white shadow-[var(--shadow-card)] transition-[width] duration-200 ${
+            className={`studio-browser-bezel relative flex h-full flex-col overflow-hidden rounded-[12px] bg-[var(--bg-card-elevated)] transition-[width] duration-200 ${
               viewportMode === 'mobile' ? 'w-[390px] max-w-full' : 'w-full'
             }`}
           >
+            {/* Minimal 28px Code-Wiki macOS Window Bezel Chrome */}
+            <div className="group flex h-[28px] shrink-0 items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card-elevated)] px-3 select-none">
+              <div className="flex items-center gap-1.5" aria-hidden="true">
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--ink-muted)]/35 transition-colors group-hover:bg-[#FF5F57]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--ink-muted)]/35 transition-colors group-hover:bg-[#FEBC2E]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--ink-muted)]/35 transition-colors group-hover:bg-[#28C840]" />
+              </div>
+
+              <div className="flex min-w-0 max-w-[62%] items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-0.5 font-mono text-[10px] text-[var(--ink-secondary)]">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    isRunning
+                      ? 'bg-[var(--cobalt-bright)] animate-studio-pulse'
+                      : 'bg-[var(--emerald)]'
+                  }`}
+                />
+                <span className="truncate">
+                  {workspaceSlug.replace(/\s+\/\s+/g, '/')}
+                </span>
+              </div>
+
+              <span className="shrink-0 font-mono text-[9.5px] tabular-nums text-[var(--ink-muted)]">
+                {viewportMode === 'mobile' ? '390×844' : '1440×900'}
+              </span>
+            </div>
+
             <div className="relative flex-1 overflow-hidden bg-white">
               {/* Ultra-thin Google Cobalt progress bar while building */}
               {isRunning && (
@@ -1036,9 +1102,45 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   )}
                 </div>
               )}
+
+              {/* Subtle Auto-Dismissing 3-Step First-Visit Whisper */}
+              {!hasRunOnce &&
+                !isRunning &&
+                drawnCircles.length === 0 &&
+                !dismissedHint &&
+                !compareMode && (
+                  <div className="absolute bottom-3 left-1/2 z-20 flex max-w-[94%] -translate-x-1/2 items-center gap-2 rounded-full border border-[rgba(138,180,248,0.22)] bg-[#080A0E]/82 py-1 pl-3.5 pr-1.5 text-[11px] text-[#E8EAED] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.65)] backdrop-blur-md">
+                    <span className="truncate tracking-[-0.005em]">
+                      <span className="font-mono text-[#8AB4F8]">1.</span> Snap a site or drop refs
+                      <span className="mx-2 text-[#6E747B]" aria-hidden="true">
+                        →
+                      </span>
+                      <span className="font-mono text-[#8AB4F8]">2.</span> Circle &amp; speak any change
+                      <span className="mx-2 text-[#6E747B]" aria-hidden="true">
+                        →
+                      </span>
+                      <span className="font-mono text-[#8AB4F8]">3.</span> Decision-1 verifies in ~250ms
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDismissedHint(true)}
+                      aria-label="Dismiss quick start hint"
+                      className="flex h-6 min-h-[24px] w-6 min-w-[24px] shrink-0 items-center justify-center rounded-full text-[#9AA0A6] transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8AB4F8]"
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
             </div>
           </div>
         </div>
+
+        <CodeDiffModal
+          open={diffModalOpen}
+          onClose={() => setDiffModalOpen(false)}
+          workspaceSlug={workspaceSlug}
+          reloadNonce={reloadNonce}
+        />
       </section>
     );
   }

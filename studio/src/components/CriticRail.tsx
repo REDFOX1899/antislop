@@ -38,6 +38,8 @@ export interface QueuedEditSummary {
   createdAt: number;
 }
 
+export type TechnicalMissionId = 'url_transfer' | 'shader_surgery' | 'luxury_store';
+
 interface CriticRailProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -63,6 +65,8 @@ interface CriticRailProps {
     transcript: string;
   }) => void;
   onSubmitTalkEdit: () => void;
+  onSelectMission?: (missionId: TechnicalMissionId) => void;
+  loadingMissionId?: TechnicalMissionId | null;
   editQueue: QueuedEditSummary[];
   onRemoveQueuedJob: (jobId: string) => void;
 }
@@ -815,11 +819,34 @@ function ConvergenceSparkline({ iterations }: { iterations: CriticIteration[] })
   );
 }
 
-/* ONLY 2 ultra-clean subtle suggestion chips for the serene Code Wiki idle state */
-const IDLE_QUICK_DIRECTIVES = [
-  'Elevate typography & generous editorial spacing',
-  'Strip AI-slop gradients and sharpen contrast',
+/* 3 Verified High-Impact Technical Missions for Immediate Testing & Live Demo */
+const TECHNICAL_DEMO_MISSIONS: Array<{
+  id: TechnicalMissionId;
+  badge: string;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    id: 'url_transfer',
+    badge: 'URL → CSS DNA',
+    title: 'Transfer anthropic.com editorial system',
+    subtitle: 'Snap live URL & compile Warm Alabaster SaaS',
+  },
+  {
+    id: 'shader_surgery',
+    badge: 'Circle + Voice',
+    title: 'Surgical <canvas> / hero region edit',
+    subtitle: 'Draw vermilion circle & patch targeted code only',
+  },
+  {
+    id: 'luxury_store',
+    badge: '5 Models + Art',
+    title: 'Kova Goods + Nano Banana 2.1 hero',
+    subtitle: 'Bespoke product photography & working React cart',
+  },
 ];
+
+const GEMINI_STACK_PILLS = ['Carbon', 'Neon', 'Hydrogen', 'Decision-1', 'Banana 2.1'];
 
 export function CriticRail({
   collapsed,
@@ -840,6 +867,8 @@ export function CriticRail({
   onVoiceTranscriptChange,
   onVoiceRecorded,
   onSubmitTalkEdit,
+  onSelectMission,
+  loadingMissionId = null,
   editQueue,
   onRemoveQueuedJob,
 }: CriticRailProps) {
@@ -920,28 +949,65 @@ export function CriticRail({
           </button>
         </div>
 
-        {/* Middle Body: Serene Code Wiki Idle Sparkle OR Minimal Scored Disclosures */}
+        {/* Middle Body: Serene Code Wiki Idle Sparkle + 3 Technical Missions OR Minimal Scored Disclosures */}
         {isFreshIdle ? (
-          <div className="codewiki-sparkle-aura flex flex-1 flex-col items-center justify-center px-6 text-center">
-            <GeminiSparkleMark className="h-12 w-12" glow />
-            <h2 className="mt-5 text-[20px] font-medium tracking-[-0.02em] text-[var(--ink-primary)]">
-              Direct this interface
-            </h2>
-            <p className="mt-1.5 max-w-[220px] text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
-              Circle the canvas, snap a site, or speak a change.
-            </p>
+          <div className="codewiki-sparkle-aura studio-scroll flex flex-1 flex-col items-center justify-between overflow-y-auto px-4 pb-3 pt-6 text-center">
+            <div className="flex flex-col items-center">
+              <GeminiSparkleMark className="h-11 w-11" glow />
+              <h2 className="mt-4 text-[19px] font-medium tracking-[-0.02em] text-[var(--ink-primary)]">
+                Direct this interface
+              </h2>
+              <p className="mt-1 max-w-[230px] text-[12px] leading-relaxed text-[var(--ink-secondary)]">
+                Circle the canvas, snap a live site, or launch a verified technical mission.
+              </p>
+            </div>
 
-            {/* ONLY 2 Ultra-Clean Subtle Suggestion Chips */}
-            <div className="mt-6 flex w-full flex-col gap-2">
-              {IDLE_QUICK_DIRECTIVES.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => onVoiceTranscriptChange(prompt)}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-transparent px-3.5 py-2.5 text-left text-[12px] text-[var(--ink-secondary)] transition-colors hover:border-[var(--cobalt-border)] hover:bg-[var(--cobalt-tint)] hover:text-[var(--ink-primary)]"
+            {/* 3 Technical One-Click Missions */}
+            <div className="my-5 flex w-full flex-col gap-2 text-left">
+              {TECHNICAL_DEMO_MISSIONS.map((mission) => {
+                const isBusy = loadingMissionId === mission.id;
+                return (
+                  <button
+                    key={mission.id}
+                    type="button"
+                    disabled={Boolean(loadingMissionId)}
+                    onClick={() => {
+                      if (onSelectMission) {
+                        onSelectMission(mission.id);
+                      } else {
+                        onVoiceTranscriptChange(mission.title);
+                      }
+                    }}
+                    className="group flex flex-col gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card-elevated)]/65 px-3 py-2.5 text-left transition-all hover:border-[var(--cobalt-border-strong)] hover:bg-[var(--cobalt-tint)] disabled:opacity-55"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.06em] text-[var(--cobalt-ice)]">
+                        {mission.badge}
+                      </span>
+                      {isBusy && (
+                        <Loader2 className="h-3 w-3 animate-spin text-[var(--cobalt-ice)]" />
+                      )}
+                    </div>
+                    <span className="text-[12px] font-medium leading-snug text-[var(--ink-primary)]">
+                      {mission.title}
+                    </span>
+                    <span className="text-[11px] leading-snug text-[var(--ink-secondary)]">
+                      {mission.subtitle}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quiet Multi-Model Engine Telemetry Strip */}
+            <div className="flex w-full flex-wrap items-center justify-center gap-1 border-t border-[var(--border-subtle)] pt-3">
+              {GEMINI_STACK_PILLS.map((pill) => (
+                <span
+                  key={pill}
+                  className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2 py-0.5 font-mono text-[9px] text-[var(--ink-muted)]"
                 >
-                  {prompt}
-                </button>
+                  {pill}
+                </span>
               ))}
             </div>
           </div>
