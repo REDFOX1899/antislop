@@ -74,13 +74,13 @@ interface QueuedEditJob {
   generateBespokeAssets: boolean;
 }
 
-const DEFAULT_LEFT_WIDTH = 224;
-const DEFAULT_RIGHT_WIDTH = 304;
+const DEFAULT_LEFT_WIDTH = 212;
+const DEFAULT_RIGHT_WIDTH = 296;
 const COLLAPSED_LEFT_WIDTH = 44;
-const MIN_LEFT_WIDTH = 196;
-const MAX_LEFT_WIDTH = 320;
+const MIN_LEFT_WIDTH = 188;
+const MAX_LEFT_WIDTH = 300;
 const MIN_RIGHT_WIDTH = 264;
-const MAX_RIGHT_WIDTH = 420;
+const MAX_RIGHT_WIDTH = 400;
 
 function isFullRunResult(obj: unknown): obj is TransformRunResult {
   return (
@@ -1195,8 +1195,6 @@ export function StudioWorkbench() {
         onSwitchWorkspace={(id) => void handleSwitchWorkspace(id)}
         switchingWorkspace={switchingWorkspace}
         onOpenRepoModal={() => setRepoModalOpen(true)}
-        onResetBaseline={() => void handleResetBaseline()}
-        resettingBaseline={resettingBaseline}
         onOpenPr={() => void handleOpenPr()}
         openingPr={openingPr}
         backendHealthy={backendHealthy}
@@ -1241,6 +1239,8 @@ export function StudioWorkbench() {
                 queueCount={editQueue.length}
                 onRunTransform={() => enqueueOrExecuteRun('antislop')}
                 onRunCircleTweak={() => enqueueOrExecuteRun('circle_tweak')}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
                 onResetBaseline={() => void handleResetBaseline()}
                 resettingBaseline={resettingBaseline}
               />
