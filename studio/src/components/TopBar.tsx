@@ -33,9 +33,60 @@ interface TopBarProps {
 }
 
 const BUILTIN_FALLBACKS: Array<{ id: string; label: string; tag: string }> = [
-  { id: 'novaflow-slop', label: 'NovaFlow AI', tag: 'Slop' },
+  { id: 'novaflow-slop', label: 'NovaFlow AI', tag: 'SaaS' },
   { id: 'shopcraft-store', label: 'Kova Goods', tag: 'Store' },
+  { id: 'dev-portfolio', label: 'Dev Portfolio', tag: 'Portfolio' },
 ];
+
+function formatWorkspaceDisplay(w: WorkspaceRepoInfo): {
+  id: string;
+  label: string;
+  tag: string;
+  isGithub: boolean;
+} {
+  const lowerId = w.id.toLowerCase();
+  const lowerName = w.name.toLowerCase();
+
+  if (w.source === 'github') {
+    return {
+      id: w.id,
+      label: w.name,
+      tag: 'GitHub',
+      isGithub: true,
+    };
+  }
+  if (lowerId.includes('portfolio') || lowerName.includes('portfolio')) {
+    return {
+      id: w.id,
+      label: 'Dev Portfolio',
+      tag: 'Portfolio',
+      isGithub: false,
+    };
+  }
+  if (lowerId.includes('shopcraft') || lowerId.includes('kova') || lowerName.includes('kova')) {
+    return {
+      id: w.id,
+      label: 'Kova Goods',
+      tag: 'Store',
+      isGithub: false,
+    };
+  }
+  if (lowerId.includes('novaflow') || lowerName.includes('novaflow')) {
+    return {
+      id: w.id,
+      label: 'NovaFlow AI',
+      tag: 'SaaS',
+      isGithub: false,
+    };
+  }
+
+  return {
+    id: w.id,
+    label: w.name.replace(/\s*\([^)]*\)\s*/g, '').trim() || w.name,
+    tag: 'App',
+    isGithub: false,
+  };
+}
 
 export function TopBar({
   activeTab,
@@ -55,18 +106,17 @@ export function TopBar({
 }: TopBarProps) {
   const displayWorkspaces =
     workspaces.length > 0
-      ? workspaces.map((w) => ({
-          id: w.id,
-          label: w.name,
-          tag:
-            w.source === 'github'
-              ? 'GitHub'
-              : w.id.toLowerCase().includes('shopcraft') || w.id.toLowerCase().includes('kova')
-              ? 'Store'
-              : 'Slop',
-          isGithub: w.source === 'github',
-        }))
+      ? workspaces.map(formatWorkspaceDisplay)
       : BUILTIN_FALLBACKS.map((b) => ({ ...b, isGithub: false }));
+
+  // Keep all 3 built-ins + any active/latest connected GitHub repos cleanly visible
+  const visibleWorkspaces =
+    displayWorkspaces.length <= 4
+      ? displayWorkspaces
+      : [
+          ...displayWorkspaces.filter((w) => !w.isGithub).slice(0, 3),
+          ...displayWorkspaces.filter((w) => w.isGithub).slice(-2),
+        ];
 
   return (
     <header className="flex h-[52px] shrink-0 items-center justify-between gap-2 border-b border-[#E5E1D8] bg-[#FFFFFF] px-3">
@@ -94,27 +144,27 @@ export function TopBar({
         <div className="h-5 w-px bg-[#E5E1D8]" />
 
         {/* Target Repo Switcher */}
-        <div className="flex items-center gap-1 rounded-[7px] border border-[#E5E1D8] bg-[#F5F3EE] p-0.5">
-          {displayWorkspaces.slice(0, 3).map((ws) => {
+        <div className="flex items-center gap-0.5 rounded-[7px] border border-[#E5E1D8] bg-[#F5F3EE] p-0.5">
+          {visibleWorkspaces.map((ws) => {
             const isActive =
               activeWorkspaceId === ws.id ||
-              (!activeWorkspaceId && ws.id === displayWorkspaces[0]?.id);
+              (!activeWorkspaceId && ws.id === visibleWorkspaces[0]?.id);
             return (
               <button
                 key={ws.id}
                 type="button"
                 disabled={switchingWorkspace}
                 onClick={() => onSwitchWorkspace(ws.id)}
-                className={`flex items-center gap-1.5 rounded-[5px] px-2 py-1 text-[11.5px] font-medium transition-all ${
+                className={`flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11px] font-medium transition-all ${
                   isActive
                     ? 'bg-white text-[#141413] shadow-[0_1px_2px_rgba(20,20,19,0.06)] ring-1 ring-[#E5E1D8]'
                     : 'text-[#64625D] hover:text-[#141413]'
                 }`}
                 title={`Switch target workspace to ${ws.label}`}
               >
-                {ws.isGithub && <FolderGit2 className="h-3 w-3 text-[#E03E2D]" />}
-                <span className="max-w-[104px] truncate">{ws.label}</span>
-                <span className="hidden font-mono text-[9.5px] uppercase tracking-wider text-[#64625D] 2xl:inline">
+                {ws.isGithub && <FolderGit2 className="h-3 w-3 shrink-0 text-[#E03E2D]" />}
+                <span className="max-w-[96px] truncate">{ws.label}</span>
+                <span className="hidden font-mono text-[9px] uppercase tracking-wider text-[#64625D] 2xl:inline">
                   {ws.tag}
                 </span>
               </button>
@@ -123,11 +173,11 @@ export function TopBar({
           <button
             type="button"
             onClick={onOpenRepoModal}
-            className="flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11.5px] font-medium text-[#141413] transition-colors hover:bg-white"
+            className="flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11px] font-medium text-[#141413] transition-colors hover:bg-white"
             title="Connect your GitHub repository or paste any public GitHub URL"
           >
             <Plus className="h-3 w-3 text-[#E03E2D]" />
-            <span className="hidden sm:inline">Connect GitHub Repo</span>
+            <span className="hidden xl:inline">GitHub</span>
           </button>
         </div>
       </div>

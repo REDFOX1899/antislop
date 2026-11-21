@@ -5,6 +5,7 @@ import type {
   CriticIteration,
   DecisionsScorecard,
   DesignManifest,
+  DrawnCircleAnnotation,
   ExecutionSpeedMode,
   MediaAssetInput,
   TransformRunRequest,
@@ -69,12 +70,43 @@ function buildErrorContext(capture: PuppeteerAuditCapture, viteError: string | n
   return parts.length > 0 ? parts.join('\n\n') : undefined;
 }
 
+function inferChangedSections(
+  filesModified: string[],
+  explicit?: string[],
+  drawnCircles?: DrawnCircleAnnotation[]
+): string[] {
+  if (Array.isArray(explicit) && explicit.length > 0) {
+    return Array.from(new Set(explicit.map((s) => s.trim()).filter(Boolean)));
+  }
+  const sections = new Set<string>();
+  if (drawnCircles && drawnCircles.length > 0) {
+    sections.add('circled-region');
+  }
+  for (const file of filesModified) {
+    const lower = file.toLowerCase();
+    if (lower.endsWith('index.html')) {
+      sections.add('typography');
+    } else if (lower.endsWith('.css')) {
+      sections.add('palette');
+      sections.add('typography');
+    } else if (lower.endsWith('.tsx') || lower.endsWith('.jsx')) {
+      sections.add('hero');
+      sections.add('layout');
+    }
+  }
+  if (sections.size === 0) {
+    sections.add('layout');
+  }
+  return Array.from(sections);
+}
+
 interface EvaluatedState {
   candidate: CandidateResult;
   files: Record<string, string>;
   capture: PuppeteerAuditCapture;
   viteError: string | null;
   effectiveScore: number;
+  changedSections: string[];
 }
 
 function computeEffectiveScore(
@@ -91,11 +123,11 @@ function computeEffectiveScore(
   if (scorecard.domAudit.consoleErrorCount > 0) {
     score -= Math.min(30, scorecard.domAudit.consoleErrorCount * 15);
   }
-  if (scorecard.domAudit.horizontalOverflowPx > 24) {
+  if (scorecard.domAudit.horizontalOverflowPx > 12) {
     score -= 12;
   }
-  if (scorecard.domAudit.overlappingTextNodes > 0) {
-    score -= Math.min(18, scorecard.domAudit.overlappingTextNodes * 6);
+  if (scorecard.domAudit.overlappingTextNodes > 2) {
+    score -= Math.min(18, (scorecard.domAudit.overlappingTextNodes - 2) * 6);
   }
   if (scorecard.domAudit.brokenImageCount > 0) {
     score -= Math.min(24, scorecard.domAudit.brokenImageCount * 12);
@@ -128,7 +160,7 @@ function applyDeterministicGates(
     Boolean(capture.viteOverlayError) ||
     capture.isBlankPage ||
     domAudit.consoleErrorCount > 0 ||
-    domAudit.horizontalOverflowPx > 24 ||
+    domAudit.horizontalOverflowPx > 12 ||
     domAudit.overlappingTextNodes > 2 ||
     domAudit.brokenImageCount > 0;
 
@@ -230,6 +262,9 @@ export class TransformOrchestrator {
     referenceImages: MediaAssetInput[];
     manifest?: DesignManifest;
     includeMobile: boolean;
+    isFastDemo?: boolean;
+    changedSections?: string[];
+    drawnCircles?: DrawnCircleAnnotation[];
     hmrWaitMs: number;
     generationLatencyMs: number;
     modelsInvoked: Set<string>;
@@ -240,12 +275,17 @@ export class TransformOrchestrator {
     const previewUrl = viteManager.getProxiedPreviewUrl();
     const capturePrefix = `${params.runId}-i${params.iteration}-${params.candidateId}`;
     const capture = await puppeteerAuditor.captureAndAudit(previewUrl, capturePrefix, {
-      includeMobile: params.includeMobile,
+      includeMobile: params.isFastDemo ? false : params.includeMobile,
+      settleMs: params.isFastDemo ? 180 : 350,
     });
 
     const viteError = viteManager.getLastViteError();
 
-    // Run Decisions API critic and Multimodal Embedding similarity in parallel to save latency
+    // In fast_demo, skip embedding unless ref images <= 2; always run in Promise.all with gemini-decision-1
+    const shouldRunEmbedding =
+      params.referenceImages.length > 0 &&
+      (!params.isFastDemo || params.referenceImages.length <= 2);
+
     const [rawScorecard, embeddingSimilarity] = await Promise.all([
       geminiEngine.evaluateVisualCandidate({
         renderedDesktopBase64: capture.desktopBase64,
@@ -254,7 +294,7 @@ export class TransformOrchestrator {
         manifest: params.manifest,
         domAudit: capture.domAudit,
       }),
-      params.referenceImages.length > 0
+      shouldRunEmbedding
         ? geminiEngine
             .computeTasteEmbeddingSimilarity({
               referenceImages: params.referenceImages,
@@ -279,6 +319,11 @@ export class TransformOrchestrator {
     );
 
     const effectiveScore = computeEffectiveScore(gatedScorecard, capture, viteError);
+    const changedSections = inferChangedSections(
+      params.filesModified,
+      params.changedSections,
+      params.drawnCircles
+    );
 
     const candidate: CandidateResult = {
       candidateId: params.candidateId,
@@ -303,6 +348,7 @@ export class TransformOrchestrator {
           candidate,
           effectiveScore,
           viteError,
+          changedSections,
         },
       }
     );
@@ -313,6 +359,7 @@ export class TransformOrchestrator {
       capture,
       viteError,
       effectiveScore,
+      changedSections,
     };
   }
 
@@ -365,6 +412,7 @@ export class TransformOrchestrator {
       const previewUrl = viteManager.getProxiedPreviewUrl();
       const baselineCapture = await puppeteerAuditor.captureAndAudit(previewUrl, `${run.runId}-baseline`, {
         includeMobile: false,
+        settleMs: run.speedMode === 'fast_demo' ? 180 : 350,
       });
       run.baselineScreenshotUrl = baselineCapture.desktopUrl;
 
@@ -388,7 +436,7 @@ export class TransformOrchestrator {
       }
 
       const referenceImages = req.assets.filter(
-        (asset) => asset.mimeType.startsWith('image/') && Boolean(asset.dataBase64)
+        (asset) => asset.mimeType.startsWith('image/') && Boolean(asset.dataBase64 || asset.fileUrl)
       );
 
       // Dispatch by mode
@@ -503,6 +551,7 @@ export class TransformOrchestrator {
       referenceAssets: req.assets,
       targetRegion: req.targetRegion,
       instruction,
+      speedMode: run.speedMode,
     });
     modelsInvoked.add(patch.modelUsed);
 
@@ -513,7 +562,11 @@ export class TransformOrchestrator {
     eventBus.emit(run.runId, 'candidate_written', `Patched ${writtenFiles.length} file(s): ${writtenFiles.join(', ')}`, {
       iteration: 1,
       model: patch.modelUsed,
-      payload: { filesModified: writtenFiles, diffSummary: patch.diffSummary },
+      payload: {
+        filesModified: writtenFiles,
+        diffSummary: patch.diffSummary,
+        changedSections: patch.changedSections,
+      },
     });
 
     let bestState = await this.evaluateWrittenWorkspace({
@@ -527,7 +580,10 @@ export class TransformOrchestrator {
       referenceAssets: req.assets,
       referenceImages,
       includeMobile: false,
-      hmrWaitMs: 500,
+      isFastDemo: run.speedMode === 'fast_demo',
+      changedSections: patch.changedSections,
+      drawnCircles: req.drawnCircles,
+      hmrWaitMs: 350,
       generationLatencyMs: patch.latencyMs,
       modelsInvoked,
     });
@@ -538,7 +594,11 @@ export class TransformOrchestrator {
 
     eventBus.emit(run.runId, 'hmr_reloaded', 'Vite HMR updated live canvas with surgical tweak', {
       iteration: 1,
-      payload: { screenshotUrl: bestState.candidate.screenshotUrl },
+      payload: {
+        screenshotUrl: bestState.candidate.screenshotUrl,
+        changedSections: bestState.changedSections,
+        drawnCircles: req.drawnCircles ?? [],
+      },
     });
 
     // Automatic single recovery patch if build broke, blank page, layout broke, or contrast failed
@@ -576,6 +636,7 @@ export class TransformOrchestrator {
         targetRegion: req.targetRegion,
         instruction: `Fix the visual/runtime issue from the previous edit while still honoring the user's request: ${instruction}`,
         errorContext,
+        speedMode: run.speedMode,
       });
       modelsInvoked.add(recoveryPatch.modelUsed);
 
@@ -594,7 +655,10 @@ export class TransformOrchestrator {
         referenceAssets: req.assets,
         referenceImages,
         includeMobile: false,
-        hmrWaitMs: 500,
+        isFastDemo: run.speedMode === 'fast_demo',
+        changedSections: recoveryPatch.changedSections,
+        drawnCircles: req.drawnCircles,
+        hmrWaitMs: 350,
         generationLatencyMs: recoveryPatch.latencyMs,
         modelsInvoked,
       });
@@ -617,7 +681,11 @@ export class TransformOrchestrator {
 
       eventBus.emit(run.runId, 'hmr_reloaded', 'Vite HMR settled after automatic recovery pass', {
         iteration: 2,
-        payload: { screenshotUrl: bestState.candidate.screenshotUrl },
+        payload: {
+          screenshotUrl: bestState.candidate.screenshotUrl,
+          changedSections: bestState.changedSections,
+          drawnCircles: req.drawnCircles ?? [],
+        },
       });
     }
 
@@ -646,7 +714,11 @@ export class TransformOrchestrator {
 
     eventBus.emit(run.runId, 'iteration_complete', 'Circle-to-Tweak completed', {
       iteration: 1,
-      payload: iterationRecord,
+      payload: {
+        ...iterationRecord,
+        changedSections: bestState.changedSections,
+        drawnCircles: req.drawnCircles ?? [],
+      },
     });
   }
 
@@ -673,7 +745,7 @@ export class TransformOrchestrator {
 
     eventBus.emit(run.runId, 'candidate_started', 'Generating Text-Only Baseline (control group, zero visual refs)...', {
       iteration: 1,
-      model: ENV.GEMINI_MODEL_ARCHITECT,
+      model: ENV.GEMINI_MODEL_PATCHER,
       payload: { textPrompt },
     });
 
@@ -714,7 +786,10 @@ export class TransformOrchestrator {
       referenceAssets: req.assets,
       referenceImages,
       includeMobile: false,
-      hmrWaitMs: 500,
+      isFastDemo: true,
+      changedSections: firstCandidate.changedSections,
+      drawnCircles: req.drawnCircles,
+      hmrWaitMs: 350,
       generationLatencyMs: firstCandidate.latencyMs,
       modelsInvoked,
     });
@@ -728,7 +803,11 @@ export class TransformOrchestrator {
 
     eventBus.emit(run.runId, 'hmr_reloaded', 'Vite HMR updated with text-only baseline', {
       iteration: 1,
-      payload: { screenshotUrl: evaluated.candidate.screenshotUrl },
+      payload: {
+        screenshotUrl: evaluated.candidate.screenshotUrl,
+        changedSections: evaluated.changedSections,
+        drawnCircles: req.drawnCircles ?? [],
+      },
     });
 
     const diff = await snapshotManager.computeSimpleDiff(wsPath);
@@ -750,7 +829,11 @@ export class TransformOrchestrator {
 
     eventBus.emit(run.runId, 'iteration_complete', 'Text-only baseline evaluation complete', {
       iteration: 1,
-      payload: iterationRecord,
+      payload: {
+        ...iterationRecord,
+        changedSections: evaluated.changedSections,
+        drawnCircles: req.drawnCircles ?? [],
+      },
     });
   }
 
@@ -790,146 +873,201 @@ export class TransformOrchestrator {
 
     const sourceFiles = await snapshotManager.readEditableFiles(wsPath);
     const currentCodeSummary = summarizeSourceFiles(sourceFiles);
+    const isFastDemo = speedMode === 'fast_demo';
+    const useFastSinglePass = isFastDemo && req.mode === 'antislop' && !shouldGenerateAssets;
 
-    // 1. Design Director: Synthesize Multimodal DesignManifest
-    const directorModelLabel =
-      speedMode === 'fast_demo' && req.mode !== 'stress_test'
-        ? ENV.GEMINI_MODEL_FAST_CRITIC
-        : ENV.GEMINI_MODEL_DIRECTOR;
+    let manifest: DesignManifest;
+    let rawCandidates: GeneratedCandidateCode[];
+    let generatedAssetUrls: string[] = [];
 
-    eventBus.emit(
-      run.runId,
-      'director_thinking',
-      `Design Director analyzing ${req.assets.length} multimodal asset(s) in ${speedMode} mode...`,
-      {
-        iteration: 1,
-        model: directorModelLabel,
-      }
-    );
-
-    let lastThoughtEmit = 0;
-    let thoughtBuffer = '';
-    const manifest: DesignManifest = await geminiEngine.synthesizeDesignManifest({
-      assets: req.assets,
-      voiceTranscript,
-      textPrompt: req.textPrompt,
-      mode: req.mode,
-      speedMode,
-      currentCodeSummary,
-      annotatedScreenshotBase64,
-      drawnCircles: req.drawnCircles,
-      onThinking: (delta) => {
-        thoughtBuffer += delta;
-        const now = Date.now();
-        if (now - lastThoughtEmit > 450 && thoughtBuffer.trim().length > 0) {
-          lastThoughtEmit = now;
-          eventBus.emit(run.runId, 'director_thinking', thoughtBuffer.slice(-300), {
-            iteration: 1,
-            model: directorModelLabel,
-            payload: { delta: thoughtBuffer },
-          });
-          thoughtBuffer = '';
+    if (useFastSinglePass) {
+      // ULTRA-FAST SINGLE-PASS FUSION (<25s live judging):
+      // ONE single gemini-4-hydrogen (thinking_level: 'low') call fuses raw moodboard images + voice + code
+      // directly into manifest + concise rewritten files + changedSections!
+      eventBus.emit(
+        run.runId,
+        'director_thinking',
+        `Fast Single-Pass Fusion analyzing ${req.assets.length} reference artifact(s) & crafting UI in one pass...`,
+        {
+          iteration: 1,
+          model: ENV.GEMINI_MODEL_PATCHER,
+          payload: { fastSinglePass: true },
         }
-      },
-    });
+      );
 
-    run.manifest = manifest;
-    modelsInvoked.add(manifest.modelUsed);
-
-    eventBus.emit(run.runId, 'manifest_ready', `Synthesized Design Manifest: "${manifest.vibeTitle}"`, {
-      iteration: 1,
-      model: manifest.modelUsed,
-      payload: manifest,
-    });
-
-    // 2. Parallel Execution: Bespoke Imagery (Nano Banana 2.1) + Candidate Code Generation (N=1..4)
-    const plannedPublicPaths = shouldGenerateAssets
-      ? manifest.bespokeAssets.map((a) =>
-          a.targetPublicPath.startsWith('/') ? a.targetPublicPath : `/${a.targetPublicPath}`
-        )
-      : [];
-
-    const generatedOutputDir = path.join(wsPath, 'public', 'generated');
-
-    const assetGenPromise = shouldGenerateAssets
-      ? geminiEngine
-          .generateBespokeAssets({
-            manifest,
-            referenceImages,
-            outputDir: generatedOutputDir,
-          })
-          .then((res) => {
-            if (res.publicUrls.length > 0) {
-              modelsInvoked.add(ENV.GEMINI_MODEL_IMAGE_GEN);
-              for (const url of res.publicUrls) {
-                eventBus.emit(run.runId, 'asset_generated', `Generated bespoke artwork: ${url}`, {
-                  iteration: 1,
-                  model: ENV.GEMINI_MODEL_IMAGE_GEN,
-                  payload: { publicUrl: url, latencyMs: res.latencyMs },
-                });
-              }
-            }
-            return res;
-          })
-          .catch((err) => {
-            console.warn('[TransformOrchestrator] Bespoke asset generation failed gracefully:', err);
-            return { generatedPaths: [], publicUrls: [], latencyMs: 0 };
-          })
-      : Promise.resolve({ generatedPaths: [], publicUrls: [], latencyMs: 0 });
-
-    eventBus.emit(
-      run.runId,
-      'candidate_started',
-      `Racing ${parallelCount} parallel frontend code candidate${parallelCount === 1 ? '' : 's'}...`,
-      {
-        iteration: 1,
-        model: speedMode === 'fast_demo' ? ENV.GEMINI_MODEL_PATCHER : ENV.GEMINI_MODEL_ARCHITECT,
-        payload: { parallelCount, shouldGenerateAssets },
-      }
-    );
-
-    const codeGenPromise = geminiEngine.generateCodeCandidates({
-      manifest,
-      sourceFiles,
-      parallelCount,
-      generatedPublicPaths: plannedPublicPaths,
-      mode: req.mode,
-      speedMode,
-      textPrompt: req.textPrompt || voiceTranscript,
-    });
-
-    const [assetResult, rawCandidates] = await Promise.all([assetGenPromise, codeGenPromise]);
-    const generatedAssetUrls = assetResult.publicUrls;
-
-    if (!rawCandidates || rawCandidates.length === 0) {
-      throw new Error('Code generator returned zero candidates');
-    }
-
-    // Reconcile extension mismatches (e.g. manifest planned .png while Nano Banana output .jpg/.webp)
-    if (generatedAssetUrls.length > 0 && plannedPublicPaths.length > 0) {
-      const actualByStem = new Map<string, string>();
-      for (const actualUrl of generatedAssetUrls) {
-        const stem = path.posix.basename(actualUrl).replace(/\.[^.]+$/, '');
-        if (stem) actualByStem.set(stem, actualUrl);
-      }
-      const replacements: Array<[string, string]> = [];
-      for (const plannedUrl of plannedPublicPaths) {
-        const stem = path.posix.basename(plannedUrl).replace(/\.[^.]+$/, '');
-        const actualUrl = actualByStem.get(stem);
-        if (actualUrl && actualUrl !== plannedUrl) {
-          replacements.push([plannedUrl, actualUrl]);
+      eventBus.emit(
+        run.runId,
+        'candidate_started',
+        'Running Single-Pass Fast Fusion (Manifest + Code in 1 Gemini 4 Hydrogen call)...',
+        {
+          iteration: 1,
+          model: ENV.GEMINI_MODEL_PATCHER,
+          payload: { parallelCount: 1, shouldGenerateAssets: false, fastSinglePass: true },
         }
-      }
-      if (replacements.length > 0) {
-        for (const cand of rawCandidates) {
-          for (const [fileKey, content] of Object.entries(cand.files)) {
-            let patched = content;
-            for (const [fromUrl, toUrl] of replacements) {
-              if (patched.includes(fromUrl)) {
-                patched = patched.split(fromUrl).join(toUrl);
+      );
+
+      const fastResult = await geminiEngine.runFastSinglePass({
+        assets: req.assets,
+        sourceFiles,
+        voiceTranscript,
+        textPrompt: req.textPrompt,
+        annotatedScreenshotBase64,
+        drawnCircles: req.drawnCircles,
+      });
+
+      manifest = fastResult.manifest;
+      run.manifest = manifest;
+      modelsInvoked.add(manifest.modelUsed);
+
+      eventBus.emit(run.runId, 'manifest_ready', `Synthesized Design Manifest: "${manifest.vibeTitle}"`, {
+        iteration: 1,
+        model: manifest.modelUsed,
+        payload: manifest,
+      });
+
+      rawCandidates = [fastResult.candidate];
+    } else {
+      // 1. Design Director: Synthesize Multimodal DesignManifest
+      const directorModelLabel =
+        isFastDemo && req.mode !== 'stress_test'
+          ? ENV.GEMINI_MODEL_FAST_CRITIC
+          : ENV.GEMINI_MODEL_DIRECTOR;
+
+      eventBus.emit(
+        run.runId,
+        'director_thinking',
+        `Design Director analyzing ${req.assets.length} multimodal asset(s) in ${speedMode} mode...`,
+        {
+          iteration: 1,
+          model: directorModelLabel,
+        }
+      );
+
+      let lastThoughtEmit = 0;
+      let thoughtBuffer = '';
+      manifest = await geminiEngine.synthesizeDesignManifest({
+        assets: req.assets,
+        voiceTranscript,
+        textPrompt: req.textPrompt,
+        mode: req.mode,
+        speedMode,
+        currentCodeSummary,
+        annotatedScreenshotBase64,
+        drawnCircles: req.drawnCircles,
+        onThinking: (delta) => {
+          thoughtBuffer += delta;
+          const now = Date.now();
+          if (now - lastThoughtEmit > 450 && thoughtBuffer.trim().length > 0) {
+            lastThoughtEmit = now;
+            eventBus.emit(run.runId, 'director_thinking', thoughtBuffer.slice(-300), {
+              iteration: 1,
+              model: directorModelLabel,
+              payload: { delta: thoughtBuffer },
+            });
+            thoughtBuffer = '';
+          }
+        },
+      });
+
+      run.manifest = manifest;
+      modelsInvoked.add(manifest.modelUsed);
+
+      eventBus.emit(run.runId, 'manifest_ready', `Synthesized Design Manifest: "${manifest.vibeTitle}"`, {
+        iteration: 1,
+        model: manifest.modelUsed,
+        payload: manifest,
+      });
+
+      // 2. Parallel Execution: Bespoke Imagery (Nano Banana 2.1) + Candidate Code Generation (N=1..4)
+      const plannedPublicPaths = shouldGenerateAssets
+        ? manifest.bespokeAssets.map((a) =>
+            a.targetPublicPath.startsWith('/') ? a.targetPublicPath : `/${a.targetPublicPath}`
+          )
+        : [];
+
+      const generatedOutputDir = path.join(wsPath, 'public', 'generated');
+
+      const assetGenPromise = shouldGenerateAssets
+        ? geminiEngine
+            .generateBespokeAssets({
+              manifest,
+              referenceImages,
+              outputDir: generatedOutputDir,
+            })
+            .then((res) => {
+              if (res.publicUrls.length > 0) {
+                modelsInvoked.add(ENV.GEMINI_MODEL_IMAGE_GEN);
+                for (const url of res.publicUrls) {
+                  eventBus.emit(run.runId, 'asset_generated', `Generated bespoke artwork: ${url}`, {
+                    iteration: 1,
+                    model: ENV.GEMINI_MODEL_IMAGE_GEN,
+                    payload: { publicUrl: url, latencyMs: res.latencyMs },
+                  });
+                }
               }
+              return res;
+            })
+            .catch((err) => {
+              console.warn('[TransformOrchestrator] Bespoke asset generation failed gracefully:', err);
+              return { generatedPaths: [], publicUrls: [], latencyMs: 0 };
+            })
+        : Promise.resolve({ generatedPaths: [], publicUrls: [], latencyMs: 0 });
+
+      eventBus.emit(
+        run.runId,
+        'candidate_started',
+        `Racing ${parallelCount} parallel frontend code candidate${parallelCount === 1 ? '' : 's'}...`,
+        {
+          iteration: 1,
+          model: isFastDemo ? ENV.GEMINI_MODEL_PATCHER : ENV.GEMINI_MODEL_ARCHITECT,
+          payload: { parallelCount, shouldGenerateAssets },
+        }
+      );
+
+      const codeGenPromise = geminiEngine.generateCodeCandidates({
+        manifest,
+        sourceFiles,
+        parallelCount,
+        generatedPublicPaths: plannedPublicPaths,
+        mode: req.mode,
+        speedMode,
+        textPrompt: req.textPrompt || voiceTranscript,
+      });
+
+      const [assetResult, generatedCandidates] = await Promise.all([assetGenPromise, codeGenPromise]);
+      generatedAssetUrls = assetResult.publicUrls;
+      rawCandidates = generatedCandidates;
+
+      if (!rawCandidates || rawCandidates.length === 0) {
+        throw new Error('Code generator returned zero candidates');
+      }
+
+      // Reconcile extension mismatches (e.g. manifest planned .png while Nano Banana output .jpg/.webp)
+      if (generatedAssetUrls.length > 0 && plannedPublicPaths.length > 0) {
+        const actualByStem = new Map<string, string>();
+        for (const actualUrl of generatedAssetUrls) {
+          const stem = path.posix.basename(actualUrl).replace(/\.[^.]+$/, '');
+          if (stem) actualByStem.set(stem, actualUrl);
+        }
+        const replacements: Array<[string, string]> = [];
+        for (const plannedUrl of plannedPublicPaths) {
+          const stem = path.posix.basename(plannedUrl).replace(/\.[^.]+$/, '');
+          const actualUrl = actualByStem.get(stem);
+          if (actualUrl && actualUrl !== plannedUrl) {
+            replacements.push([plannedUrl, actualUrl]);
+          }
+        }
+        if (replacements.length > 0) {
+          for (const cand of rawCandidates) {
+            for (const [fileKey, content] of Object.entries(cand.files)) {
+              let patched = content;
+              for (const [fromUrl, toUrl] of replacements) {
+                if (patched.includes(fromUrl)) {
+                  patched = patched.split(fromUrl).join(toUrl);
+                }
+              }
+              cand.files[fileKey] = patched;
             }
-            cand.files[fileKey] = patched;
           }
         }
       }
@@ -963,6 +1101,7 @@ export class TransformOrchestrator {
             candidateId: codeCand.candidateId,
             strategyLabel: codeCand.strategyLabel,
             filesModified: writtenFiles,
+            changedSections: codeCand.changedSections,
           },
         }
       );
@@ -979,7 +1118,10 @@ export class TransformOrchestrator {
         referenceImages,
         manifest,
         includeMobile: isDeep,
-        hmrWaitMs: 450,
+        isFastDemo,
+        changedSections: codeCand.changedSections,
+        drawnCircles: req.drawnCircles,
+        hmrWaitMs: isFastDemo ? 300 : 450,
         generationLatencyMs: codeCand.latencyMs,
         modelsInvoked,
       });
@@ -998,7 +1140,7 @@ export class TransformOrchestrator {
       await snapshotManager.restoreTempSnapshot(wsPath, preRaceSnap);
       viteManager.clearLastViteError();
       await snapshotManager.writeFiles(wsPath, bestState.files);
-      await sleep(400);
+      await sleep(350);
     }
 
     eventBus.emit(
@@ -1010,6 +1152,8 @@ export class TransformOrchestrator {
         payload: {
           winnerCandidateId: bestState.candidate.candidateId,
           screenshotUrl: bestState.candidate.screenshotUrl,
+          changedSections: bestState.changedSections,
+          drawnCircles: req.drawnCircles ?? [],
         },
       }
     );
@@ -1017,7 +1161,7 @@ export class TransformOrchestrator {
     const iter1Diff = await snapshotManager.computeSimpleDiff(wsPath);
     const iter1Record: CriticIteration = {
       iteration: 1,
-      phase: parallelCount > 1 ? 'parallel_race' : 'fast_pass',
+      phase: parallelCount > 1 && !useFastSinglePass ? 'parallel_race' : 'fast_pass',
       candidates: evaluatedCandidates.map((e) => e.candidate),
       winnerCandidateId: bestState.candidate.candidateId,
       scorecard: bestState.candidate.scorecard,
@@ -1030,7 +1174,11 @@ export class TransformOrchestrator {
 
     eventBus.emit(run.runId, 'iteration_complete', `Iteration 1 complete — Taste Index ${bestState.candidate.scorecard.overallTasteScore.toFixed(1)}/100`, {
       iteration: 1,
-      payload: iter1Record,
+      payload: {
+        ...iter1Record,
+        changedSections: bestState.changedSections,
+        drawnCircles: req.drawnCircles ?? [],
+      },
     });
 
     // 4. Autonomous Critic Refinement Loop driven by gemini-decision-1 + Puppeteer DOM Audit
@@ -1070,6 +1218,7 @@ export class TransformOrchestrator {
         referenceAssets: req.assets,
         instruction: bestState.candidate.scorecard.criticActionDirective,
         errorContext,
+        speedMode,
       });
       modelsInvoked.add(patch.modelUsed);
 
@@ -1084,7 +1233,11 @@ export class TransformOrchestrator {
         {
           iteration,
           model: patch.modelUsed,
-          payload: { filesModified: writtenFiles, diffSummary: patch.diffSummary },
+          payload: {
+            filesModified: writtenFiles,
+            diffSummary: patch.diffSummary,
+            changedSections: patch.changedSections,
+          },
         }
       );
 
@@ -1100,7 +1253,10 @@ export class TransformOrchestrator {
         referenceImages,
         manifest,
         includeMobile: isDeep,
-        hmrWaitMs: 500,
+        isFastDemo,
+        changedSections: patch.changedSections,
+        drawnCircles: req.drawnCircles,
+        hmrWaitMs: isFastDemo ? 300 : 450,
         generationLatencyMs: patch.latencyMs,
         modelsInvoked,
       });
@@ -1119,13 +1275,18 @@ export class TransformOrchestrator {
           `Refinement #${iteration} accepted (Taste Index ${refinedState.candidate.scorecard.overallTasteScore.toFixed(1)}/100)`,
           {
             iteration,
-            payload: { screenshotUrl: refinedState.candidate.screenshotUrl, accepted: true },
+            payload: {
+              screenshotUrl: refinedState.candidate.screenshotUrl,
+              accepted: true,
+              changedSections: refinedState.changedSections,
+              drawnCircles: req.drawnCircles ?? [],
+            },
           }
         );
       } else {
         // Auto-rollback regression so we never ship a worse visual result!
         await snapshotManager.restoreTempSnapshot(wsPath, preRefineSnap);
-        await sleep(350);
+        await sleep(300);
 
         eventBus.emit(
           run.runId,
@@ -1133,7 +1294,12 @@ export class TransformOrchestrator {
           `Refinement #${iteration} regressed (${refinedState.effectiveScore.toFixed(1)} < ${bestState.effectiveScore.toFixed(1)}) — auto-rolled back to prior best`,
           {
             iteration,
-            payload: { screenshotUrl: bestState.candidate.screenshotUrl, rolledBack: true },
+            payload: {
+              screenshotUrl: bestState.candidate.screenshotUrl,
+              rolledBack: true,
+              changedSections: bestState.changedSections,
+              drawnCircles: req.drawnCircles ?? [],
+            },
           }
         );
       }
@@ -1158,7 +1324,11 @@ export class TransformOrchestrator {
         `Iteration ${iteration} complete — Best Taste Index ${bestState.candidate.scorecard.overallTasteScore.toFixed(1)}/100`,
         {
           iteration,
-          payload: iterRecord,
+          payload: {
+            ...iterRecord,
+            changedSections: bestState.changedSections,
+            drawnCircles: req.drawnCircles ?? [],
+          },
         }
       );
     }

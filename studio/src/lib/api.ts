@@ -5,6 +5,7 @@ import type {
   GitHubRepoSummary,
   ManagedAgentEvent,
   ManagedAgentShipRequest,
+  MediaAssetInput,
   StreamEvent,
   StreamEventType,
   TransformRunRequest,
@@ -137,6 +138,24 @@ export async function transcribeVoiceAudio(
   return fetchJson('/api/transcribe', {
     method: 'POST',
     body: JSON.stringify({ audioBase64, mimeType }),
+  });
+}
+
+export interface CaptureReferenceUrlResponse {
+  asset: MediaAssetInput;
+  url: string;
+  title?: string;
+  extractedCssSummary?: string;
+  screenshotUrl?: string;
+  latencyMs?: number;
+}
+
+export async function captureReferenceUrl(
+  url: string
+): Promise<CaptureReferenceUrlResponse> {
+  return fetchJson<CaptureReferenceUrlResponse>('/api/reference/capture-url', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
   });
 }
 

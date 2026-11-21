@@ -1,10 +1,29 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const REPO_ROOT = path.resolve(__dirname, '../../..');
-export const BACKEND_ROOT = path.resolve(__dirname, '../..');
+
+function findRepoRoot(startDir: string): string {
+  let cur = startDir;
+  for (let i = 0; i < 8; i++) {
+    if (
+      fs.existsSync(path.join(cur, 'target-repo')) ||
+      fs.existsSync(path.join(cur, 'shared', 'types.ts')) ||
+      fs.existsSync(path.join(cur, 'env', '.env.example'))
+    ) {
+      return cur;
+    }
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return path.resolve(startDir, '../../..');
+}
+
+export const REPO_ROOT = findRepoRoot(__dirname);
+export const BACKEND_ROOT = path.join(REPO_ROOT, 'backend');
 export const TARGET_REPO_DIR = path.join(REPO_ROOT, 'target-repo');
 
 // Load master env/.env cleanly

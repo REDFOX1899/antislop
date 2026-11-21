@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { DrawnCircleAnnotation } from '@shared/types';
+import type { DrawnCircleAnnotation, TransformRunRequest } from '@shared/types';
 import {
   Columns2,
   ExternalLink,
@@ -16,6 +16,7 @@ import {
   Mic,
   Monitor,
   Pencil,
+  Plus,
   RefreshCw,
   Smartphone,
   Sparkles,
@@ -32,6 +33,17 @@ export interface LiveCanvasHandle {
   exportOverlayPngBase64: () => string | undefined;
 }
 
+export interface CanvasChangeSummary {
+  completedAt: number;
+  mode: TransformRunRequest['mode'];
+  slopBefore?: number;
+  slopAfter?: number;
+  matchAfter?: number;
+  tasteBefore?: number;
+  tasteAfter?: number;
+  latencyMs?: number;
+}
+
 interface LiveCanvasProps {
   previewUrl: string;
   reloadNonce: number;
@@ -40,6 +52,8 @@ interface LiveCanvasProps {
   finalScreenshotUrl?: string;
   drawnCircles: DrawnCircleAnnotation[];
   onDrawnCirclesChange: (circles: DrawnCircleAnnotation[]) => void;
+  drawMode: boolean;
+  onDrawModeChange: (active: boolean) => void;
   voiceTranscript: string;
   onCanvasVoiceRecorded: (payload: {
     audioBase64: string;
@@ -48,8 +62,17 @@ interface LiveCanvasProps {
   }) => void;
   onApplyCircleSpeak: () => void;
   isRunning: boolean;
+  queueCount: number;
   liveStatusText?: string;
   liveModelTag?: string;
+  lastAppliedCircles: DrawnCircleAnnotation[];
+  lastRunSummary: CanvasChangeSummary | null;
+  isResizingRails?: boolean;
+}
+
+function buildCacheBustedUrl(baseUrl: string, nonce: number, manual: number): string {
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}_antislop=${nonce}_${manual}`;
 }
 
 export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
@@ -62,22 +85,44 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       finalScreenshotUrl,
       drawnCircles,
       onDrawnCirclesChange,
+      drawMode,
+      onDrawModeChange,
       voiceTranscript,
       onCanvasVoiceRecorded,
       onApplyCircleSpeak,
       isRunning,
+      queueCount,
       liveStatusText,
       liveModelTag,
+      lastAppliedCircles,
+      lastRunSummary,
+      isResizingRails = false,
     },
     ref
   ) {
-    const [drawMode, setDrawMode] = useState(false);
     const [viewportMode, setViewportMode] = useState<'desktop' | 'mobile'>('desktop');
     const [compareMode, setCompareMode] = useState(false);
     const [wipePercent, setWipePercent] = useState(50);
     const [manualReload, setManualReload] = useState(0);
     const [editingCircleId, setEditingCircleId] = useState<string | null>(null);
     const [showHmrBadge, setShowHmrBadge] = useState(false);
+
+    // Zero-flicker double-buffered iframe state: keeps previous site visible until new frame paints
+    const [slotUrls, setSlotUrls] = useState<[string, string | null]>(() => [
+      buildCacheBustedUrl(previewUrl, reloadNonce, 0),
+      null,
+    ]);
+    const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
+    const pendingSlotRef = useRef<0 | 1 | null>(null);
+    const swapFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastCommittedSrcRef = useRef<string>(
+      buildCacheBustedUrl(previewUrl, reloadNonce, 0)
+    );
+
+    // Dramatic Arrival Reveal Sweep + Fix-Glow + 6s What Changed Pill
+    const [revealKey, setRevealKey] = useState<number>(0);
+    const [showRevealEffect, setShowRevealEffect] = useState(false);
+    const [showWhatChangedPill, setShowWhatChangedPill] = useState(false);
 
     const stageRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -95,13 +140,83 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       });
     });
 
-    // Show crisp brief "HMR Synced" indicator whenever Vite reloads
+    const triggerArrivalReveal = useCallback(() => {
+      setRevealKey((k) => k + 1);
+      setShowRevealEffect(true);
+    }, []);
+
+    // Auto-clear reveal overlays cleanly after animation completes
+    useEffect(() => {
+      if (!showRevealEffect) return;
+      const t = setTimeout(() => setShowRevealEffect(false), 3600);
+      return () => clearTimeout(t);
+    }, [showRevealEffect, revealKey]);
+
+    // Queue next URL into the hidden buffer iframe so the active live site never blanks
+    useEffect(() => {
+      const nextSrc = buildCacheBustedUrl(previewUrl, reloadNonce, manualReload);
+      if (nextSrc === lastCommittedSrcRef.current) return;
+      lastCommittedSrcRef.current = nextSrc;
+
+      const targetSlot: 0 | 1 = activeSlot === 0 ? 1 : 0;
+      pendingSlotRef.current = targetSlot;
+
+      setSlotUrls((prev) =>
+        targetSlot === 0 ? [nextSrc, prev[1]] : [prev[0], nextSrc]
+      );
+
+      if (swapFallbackTimerRef.current) {
+        clearTimeout(swapFallbackTimerRef.current);
+      }
+      // Safety net if remote/slow frame delays load event
+      swapFallbackTimerRef.current = setTimeout(() => {
+        if (pendingSlotRef.current === targetSlot) {
+          pendingSlotRef.current = null;
+          setActiveSlot(targetSlot);
+        }
+      }, 2200);
+
+      return () => {
+        if (swapFallbackTimerRef.current) {
+          clearTimeout(swapFallbackTimerRef.current);
+          swapFallbackTimerRef.current = null;
+        }
+      };
+    }, [previewUrl, reloadNonce, manualReload, activeSlot]);
+
+    const handleIframeLoad = useCallback(
+      (slotIndex: 0 | 1) => {
+        if (pendingSlotRef.current !== slotIndex) return;
+        pendingSlotRef.current = null;
+        if (swapFallbackTimerRef.current) {
+          clearTimeout(swapFallbackTimerRef.current);
+          swapFallbackTimerRef.current = null;
+        }
+        // Small paint settle beat so Tailwind + fonts paint before atomic reveal swap
+        setTimeout(() => {
+          setActiveSlot(slotIndex);
+        }, 120);
+      },
+      []
+    );
+
+    // Show crisp brief "HMR Synced" indicator + architectural reveal sweep on live updates
     useEffect(() => {
       if (!hmrPulseAt) return;
       setShowHmrBadge(true);
+      triggerArrivalReveal();
       const t = setTimeout(() => setShowHmrBadge(false), 3200);
       return () => clearTimeout(t);
-    }, [hmrPulseAt]);
+    }, [hmrPulseAt, triggerArrivalReveal]);
+
+    // Show floating "What Changed" Pill at top-center for 6 seconds when a run completes
+    useEffect(() => {
+      if (!lastRunSummary) return;
+      setShowWhatChangedPill(true);
+      triggerArrivalReveal();
+      const t = setTimeout(() => setShowWhatChangedPill(false), 6000);
+      return () => clearTimeout(t);
+    }, [lastRunSummary, triggerArrivalReveal]);
 
     // Turn off wipe compare mode automatically if draw mode is turned on
     useEffect(() => {
@@ -221,7 +336,6 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
           const ctx = offscreen.getContext('2d');
           if (!ctx) return undefined;
 
-          // Draw vermilion freehand strokes + crisp #1, #2 numbered pins onto transparent PNG
           drawnCircles.forEach((circle, idx) => {
             if (circle.points && circle.points.length >= 2) {
               ctx.save();
@@ -249,7 +363,6 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               ctx.restore();
             }
 
-            // Numbered vermilion callout pin
             const px = Math.max(18, Math.min(w - 24, circle.x * w));
             const py = Math.max(18, Math.min(h - 24, circle.y * h));
             ctx.save();
@@ -325,7 +438,6 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       const width = Math.max(0.03, maxX - minX);
       const height = Math.max(0.03, maxY - minY);
 
-      // Downsample points cleanly (<= 48 points) for compact API payload
       const stride = Math.max(1, Math.ceil(pts.length / 48));
       const compactPoints = pts.filter(
         (_, i) => i % stride === 0 || i === pts.length - 1
@@ -367,34 +479,52 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       if (editingCircleId === id) setEditingCircleId(null);
     };
 
-    const iframeSrc = (() => {
-      const separator = previewUrl.includes('?') ? '&' : '?';
-      return `${previewUrl}${separator}_antislop=${reloadNonce}_${manualReload}`;
-    })();
-
     const canCompare = Boolean(resolvedBaseline);
 
+    // Format crisp "What Changed" Pill readout
+    const whatChangedSummaryText = (() => {
+      if (!lastRunSummary) return '';
+      const parts: string[] = ['Updated'];
+      if (
+        typeof lastRunSummary.slopBefore === 'number' &&
+        typeof lastRunSummary.slopAfter === 'number'
+      ) {
+        parts.push(
+          `Slop ${lastRunSummary.slopBefore.toFixed(1)} → ${lastRunSummary.slopAfter.toFixed(1)}`
+        );
+      } else if (typeof lastRunSummary.slopAfter === 'number') {
+        parts.push(`Slop ${lastRunSummary.slopAfter.toFixed(1)}/10`);
+      }
+      if (typeof lastRunSummary.matchAfter === 'number') {
+        parts.push(`Match ${lastRunSummary.matchAfter.toFixed(1)}/10`);
+      }
+      if (typeof lastRunSummary.latencyMs === 'number' && lastRunSummary.latencyMs > 0) {
+        parts.push(`${(lastRunSummary.latencyMs / 1000).toFixed(1)}s`);
+      }
+      return parts.join(' · ');
+    })();
+
     return (
-      <section className="relative flex min-w-0 flex-1 flex-col bg-[#EFECE5]">
-        {/* Floating Studio Canvas Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E1D8] bg-[#FAF8F4] px-3 py-2">
-          {/* Left: Draw Circles + Voice-Only Mic + One-Click Apply */}
-          <div className="flex flex-wrap items-center gap-1.5">
+      <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[#EFECE5]">
+        {/* Crisp Architectural Canvas Toolbar */}
+        <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-[#E5E1D8] bg-[#FAF8F4] px-2.5">
+          {/* Left: Circle Ink + Voice Mic + One-Click Apply/Queue */}
+          <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setDrawMode((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-[6px] border px-2.5 py-1 text-[11.5px] font-medium transition-all ${
+              onClick={() => onDrawModeChange(!drawMode)}
+              className={`flex h-7 items-center gap-1.5 rounded-[5px] border px-2 text-[11px] font-medium transition-colors ${
                 drawMode
-                  ? 'border-[#E03E2D] bg-[#E03E2D] text-white shadow-[0_1px_2px_rgba(224,62,45,0.28)]'
+                  ? 'border-[#E03E2D] bg-[#E03E2D] text-white'
                   : 'border-[#E5E1D8] bg-white text-[#141413] hover:border-[#141413]'
               }`}
-              title="Draw freehand vermilion circles directly onto elements of the live app"
+              title="Draw freehand vermilion circles directly over elements of the live app"
             >
-              <Pencil className="h-3.5 w-3.5" />
-              <span>{drawMode ? 'Drawing Circles' : 'Draw Circles'}</span>
+              <Pencil className="h-3 w-3" />
+              <span>{drawMode ? 'Circling' : 'Circle'}</span>
               {drawnCircles.length > 0 && (
                 <span
-                  className={`rounded-full px-1.5 py-0.2 font-mono text-[10px] ${
+                  className={`rounded-full px-1.5 font-mono text-[9.5px] ${
                     drawMode
                       ? 'bg-white/20 text-white'
                       : 'bg-[#FDF1EF] text-[#E03E2D]'
@@ -411,63 +541,63 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   type="button"
                   onClick={undoCircle}
                   title="Undo last circle"
-                  className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
+                  className="flex h-7 w-7 items-center justify-center rounded-[5px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
                 >
-                  <Undo2 className="h-3.5 w-3.5" />
+                  <Undo2 className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
                   onClick={clearCircles}
                   title="Clear all drawn circles"
-                  className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#E03E2D] hover:text-[#E03E2D]"
+                  className="flex h-7 w-7 items-center justify-center rounded-[5px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#E03E2D] hover:text-[#E03E2D]"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3 w-3" />
                 </button>
               </>
             )}
 
-            <div className="mx-0.5 h-4 w-px bg-[#E5E1D8]" />
+            <div className="mx-0.5 h-3.5 w-px bg-[#E5E1D8]" />
 
-            {/* Inline Voice-Only Mic with Live Web Audio Waveform */}
-            <div className="flex items-center gap-1.5 rounded-[6px] border border-[#E5E1D8] bg-white px-2 py-1">
+            {/* Inline Voice Mic */}
+            <div className="flex h-7 items-center gap-1 rounded-[5px] border border-[#E5E1D8] bg-white px-1.5">
               <button
                 type="button"
                 onClick={canvasVoice.toggleRecording}
-                className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11.5px] font-medium transition-colors ${
+                className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
                   canvasVoice.isRecording
                     ? 'bg-[#E03E2D] text-white'
                     : 'text-[#141413] hover:bg-[#F5F3EE]'
                 }`}
-                title="Speak an edit aloud while circling (uses gemini-3.5-transcribe)"
+                title="Speak an edit aloud (uses gemini-3.5-transcribe)"
               >
                 {canvasVoice.isRecording ? (
                   <>
-                    <Square className="h-3 w-3 fill-current" />
-                    <span className="font-mono text-[10.5px]">
-                      REC 0:{String(canvasVoice.durationSec).padStart(2, '0')}
+                    <Square className="h-2.5 w-2.5 fill-current" />
+                    <span className="font-mono text-[10px]">
+                      0:{String(canvasVoice.durationSec).padStart(2, '0')}
                     </span>
                   </>
                 ) : (
                   <>
-                    <Mic className="h-3.5 w-3.5 text-[#E03E2D]" />
-                    <span>Voice</span>
+                    <Mic className="h-3 w-3 text-[#E03E2D]" />
+                    <span>Speak</span>
                   </>
                 )}
               </button>
 
               {(canvasVoice.isRecording || canvasVoice.isTranscribing) && (
-                <div className="flex h-4 items-center gap-[2px] px-1">
+                <div className="flex h-3.5 items-center gap-[2px] px-0.5">
                   {canvasVoice.isTranscribing ? (
-                    <span className="flex items-center gap-1 font-mono text-[10px] text-[#B45309]">
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="flex items-center gap-1 font-mono text-[9.5px] text-[#B45309]">
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
                       transcribing
                     </span>
                   ) : (
-                    canvasVoice.levels.slice(0, 10).map((lvl, idx) => (
+                    canvasVoice.levels.slice(0, 8).map((lvl, idx) => (
                       <span
                         key={idx}
                         style={{ height: `${Math.round(lvl * 100)}%` }}
-                        className="w-[2.5px] rounded-full bg-[#E03E2D] transition-[height] duration-75"
+                        className="w-[2px] rounded-full bg-[#E03E2D] transition-[height] duration-75"
                       />
                     ))
                   )}
@@ -475,31 +605,34 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               )}
             </div>
 
-            {/* One-Click Circle & Speak -> Apply Now */}
+            {/* One-Click Circle & Speak -> Apply or Queue (NEVER disabled during build!) */}
             {drawnCircles.length > 0 && (
               <button
                 type="button"
-                disabled={isRunning}
                 onClick={onApplyCircleSpeak}
-                className="flex items-center gap-1.5 rounded-[6px] bg-[#E03E2D] px-2.5 py-1 text-[11.5px] font-semibold text-white transition-colors hover:bg-[#C53222] disabled:opacity-50"
-                title="Run <10s surgical edit via gemini-4-hydrogen + Decisions API re-score"
+                className="flex h-7 items-center gap-1 rounded-[5px] bg-[#E03E2D] px-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#C53222]"
+                title={
+                  isRunning
+                    ? 'Add this circled region edit to the automatic queue'
+                    : 'Run surgical circle-to-tweak edit via gemini-4-hydrogen'
+                }
               >
                 {isRunning ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Plus className="h-3 w-3" />
                 ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3 w-3" />
                 )}
-                <span>Circle &amp; Speak → Apply Now</span>
+                <span>{isRunning ? 'Queue Circle Edit' : 'Apply Circle'}</span>
               </button>
             )}
           </div>
 
-          {/* Right: Before/After Wipe Curtain + Viewport Switch + Reload */}
-          <div className="flex items-center gap-1.5">
-            {showHmrBadge && (
-              <span className="inline-flex items-center gap-1 rounded border border-[#15803D]/30 bg-[#EEF8F1] px-2 py-0.5 font-mono text-[10px] font-medium text-[#15803D]">
+          {/* Right: HMR Synced + Before/After Wipe + Viewport + Reload */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {showHmrBadge && !isRunning && (
+              <span className="hidden items-center gap-1 rounded border border-[#15803D]/30 bg-[#EEF8F1] px-1.5 py-0.5 font-mono text-[9.5px] font-medium text-[#15803D] xl:inline-flex">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#15803D]" />
-                HMR SYNCED
+                LIVE
               </span>
             )}
 
@@ -507,10 +640,10 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               type="button"
               disabled={!canCompare}
               onClick={() => {
-                setDrawMode(false);
+                onDrawModeChange(false);
                 setCompareMode((v) => !v);
               }}
-              className={`flex items-center gap-1.5 rounded-[6px] border px-2.5 py-1 text-[11.5px] font-medium transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`flex h-7 items-center gap-1 rounded-[5px] border px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                 compareMode
                   ? 'border-[#141413] bg-[#141413] text-white'
                   : 'border-[#E5E1D8] bg-white text-[#141413] hover:border-[#141413]'
@@ -518,49 +651,49 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               title={
                 canCompare
                   ? 'Drag split curtain between AI Slop baseline and live transformed app'
-                  : 'Run a transform first to capture the AI Slop baseline screenshot'
+                  : 'Run a transform first to capture the baseline screenshot'
               }
             >
-              <Columns2 className="h-3.5 w-3.5" />
-              <span>Before / After</span>
+              <Columns2 className="h-3 w-3" />
+              <span className="hidden sm:inline">Before / After</span>
             </button>
 
-            <div className="flex items-center rounded-[6px] border border-[#E5E1D8] bg-[#F5F3EE] p-0.5">
+            <div className="flex h-7 items-center rounded-[5px] border border-[#E5E1D8] bg-[#F5F3EE] p-0.5">
               <button
                 type="button"
                 onClick={() => setViewportMode('desktop')}
-                className={`flex items-center gap-1 rounded px-2 py-0.5 font-mono text-[10.5px] transition-colors ${
+                className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
                   viewportMode === 'desktop'
-                    ? 'bg-white text-[#141413] shadow-xs'
+                    ? 'bg-white text-[#141413]'
                     : 'text-[#64625D] hover:text-[#141413]'
                 }`}
                 title="Desktop preview (1440px)"
               >
                 <Monitor className="h-3 w-3" />
-                <span>1440</span>
+                <span className="hidden lg:inline">1440</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewportMode('mobile')}
-                className={`flex items-center gap-1 rounded px-2 py-0.5 font-mono text-[10.5px] transition-colors ${
+                className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
                   viewportMode === 'mobile'
-                    ? 'bg-white text-[#141413] shadow-xs'
+                    ? 'bg-white text-[#141413]'
                     : 'text-[#64625D] hover:text-[#141413]'
                 }`}
                 title="Mobile preview (390px)"
               >
                 <Smartphone className="h-3 w-3" />
-                <span>390</span>
+                <span className="hidden lg:inline">390</span>
               </button>
             </div>
 
             <button
               type="button"
               onClick={() => setManualReload((n) => n + 1)}
-              title="Force reload live preview iframe"
-              className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
+              title="Refresh live preview seamlessly"
+              className="flex h-7 w-7 items-center justify-center rounded-[5px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-3 w-3" />
             </button>
 
             <a
@@ -568,28 +701,28 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               target="_blank"
               rel="noreferrer"
               title={`Open live target app (${previewUrl}) in new tab`}
-              className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
+              className="flex h-7 w-7 items-center justify-center rounded-[5px] border border-[#E5E1D8] bg-white text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         </div>
 
-        {/* Non-blocking inline voice transcript ribbon when speaking / circles drawn */}
+        {/* Slim contextual ink ribbon when circling */}
         {(drawMode || drawnCircles.length > 0) && (
-          <div className="flex items-center justify-between gap-3 border-b border-[#E5E1D8] bg-[#FDF1EF] px-3.5 py-1.5 text-[11.5px]">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E5E1D8] bg-[#FDF1EF] px-3 py-1 text-[11px]">
             <div className="flex min-w-0 items-center gap-2 text-[#141413]">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-[#E03E2D]" />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E03E2D]" />
               <span className="truncate">
                 {drawMode
-                  ? 'Freehand Ink Active — draw vermilion circles directly over any headline, card, or hero block, then speak what to change.'
-                  : `${drawnCircles.length} target circle${
-                      drawnCircles.length > 1 ? 's' : ''
-                    } pinned on canvas.`}
+                  ? isRunning
+                    ? 'Circle next region while current edit builds — speak or click Queue Circle Edit.'
+                    : 'Circle any headline, card, or section, then speak what to change.'
+                  : `${drawnCircles.length} target region${drawnCircles.length > 1 ? 's' : ''} marked.`}
                 {voiceTranscript.trim() ? (
-                  <span className="ml-2 font-mono text-[10.5px] text-[#64625D]">
-                    &ldquo;{voiceTranscript.trim().slice(0, 96)}
-                    {voiceTranscript.trim().length > 96 ? '…' : ''}&rdquo;
+                  <span className="ml-2 font-mono text-[10px] text-[#64625D]">
+                    &ldquo;{voiceTranscript.trim().slice(0, 84)}
+                    {voiceTranscript.trim().length > 84 ? '…' : ''}&rdquo;
                   </span>
                 ) : null}
               </span>
@@ -597,52 +730,172 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
             {drawMode && (
               <button
                 type="button"
-                onClick={() => setDrawMode(false)}
-                className="shrink-0 font-mono text-[10.5px] font-medium text-[#E03E2D] underline"
+                onClick={() => onDrawModeChange(false)}
+                className="shrink-0 font-mono text-[10px] font-medium text-[#E03E2D] underline"
               >
-                Interact with page
+                Done circling
               </button>
             )}
           </div>
         )}
 
-        {/* Main Drafting Stage */}
-        <div className="atelier-stage-grid relative flex flex-1 items-center justify-center overflow-hidden p-3">
+        {/* Main Drafting Stage — maximized canvas area */}
+        <div className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2">
           <div
             ref={stageRef}
-            className={`relative flex h-full flex-col overflow-hidden rounded-[8px] border border-[#D8D2C5] bg-white shadow-[0_6px_28px_-14px_rgba(20,20,19,0.18)] transition-[width] duration-200 ${
+            className={`relative flex h-full flex-col overflow-hidden rounded-[7px] border border-[#D8D2C5] bg-white shadow-[0_6px_28px_-14px_rgba(20,20,19,0.18)] transition-[width] duration-200 ${
               viewportMode === 'mobile' ? 'w-[390px] max-w-full' : 'w-full'
             }`}
           >
-            {/* Slim tactile specimen chrome bar */}
-            <div className="flex h-7 shrink-0 items-center justify-between border-b border-[#E5E1D8] bg-[#FAF8F4] px-3">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#D8D2C5]" />
-                <span className="h-2 w-2 rounded-full bg-[#D8D2C5]" />
-                <span className="h-2 w-2 rounded-full bg-[#D8D2C5]" />
-                <span className="ml-2 font-mono text-[10px] text-[#64625D]">
+            {/* Slim 24px Specimen Header */}
+            <div className="flex h-6 shrink-0 items-center justify-between border-b border-[#E5E1D8] bg-[#FAF8F4] px-2.5">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#D8D2C5]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[#D8D2C5]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[#D8D2C5]" />
+                <span className="ml-1.5 truncate font-mono text-[9.5px] text-[#64625D]">
                   {previewUrl}
                 </span>
               </div>
-              <span className="font-mono text-[9.5px] uppercase tracking-wider text-[#64625D]">
-                {viewportMode === 'desktop' ? '1440px · LIVE VITE HMR' : '390px · MOBILE'}
+              <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-[#64625D]">
+                {viewportMode === 'desktop' ? 'LIVE PREVIEW' : '390PX MOBILE'}
               </span>
             </div>
 
             {/* Live Viewport Container */}
             <div className="relative flex-1 overflow-hidden bg-white">
-              {/* Live Target App Iframe */}
+              {/* Ultra-thin 2px animated vermilion top-edge progress bar while building */}
+              {isRunning && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 z-30 h-[2.5px] overflow-hidden bg-[#E5E1D8]/50"
+                >
+                  <div className="atelier-progress-bar h-full w-1/2 bg-[#E03E2D]" />
+                </div>
+              )}
+
+              {/* Zero-Flicker Double-Buffered Live Iframes (previous site NEVER blanks while building!) */}
               <iframe
-                key={`${previewUrl}-${reloadNonce}-${manualReload}`}
-                src={iframeSrc}
+                src={slotUrls[0]}
                 title="Live AntiSlop Target Website Preview"
-                className="h-full w-full border-0 bg-white"
+                onLoad={() => handleIframeLoad(0)}
+                className={`absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-200 ${
+                  activeSlot === 0
+                    ? 'z-[1] opacity-100'
+                    : 'pointer-events-none z-0 opacity-0'
+                } ${isResizingRails ? 'pointer-events-none' : ''}`}
               />
+              {slotUrls[1] && (
+                <iframe
+                  src={slotUrls[1]}
+                  title="Live AntiSlop Target Website Preview Buffer"
+                  onLoad={() => handleIframeLoad(1)}
+                  className={`absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-200 ${
+                    activeSlot === 1
+                      ? 'z-[1] opacity-100'
+                      : 'pointer-events-none z-0 opacity-0'
+                  } ${isResizingRails ? 'pointer-events-none' : ''}`}
+                />
+              )}
+
+              {/* 1.4s Architectural Luminous Hairline Reveal Curtain Sweep on New Render Arrival */}
+              {showRevealEffect && !compareMode && (
+                <div
+                  key={`sweep-${revealKey}`}
+                  aria-hidden="true"
+                  className="atelier-reveal-sweep pointer-events-none absolute inset-0 z-[25]"
+                  style={{
+                    background:
+                      'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(245,243,238,0.22) 62%, rgba(21,128,61,0.14) 94%, rgba(224,62,45,0.45) 100%)',
+                    borderBottom: '2px solid #15803D',
+                  }}
+                />
+              )}
+
+              {/* Animated Fix-Glow Halos over Circled Regions OR Refined Outer-Frame Emerald Arrival Glow */}
+              {showRevealEffect && !compareMode && lastAppliedCircles.length > 0 && (
+                <div
+                  key={`halos-${revealKey}`}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-[25]"
+                >
+                  {lastAppliedCircles.map((circle, idx) => (
+                    <div
+                      key={`${circle.id}-${revealKey}`}
+                      style={{
+                        left: `${Math.max(1, circle.x * 100 - 1)}%`,
+                        top: `${Math.max(1, circle.y * 100 - 1)}%`,
+                        width: `${Math.min(98, circle.width * 100 + 2)}%`,
+                        height: `${Math.min(98, circle.height * 100 + 2)}%`,
+                        boxShadow:
+                          '0 0 0 2px rgba(21,128,61,0.85), 0 0 22px 2px rgba(21,128,61,0.28), inset 0 0 18px rgba(224,62,45,0.14)',
+                      }}
+                      className="atelier-fix-halo absolute rounded-[6px] border border-[#15803D] bg-[#15803D]/[0.04]"
+                    >
+                      <span className="absolute -left-px -top-px h-2.5 w-2.5 border-l-2 border-t-2 border-[#E03E2D]" />
+                      <span className="absolute -right-px -top-px h-2.5 w-2.5 border-r-2 border-t-2 border-[#E03E2D]" />
+                      <span className="absolute -bottom-px -left-px h-2.5 w-2.5 border-b-2 border-l-2 border-[#15803D]" />
+                      <span className="absolute -bottom-px -right-px h-2.5 w-2.5 border-b-2 border-r-2 border-[#15803D]" />
+                      <span className="absolute -top-2.5 right-1.5 rounded bg-[#15803D] px-1.5 py-0.5 font-mono text-[8.5px] font-semibold uppercase tracking-wider text-white">
+                        ✓ #{idx + 1} Refined
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {showRevealEffect && !compareMode && lastAppliedCircles.length === 0 && (
+                <div
+                  key={`frame-glow-${revealKey}`}
+                  aria-hidden="true"
+                  style={{
+                    boxShadow:
+                      'inset 0 0 0 2.5px rgba(21,128,61,0.85), inset 0 0 36px rgba(21,128,61,0.16)',
+                  }}
+                  className="atelier-frame-arrival pointer-events-none absolute inset-0 z-[25]"
+                />
+              )}
+
+              {/* Floating "What Changed" Pill at Top-Center (auto-hides after 6s) */}
+              {showWhatChangedPill && lastRunSummary && !compareMode && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="atelier-what-changed-pill absolute left-1/2 top-3 z-30 flex max-w-[94%] items-center gap-2 rounded-full border border-[#141413] bg-[#FFFFFF] py-1 pl-3 pr-1.5 text-[#141413] shadow-[0_10px_28px_-12px_rgba(20,20,19,0.32)]"
+                >
+                  <span className="font-mono text-[11px] font-semibold text-[#15803D]">
+                    ✦
+                  </span>
+                  <span className="truncate font-mono text-[10.5px] font-medium text-[#141413]">
+                    {whatChangedSummaryText}
+                  </span>
+                  {canCompare && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDrawModeChange(false);
+                        setCompareMode(true);
+                        setShowWhatChangedPill(false);
+                      }}
+                      className="shrink-0 rounded-full bg-[#141413] px-2.5 py-0.5 font-mono text-[9.5px] font-medium text-[#F5F3EE] transition-colors hover:bg-[#E03E2D]"
+                    >
+                      Compare Before/After
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowWhatChangedPill(false)}
+                    aria-label="Dismiss update summary"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
 
               {/* Before / After Wipe Curtain Overlay */}
               {compareMode && resolvedBaseline && (
                 <div className="absolute inset-0 z-20 overflow-hidden bg-white">
-                  {/* Right (AFTER): either live screenshot or real iframe underneath */}
                   {resolvedFinal ? (
                     <img
                       src={resolvedFinal}
@@ -651,7 +904,6 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                     />
                   ) : null}
 
-                  {/* Left (BEFORE · AI SLOP): clipped by wipePercent */}
                   <div
                     style={{
                       clipPath: `inset(0 ${100 - wipePercent}% 0 0)`,
@@ -665,7 +917,6 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                     />
                   </div>
 
-                  {/* Crisp vertical curtain rule + tactile handle */}
                   <div
                     style={{ left: `${wipePercent}%` }}
                     className="pointer-events-none absolute inset-y-0 z-10 w-[2px] -translate-x-1/2 bg-[#E03E2D]"
@@ -675,15 +926,13 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                     </div>
                   </div>
 
-                  {/* Paper Specimen Badges */}
-                  <div className="pointer-events-none absolute left-3 top-3 rounded border border-[#E5E1D8] bg-white/95 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#141413]">
-                    Before · AI Slop Baseline
+                  <div className="pointer-events-none absolute left-3 top-3 rounded border border-[#E5E1D8] bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#141413]">
+                    Before · Baseline
                   </div>
-                  <div className="pointer-events-none absolute right-3 top-3 rounded border border-[#15803D]/30 bg-white/95 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#15803D]">
-                    After · AntiSlop Live
+                  <div className="pointer-events-none absolute right-3 top-3 rounded border border-[#15803D]/30 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#15803D]">
+                    After · AntiSlop
                   </div>
 
-                  {/* Native accessible range slider powering drag + Left/Right keyboard */}
                   <input
                     type="range"
                     min={0}
@@ -732,7 +981,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                           )
                         }
                         className="flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-[#E03E2D] px-1.5 font-mono text-[10px] font-bold text-white shadow-sm"
-                        title="Click to add optional text note for this circle"
+                        title="Click to add optional note for this circle"
                       >
                         #{idx + 1}
                       </button>
@@ -768,20 +1017,27 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   </div>
                 ))}
 
-              {/* Subtle non-blocking live progress pill while Gemini 4 runs */}
+              {/* Minimal Floating Glassless Bottom-Center Pill while Building */}
               {isRunning && (
-                <div className="pointer-events-none absolute bottom-3 left-3 z-30 flex items-center gap-2.5 rounded-lg border border-[#141413] bg-[#141413]/95 px-3 py-2 text-white shadow-lg">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#E03E2D]" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-[#E03E2D]">
-                        {liveModelTag || 'GEMINI 4 ENGINE'}
-                      </span>
-                    </div>
-                    <p className="max-w-[340px] truncate text-[11.5px] text-[#F5F3EE]">
-                      {liveStatusText || 'Executing multimodal design loop…'}
-                    </p>
-                  </div>
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="pointer-events-none absolute bottom-3 left-1/2 z-30 flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border border-[#2C2B28] bg-[#141413] px-3.5 py-1.5 text-[#F5F3EE] shadow-[0_8px_24px_-8px_rgba(20,20,19,0.45)]"
+                >
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[#E03E2D] animate-studio-pulse" />
+                  <span className="truncate font-mono text-[10.5px]">
+                    {liveModelTag
+                      ? `${liveModelTag.replace('gemini-4-', '').replace('gemini-', '')} · `
+                      : ''}
+                    {liveStatusText
+                      ? `${liveStatusText.slice(0, 68)}${liveStatusText.length > 68 ? '…' : ''} · keeping live preview active`
+                      : 'Carbon + Neon working · keeping live preview active…'}
+                  </span>
+                  {queueCount > 0 && (
+                    <span className="shrink-0 rounded-full bg-[#E03E2D] px-1.5 py-0.5 font-mono text-[9px] font-semibold text-white">
+                      +{queueCount} queued
+                    </span>
+                  )}
                 </div>
               )}
             </div>

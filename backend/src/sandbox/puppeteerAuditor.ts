@@ -1,10 +1,39 @@
+import dns from 'node:dns/promises';
 import fsPromises from 'node:fs/promises';
+import net from 'node:net';
 import path from 'node:path';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import type { DecisionsScorecard } from '../../../shared/types.js';
 import { BACKEND_ROOT, ENV } from '../config/env.js';
 
 export const SCREENSHOTS_DIR = path.join(BACKEND_ROOT, 'screenshots');
+
+const DESKTOP_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+export interface ExtractedCssDna {
+  title: string;
+  bodyBg: string;
+  bodyColor: string;
+  displayFont: string;
+  bodyFont: string;
+  h1Size: string;
+  bodySize: string;
+  accentColors: string[];
+  borderRadiusSample: string;
+  hasAnimations: boolean;
+}
+
+export interface ReferenceWebsiteCapture {
+  url: string;
+  title: string;
+  screenshotUrl: string;
+  screenshotBase64: string;
+  mimeType: 'image/jpeg';
+  extractedCssSummary: string;
+  cssDna: ExtractedCssDna;
+  latencyMs: number;
+}
 
 export interface CaptureAuditOptions {
   includeMobile?: boolean;
@@ -42,6 +71,128 @@ function stripBase64Prefix(input: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPrivateOrReservedIp(rawIp: string): boolean {
+  const ip = rawIp.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  const version = net.isIP(ip);
+  if (version === 4) {
+    const parts = ip.split('.').map((n) => Number.parseInt(n, 10));
+    if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return true;
+    const [a, b, c] = parts;
+    if (a === 0) return true; // 0.0.0.0/8
+    if (a === 10) return true; // 10.0.0.0/8 (RFC1918)
+    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 (CGNAT)
+    if (a === 127) return true; // 127.0.0.0/8 (loopback)
+    if (a === 169 && b === 254) return true; // 169.254.0.0/16 (link-local & cloud metadata)
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12 (RFC1918)
+    if (a === 192 && b === 0 && c === 0) return true; // 192.0.0.0/24
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16 (RFC1918)
+    if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15
+    if (a >= 224) return true; // multicast & reserved
+    return false;
+  }
+
+  if (version === 6) {
+    if (ip === '::' || ip === '::1') return true;
+    // IPv4-mapped IPv6 e.g. ::ffff:127.0.0.1 or ::ffff:169.254.169.254
+    const v4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+    if (v4Mapped) {
+      return isPrivateOrReservedIp(v4Mapped[1]);
+    }
+    const firstHextet = ip.split(':')[0] || '';
+    if (/^f[cd]/i.test(firstHextet)) return true; // fc00::/7 ULA
+    if (/^fe[89ab]/i.test(firstHextet)) return true; // fe80::/10 link-local
+    if (/^ff/i.test(firstHextet)) return true; // ff00::/8 multicast
+    return false;
+  }
+
+  return false;
+}
+
+function isBlockedHostnameLiteral(rawHost: string): boolean {
+  const host = rawHost.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!host) return true;
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.arpa') ||
+    host === 'metadata' ||
+    host === 'metadata.google.internal' ||
+    host === 'metadata.goog'
+  ) {
+    return true;
+  }
+  if (net.isIP(host) !== 0) {
+    return isPrivateOrReservedIp(host);
+  }
+  // Reject non-standard integer / hex / octal IP tricks (e.g. http://2130706433/ or 0x7f000001)
+  if (/^(0x[0-9a-f]+|\d+)$/i.test(host)) {
+    return true;
+  }
+  return false;
+}
+
+async function validatePublicReferenceUrl(rawUrl: string): Promise<URL> {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) {
+    throw new Error('Reference URL is required');
+  }
+
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    throw new Error(`Invalid URL: "${trimmed}"`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Unsupported URL protocol "${parsed.protocol}" — only http:// and https:// are allowed`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('URLs with embedded credentials are not allowed');
+  }
+
+  const hostname = parsed.hostname;
+  if (isBlockedHostnameLiteral(hostname)) {
+    throw new Error(`Blocked unsafe or local host: "${hostname}"`);
+  }
+
+  // Resolve DNS and reject private/loopback/metadata targets (prevents DNS rebinding / internal SSRF)
+  try {
+    const records = await Promise.race([
+      dns.lookup(hostname, { all: true }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`DNS lookup timed out for "${hostname}"`)), 3000)
+      ),
+    ]);
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new Error(`Could not resolve hostname "${hostname}"`);
+    }
+    for (const rec of records) {
+      if (isPrivateOrReservedIp(rec.address)) {
+        throw new Error(`Blocked private or reserved IP resolution for "${hostname}"`);
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && /Blocked|Could not resolve|timed out/i.test(err.message)) {
+      throw err;
+    }
+    throw new Error(`Unable to resolve host "${hostname}"`);
+  }
+
+  return parsed;
+}
+
+function primaryFontName(fontFamily: string): string {
+  const first = (fontFamily || '').split(',')[0] || '';
+  return first.replace(/['"]/g, '').trim() || 'system-ui';
 }
 
 export class PuppeteerAuditor {
@@ -381,6 +532,276 @@ export class PuppeteerAuditor {
         annotatedBase64,
         annotatedUrl: `/artifacts/screenshots/${safeName}`,
         annotatedPath,
+      };
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Captures a live external website as a high-res 1440x900 JPEG moodboard anchor + extracts
+   * real computed CSS DNA (palette, display/body fonts, type scale, accent colors, radii, motion).
+   * Protected against SSRF (blocks localhost, private RFC1918, and cloud metadata IPs) and
+   * bounded by a hard 10s overall capture budget so slow sites never hang.
+   */
+  async captureReferenceWebsite(rawUrl: string): Promise<ReferenceWebsiteCapture> {
+    const startedAt = Date.now();
+    const parsedUrl = await validatePublicReferenceUrl(rawUrl);
+    await this.ensureScreenshotsDir();
+
+    const hardDeadline = startedAt + 10_000;
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
+
+    try {
+      await page.setUserAgent(DESKTOP_USER_AGENT);
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+
+      // Block sub-requests or redirects targeting local/private/metadata addresses
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        try {
+          const reqUrl = req.url();
+          if (reqUrl.startsWith('http://') || reqUrl.startsWith('https://')) {
+            const u = new URL(reqUrl);
+            if (isBlockedHostnameLiteral(u.hostname)) {
+              void req.abort('blockedbyclient');
+              return;
+            }
+          }
+          void req.continue();
+        } catch {
+          void req.abort('blockedbyclient');
+        }
+      });
+
+      const navBudget = Math.max(2500, Math.min(7500, hardDeadline - Date.now() - 1800));
+      let navTimedOut = false;
+      try {
+        await page.goto(parsedUrl.toString(), {
+          waitUntil: 'domcontentloaded',
+          timeout: navBudget,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/timeout/i.test(msg)) {
+          navTimedOut = true;
+        } else {
+          throw err;
+        }
+      }
+
+      // Verify final redirected URL isn't an unsafe host
+      const finalUrl = page.url() || parsedUrl.toString();
+      try {
+        const finalParsed = new URL(finalUrl);
+        if (
+          (finalParsed.protocol === 'http:' || finalParsed.protocol === 'https:') &&
+          isBlockedHostnameLiteral(finalParsed.hostname)
+        ) {
+          throw new Error(`Redirected to blocked host: "${finalParsed.hostname}"`);
+        }
+      } catch (err) {
+        if (err instanceof Error && /Redirected to blocked/i.test(err.message)) {
+          throw err;
+        }
+      }
+
+      // Race document.fonts.ready + 1200ms visual settle strictly within hard 10s deadline
+      const fontBudget = Math.max(0, Math.min(1400, hardDeadline - Date.now() - 1400));
+      if (fontBudget > 150) {
+        await page
+          .evaluate(async (budgetMs: number) => {
+            if (document.fonts && document.fonts.ready) {
+              await Promise.race([
+                document.fonts.ready,
+                new Promise<void>((resolve) => setTimeout(resolve, budgetMs)),
+              ]);
+            }
+          }, fontBudget)
+          .catch(() => undefined);
+      }
+
+      const settleBudget = Math.max(0, Math.min(1200, hardDeadline - Date.now() - 900));
+      if (settleBudget > 0) {
+        await sleep(settleBudget);
+      }
+
+      if (navTimedOut) {
+        const hasBody = await page
+          .evaluate(() => Boolean(document.body && (document.body.innerText.trim().length > 0 || document.body.children.length > 0)))
+          .catch(() => false);
+        if (!hasBody) {
+          throw new Error(`Timed out loading reference website "${parsedUrl.hostname}" within 10s`);
+        }
+      }
+
+      // Extract real computed CSS DNA
+      const cssDna = await page.evaluate((): ExtractedCssDna => {
+        const toHexIfOpaque = (cssColor: string): string | null => {
+          const m = cssColor.match(
+            /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i
+          );
+          if (!m) return null;
+          const alpha = m[4] !== undefined ? Number.parseFloat(m[4]) : 1;
+          if (!Number.isFinite(alpha) || alpha < 0.15) return null;
+          const r = Math.min(255, Math.max(0, Number.parseInt(m[1], 10)));
+          const g = Math.min(255, Math.max(0, Number.parseInt(m[2], 10)));
+          const b = Math.min(255, Math.max(0, Number.parseInt(m[3], 10)));
+          const hex = (n: number) => n.toString(16).padStart(2, '0').toUpperCase();
+          return `#${hex(r)}${hex(g)}${hex(b)}`;
+        };
+
+        const body = document.body;
+        const html = document.documentElement;
+        const bodyStyle = body ? window.getComputedStyle(body) : window.getComputedStyle(html);
+        const htmlStyle = window.getComputedStyle(html);
+
+        const bodyBg =
+          toHexIfOpaque(bodyStyle.backgroundColor) ||
+          toHexIfOpaque(htmlStyle.backgroundColor) ||
+          '#FFFFFF';
+        const bodyColor = toHexIfOpaque(bodyStyle.color) || '#111111';
+
+        const pickLargestVisible = (selector: string): Element | null => {
+          let best: Element | null = null;
+          let bestSize = 0;
+          for (const el of Array.from(document.querySelectorAll(selector))) {
+            const st = window.getComputedStyle(el);
+            const r = el.getBoundingClientRect();
+            if (st.display === 'none' || st.visibility === 'hidden' || r.width < 10 || r.height < 10) {
+              continue;
+            }
+            const px = Number.parseFloat(st.fontSize || '0') || 0;
+            if (px > bestSize) {
+              bestSize = px;
+              best = el;
+            }
+          }
+          return best;
+        };
+
+        const headingEl = pickLargestVisible('h1') || pickLargestVisible('h2') || body;
+
+        const headingStyle = headingEl ? window.getComputedStyle(headingEl) : bodyStyle;
+        const paragraphEl = document.querySelector('p');
+        const bodyFontStyle = paragraphEl ? window.getComputedStyle(paragraphEl) : bodyStyle;
+
+        const displayFont = headingStyle.fontFamily || bodyStyle.fontFamily || 'system-ui';
+        const bodyFont = bodyFontStyle.fontFamily || bodyStyle.fontFamily || 'system-ui';
+        const h1Size = headingStyle.fontSize || '48px';
+        const bodySize = bodyFontStyle.fontSize || bodyStyle.fontSize || '16px';
+
+        // Sample distinct accent colors from links and buttons
+        const colorCounts = new Map<string, number>();
+        const interactiveEls = Array.from(
+          document.querySelectorAll('a, button, [role="button"], input[type="submit"]')
+        ).slice(0, 120);
+
+        const radiusCounts = new Map<string, number>();
+
+        for (const el of interactiveEls) {
+          const st = window.getComputedStyle(el);
+          if (st.display === 'none' || st.visibility === 'hidden') continue;
+          const bgHex = toHexIfOpaque(st.backgroundColor);
+          const fgHex = toHexIfOpaque(st.color);
+          if (bgHex && bgHex !== bodyBg && bgHex !== bodyColor) {
+            colorCounts.set(bgHex, (colorCounts.get(bgHex) || 0) + 2);
+          }
+          if (fgHex && fgHex !== bodyBg && fgHex !== bodyColor) {
+            colorCounts.set(fgHex, (colorCounts.get(fgHex) || 0) + 1);
+          }
+          const rad = (st.borderRadius || '').trim();
+          if (rad && rad !== '0px' && rad !== 'none') {
+            radiusCounts.set(rad, (radiusCounts.get(rad) || 0) + 1);
+          }
+        }
+
+        // Also sample card/panel radii if buttons didn't yield enough samples
+        if (radiusCounts.size === 0) {
+          const cardEls = Array.from(document.querySelectorAll('section, article, div')).slice(0, 80);
+          for (const el of cardEls) {
+            const rad = (window.getComputedStyle(el).borderRadius || '').trim();
+            if (rad && rad !== '0px' && rad !== 'none') {
+              radiusCounts.set(rad, (radiusCounts.get(rad) || 0) + 1);
+            }
+          }
+        }
+
+        const accentColors = Array.from(colorCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([hex]) => hex)
+          .slice(0, 5);
+
+        const topRadius = Array.from(radiusCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+        const borderRadiusSample = topRadius || '0px';
+
+        // Detect motion/animation affordances (CSS animations, transitions, SVG, canvas)
+        let hasAnimations = Boolean(
+          document.querySelector('canvas, svg animate, svg animateTransform, video')
+        );
+        if (!hasAnimations) {
+          const sampleEls = Array.from(document.querySelectorAll('body, header, nav, main, section, a, button')).slice(0, 60);
+          for (const el of sampleEls) {
+            const st = window.getComputedStyle(el);
+            const hasAnimName = st.animationName && st.animationName !== 'none';
+            const transDur = Number.parseFloat(st.transitionDuration || '0');
+            if (hasAnimName || (Number.isFinite(transDur) && transDur > 0.05)) {
+              hasAnimations = true;
+              break;
+            }
+          }
+        }
+        if (!hasAnimations && document.querySelectorAll('svg').length >= 3) {
+          hasAnimations = true;
+        }
+
+        return {
+          title: (document.title || window.location.hostname || '').trim().slice(0, 140),
+          bodyBg,
+          bodyColor,
+          displayFont,
+          bodyFont,
+          h1Size,
+          bodySize,
+          accentColors,
+          borderRadiusSample,
+          hasAnimations,
+        };
+      });
+
+      const filename = `ref-${Date.now()}.jpg`;
+      const filePath = path.join(SCREENSHOTS_DIR, filename);
+      const jpegRaw = await page.screenshot({
+        type: 'jpeg',
+        quality: 85,
+        fullPage: false,
+      });
+      const jpegBuffer = Buffer.from(jpegRaw);
+      await fsPromises.writeFile(filePath, jpegBuffer);
+
+      const displayPrimary = primaryFontName(cssDna.displayFont);
+      const bodyPrimary = primaryFontName(cssDna.bodyFont);
+      const accentText =
+        cssDna.accentColors.length > 0 ? cssDna.accentColors.join(', ') : 'monochrome';
+      const extractedCssSummary = [
+        `Canvas ${cssDna.bodyBg} / Ink ${cssDna.bodyColor}`,
+        `Display: ${displayPrimary} (${cssDna.h1Size})`,
+        `Body: ${bodyPrimary} (${cssDna.bodySize})`,
+        `Accents: ${accentText}`,
+        `Radius: ${cssDna.borderRadiusSample}`,
+        `Motion: ${cssDna.hasAnimations ? 'detected' : 'static'}`,
+      ].join(' · ');
+
+      return {
+        url: finalUrl,
+        title: cssDna.title || parsedUrl.hostname,
+        screenshotUrl: `/artifacts/screenshots/${filename}`,
+        screenshotBase64: jpegBuffer.toString('base64'),
+        mimeType: 'image/jpeg',
+        extractedCssSummary,
+        cssDna,
+        latencyMs: Date.now() - startedAt,
       };
     } finally {
       await page.close().catch(() => undefined);

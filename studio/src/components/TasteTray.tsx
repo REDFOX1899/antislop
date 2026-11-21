@@ -7,26 +7,32 @@ import {
   ChevronLeft,
   ChevronRight,
   Film,
+  Globe,
   ImagePlus,
   Loader2,
-  Mic,
+  Plus,
   Sparkles,
-  Square,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
+import { captureReferenceUrl, resolveBackendUrl } from '@/lib/api';
 import {
   QUICK_TASTE_STARTERS,
   buildQuickStarterVisualAsset,
   createAssetId,
+  extractDomainFromUrl,
   fileToLocalAsset,
   formatBytes,
   type LocalMediaAsset,
   type QuickTasteStarter,
 } from '@/lib/media';
-import { useVoiceRecorder } from '@/lib/useVoiceRecorder';
 import { NativeDialog } from './NativeDialog';
+
+const QUICK_SITE_REFS: Array<{ label: string; url: string }> = [
+  { label: 'connorhyatt.com', url: 'https://www.connorhyatt.com' },
+  { label: 'are.na', url: 'https://www.are.na' },
+];
 
 interface TasteTrayProps {
   collapsed: boolean;
@@ -35,20 +41,14 @@ interface TasteTrayProps {
   onAddAssets: (newAssets: LocalMediaAsset[]) => void;
   onRemoveAsset: (id: string) => void;
   onClearAssets: () => void;
-  voiceTranscript: string;
-  onVoiceTranscriptChange: (val: string) => void;
-  voiceAudioBase64?: string;
-  onVoiceRecorded: (payload: {
-    audioBase64: string;
-    mimeType: string;
-    transcript: string;
-  }) => void;
-  onClearVoiceAudio: () => void;
+  onSeedVoiceHint?: (hint: string) => void;
+  onNotify?: (tone: 'info' | 'success' | 'error', message: string) => void;
   generateBespokeAssets: boolean;
   onToggleBespokeAssets: (val: boolean) => void;
   speedMode: ExecutionSpeedMode;
   drawnCirclesCount: number;
   isRunning: boolean;
+  queueCount: number;
   onRunTransform: () => void;
   onRunCircleTweak: () => void;
 }
@@ -60,22 +60,25 @@ export function TasteTray({
   onAddAssets,
   onRemoveAsset,
   onClearAssets,
-  voiceTranscript,
-  onVoiceTranscriptChange,
-  voiceAudioBase64,
-  onVoiceRecorded,
-  onClearVoiceAudio,
+  onSeedVoiceHint,
+  onNotify,
   generateBespokeAssets,
   onToggleBespokeAssets,
   speedMode,
   drawnCirclesCount,
   isRunning,
+  queueCount,
   onRunTransform,
   onRunCircleTweak,
 }: TasteTrayProps) {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
-  const [isDraggingImages, setIsDraggingImages] = useState(false);
+
+  const [siteUrlInput, setSiteUrlInput] = useState('');
+  const [capturingUrl, setCapturingUrl] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  const [isDraggingMedia, setIsDraggingMedia] = useState(false);
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
   const [webcamReady, setWebcamReady] = useState(false);
@@ -88,50 +91,104 @@ export function TasteTray({
   );
   const videoAssets = assets.filter((a) => a.modality === 'motion_video');
 
-  const voice = useVoiceRecorder((out) => {
-    onVoiceRecorded({
-      audioBase64: out.audioBase64,
-      mimeType: out.mimeType,
-      transcript: out.transcript,
-    });
-  });
+  const handleCaptureSiteUrl = useCallback(
+    async (rawInput: string) => {
+      const trimmed = rawInput.trim();
+      if (!trimmed || capturingUrl) return;
 
-  const handleImageFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const remaining = Math.max(0, 14 - imageAssets.length);
-      if (remaining === 0) return;
-      const list = Array.from(files)
-        .filter((f) => f.type.startsWith('image/'))
-        .slice(0, remaining);
-      if (list.length === 0) return;
-      const parsed = await Promise.all(
-        list.map((f) => fileToLocalAsset(f, 'moodboard_image'))
-      );
-      onAddAssets(parsed);
+      const normalizedUrl = /^https?:\/\//i.test(trimmed)
+        ? trimmed
+        : `https://${trimmed}`;
+      const domain = extractDomainFromUrl(normalizedUrl);
+
+      setCaptureError(null);
+      setCapturingUrl(domain);
+
+      try {
+        const res = await captureReferenceUrl(normalizedUrl);
+        const finalUrl = res.url || normalizedUrl;
+        const finalDomain = extractDomainFromUrl(finalUrl);
+        const mimeType = res.asset?.mimeType || 'image/png';
+        const previewUrl = res.asset?.dataBase64
+          ? `data:${mimeType};base64,${res.asset.dataBase64}`
+          : resolveBackendUrl(res.asset?.fileUrl || res.screenshotUrl) || '';
+
+        const cssSummary = res.extractedCssSummary?.trim();
+        const titleText = res.title?.trim() || finalDomain;
+        const combinedLabel = cssSummary
+          ? `${titleText} (${finalDomain}) · ${cssSummary}`
+          : `${titleText} (${finalDomain})`;
+
+        const capturedAsset: LocalMediaAsset = {
+          id: res.asset?.id || createAssetId('site'),
+          modality: res.asset?.modality || 'moodboard_image',
+          mimeType,
+          dataBase64: res.asset?.dataBase64,
+          fileUrl: res.asset?.fileUrl || res.screenshotUrl,
+          filename: res.asset?.filename || `${finalDomain}.png`,
+          label: combinedLabel,
+          previewUrl,
+          sourceUrl: finalUrl,
+          sourceDomain: finalDomain,
+          extractedCssSummary: cssSummary,
+        };
+
+        onAddAssets([capturedAsset]);
+        setSiteUrlInput('');
+        const secLabel =
+          typeof res.latencyMs === 'number'
+            ? ` (${(res.latencyMs / 1000).toFixed(1)}s)`
+            : '';
+        onNotify?.(
+          'success',
+          `Snapped ${finalDomain}${secLabel} — screenshot + CSS DNA added to moodboard.`
+        );
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : `Could not capture ${domain}`;
+        setCaptureError(msg);
+        onNotify?.('error', msg);
+      } finally {
+        setCapturingUrl(null);
+      }
     },
-    [imageAssets.length, onAddAssets]
+    [capturingUrl, onAddAssets, onNotify]
   );
 
-  const handleVideoFiles = useCallback(
+  const handleMediaFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files)
+      const all = Array.from(files);
+      const images = all
+        .filter((f) => f.type.startsWith('image/'))
+        .slice(0, Math.max(0, 14 - imageAssets.length));
+      const videos = all
         .filter((f) => f.type.startsWith('video/'))
-        .slice(0, 2);
-      if (list.length === 0) return;
-      const parsed = await Promise.all(
-        list.map((f) => fileToLocalAsset(f, 'motion_video'))
-      );
-      onAddAssets(parsed);
+        .slice(0, Math.max(0, 2 - videoAssets.length));
+
+      const nextAssets: LocalMediaAsset[] = [];
+      if (images.length > 0) {
+        const parsedImages = await Promise.all(
+          images.map((f) => fileToLocalAsset(f, 'moodboard_image'))
+        );
+        nextAssets.push(...parsedImages);
+      }
+      if (videos.length > 0) {
+        const parsedVideos = await Promise.all(
+          videos.map((f) => fileToLocalAsset(f, 'motion_video'))
+        );
+        nextAssets.push(...parsedVideos);
+      }
+      if (nextAssets.length > 0) {
+        onAddAssets(nextAssets);
+      }
     },
-    [onAddAssets]
+    [imageAssets.length, onAddAssets, videoAssets.length]
   );
 
   const handleStarterClick = (starter: QuickTasteStarter) => {
     const asset = buildQuickStarterVisualAsset(starter);
     onAddAssets([asset]);
-    if (!voiceTranscript.trim()) {
-      onVoiceTranscriptChange(starter.voiceHint);
-    }
+    onSeedVoiceHint?.(starter.voiceHint);
   };
 
   // Manage live webcam stream whenever viewfinder dialog opens/closes
@@ -247,31 +304,39 @@ export function TasteTray({
 
   if (collapsed) {
     return (
-      <aside className="flex w-[46px] shrink-0 flex-col items-center justify-between border-r border-[#E5E1D8] bg-[#FFFFFF] py-3">
-        <div className="flex flex-col items-center gap-2.5">
+      <aside className="flex h-full w-full flex-col items-center justify-between border-r border-[#E5E1D8] bg-[#FFFFFF] py-2.5">
+        <div className="flex flex-col items-center gap-2">
           <button
             type="button"
             onClick={onToggleCollapse}
-            title="Expand Multimodal Taste Tray"
-            aria-label="Expand Multimodal Taste Tray"
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E1D8] bg-[#F5F3EE] text-[#141413] hover:border-[#141413]"
+            title="Expand Reference Rail"
+            aria-label="Expand Reference Rail"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E5E1D8] bg-[#F5F3EE] text-[#141413] hover:border-[#141413]"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
-          <div className="h-px w-6 bg-[#E5E1D8]" />
+          <div className="h-px w-5 bg-[#E5E1D8]" />
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title="Capture Live Reference URL"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+          >
+            <Globe className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={() => {
               onToggleCollapse();
               setTimeout(() => imageInputRef.current?.click(), 80);
             }}
-            title={`Moodboard images (${imageAssets.length}/14)`}
-            className="relative flex h-8 w-8 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+            title={`Moodboard references (${imageAssets.length}/14)`}
+            className="relative flex h-7 w-7 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
           >
-            <ImagePlus className="h-4 w-4" />
-            {imageAssets.length > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#141413] px-1 font-mono text-[9px] text-white">
-                {imageAssets.length}
+            <ImagePlus className="h-3.5 w-3.5" />
+            {assets.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#141413] px-1 font-mono text-[8.5px] text-white">
+                {assets.length}
               </span>
             )}
           </button>
@@ -279,39 +344,28 @@ export function TasteTray({
             type="button"
             onClick={() => setWebcamOpen(true)}
             title="Capture physical object via Webcam"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]"
           >
-            <Camera className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={voice.toggleRecording}
-            title="Record Voice Art Direction"
-            className={`flex h-8 w-8 items-center justify-center rounded-md ${
-              voice.isRecording
-                ? 'bg-[#E03E2D] text-white'
-                : 'text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#141413]'
-            }`}
-          >
-            <Mic className="h-4 w-4" />
+            <Camera className="h-3.5 w-3.5" />
           </button>
         </div>
 
         <button
           type="button"
-          disabled={isRunning}
           onClick={drawnCirclesCount > 0 ? onRunCircleTweak : onRunTransform}
           title={
-            drawnCirclesCount > 0
-              ? 'Apply Circle & Voice Tweak'
+            isRunning
+              ? 'Queue Next Transform'
+              : drawnCirclesCount > 0
+              ? 'Apply Circle Tweak'
               : 'Transform Live App'
           }
-          className="flex h-9 w-9 items-center justify-center rounded-md bg-[#E03E2D] text-white transition-colors hover:bg-[#C53222] disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-md bg-[#E03E2D] text-white transition-colors hover:bg-[#C53222]"
         >
           {isRunning ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Plus className="h-4 w-4" />
           ) : (
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-3.5 w-3.5" />
           )}
         </button>
       </aside>
@@ -320,254 +374,269 @@ export function TasteTray({
 
   return (
     <>
-      <aside className="flex w-[292px] shrink-0 flex-col border-r border-[#E5E1D8] bg-[#FFFFFF]">
-        {/* Tray Header */}
-        <div className="flex items-center justify-between border-b border-[#E5E1D8] px-3.5 py-2.5">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64625D]">
-                Taste Tray
-              </span>
-              <span className="rounded bg-[#F5F3EE] px-1.5 py-0.5 font-mono text-[10px] text-[#141413]">
-                {assets.length} refs
-              </span>
-            </div>
-            <p className="text-[11px] text-[#64625D]">
-              Raw multimodal inputs · zero text-slop
-            </p>
+      <aside className="flex h-full w-full min-w-0 flex-col border-r border-[#E5E1D8] bg-[#FFFFFF]">
+        {/* Minimal Rail Header */}
+        <div className="flex h-9 shrink-0 items-center justify-between border-b border-[#E5E1D8] px-2.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#141413]">
+              References
+            </span>
+            <span className="rounded bg-[#F5F3EE] px-1.5 py-0.5 font-mono text-[9px] text-[#64625D]">
+              {assets.length}
+            </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {assets.length > 0 && (
               <button
                 type="button"
                 onClick={onClearAssets}
                 title="Clear all references"
-                className="flex h-7 w-7 items-center justify-center rounded text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#E03E2D]"
+                aria-label="Clear all references"
+                className="flex h-6 w-6 items-center justify-center rounded text-[#64625D] hover:bg-[#F5F3EE] hover:text-[#E03E2D]"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-3 w-3" />
               </button>
             )}
             <button
               type="button"
               onClick={onToggleCollapse}
-              title="Collapse Taste Tray for larger canvas"
-              aria-label="Collapse Taste Tray"
-              className="flex h-7 w-7 items-center justify-center rounded border border-[#E5E1D8] bg-[#FAF8F4] text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
+              title="Collapse Reference Rail (expand canvas)"
+              aria-label="Collapse Reference Rail"
+              className="flex h-6 w-6 items-center justify-center rounded border border-[#E5E1D8] bg-[#FAF8F4] text-[#64625D] hover:border-[#141413] hover:text-[#141413]"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Multimodal Inputs */}
-        <div className="studio-scroll flex-1 space-y-4 overflow-y-auto px-3.5 py-3">
-          {/* 1. Moodboard Dropzone (1-14 images) */}
-          <section aria-label="Moodboard references">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11.5px] font-semibold text-[#141413]">
-                1. Moodboard & Print
+        {/* Scrollable Compact Atelier Inputs */}
+        <div className="studio-scroll flex-1 space-y-3 overflow-y-auto px-2.5 py-2.5">
+          {/* 1. LIVE SITE REFERENCE URL CAPTURE */}
+          <section aria-label="Live Site Reference">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#64625D]">
+                <Globe className="h-2.5 w-2.5 text-[#E03E2D]" />
+                Live Site Reference
               </span>
-              <span className="font-mono text-[10px] text-[#64625D]">
-                {imageAssets.length}/14 imgs
-              </span>
+              {capturingUrl && (
+                <span className="font-mono text-[8.5px] text-[#E03E2D]">
+                  snapping…
+                </span>
+              )}
             </div>
 
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleCaptureSiteUrl(siteUrlInput);
+              }}
+              className="flex items-center gap-1"
+            >
+              <input
+                type="text"
+                value={siteUrlInput}
+                onChange={(e) => {
+                  setSiteUrlInput(e.target.value);
+                  if (captureError) setCaptureError(null);
+                }}
+                placeholder="Paste URL (stripe.com)"
+                disabled={Boolean(capturingUrl)}
+                aria-label="Live reference website URL"
+                className="h-7 min-w-0 flex-1 rounded-[5px] border border-[#E5E1D8] bg-[#FAF8F4] px-2 text-[11px] text-[#141413] placeholder:text-[#96928A] focus:border-[#141413] focus:bg-white focus:outline-none disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={!siteUrlInput.trim() || Boolean(capturingUrl)}
+                className="flex h-7 shrink-0 items-center justify-center gap-1 rounded-[5px] bg-[#141413] px-2 font-mono text-[10px] font-medium text-white transition-colors hover:bg-[#E03E2D] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {capturingUrl ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span>Snap</span>
+                )}
+              </button>
+            </form>
+
+            {/* 1-Click Quick Reference Chips */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              {QUICK_SITE_REFS.map((site) => {
+                const isBusy = capturingUrl === site.label;
+                return (
+                  <button
+                    key={site.label}
+                    type="button"
+                    disabled={Boolean(capturingUrl)}
+                    onClick={() => {
+                      setSiteUrlInput(site.label);
+                      void handleCaptureSiteUrl(site.url);
+                    }}
+                    className="inline-flex items-center gap-1 rounded border border-[#E5E1D8] bg-[#FAF8F4] px-1.5 py-0.5 font-mono text-[9.5px] text-[#141413] transition-colors hover:border-[#141413] hover:bg-white disabled:opacity-50"
+                    title={`Capture live screenshot + CSS DNA from ${site.url}`}
+                  >
+                    {isBusy ? (
+                      <Loader2 className="h-2.5 w-2.5 animate-spin text-[#E03E2D]" />
+                    ) : (
+                      <Globe className="h-2.5 w-2.5 text-[#64625D]" />
+                    )}
+                    <span>{site.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {captureError && (
+              <p className="mt-1 text-[10px] leading-snug text-[#E03E2D]">
+                {captureError}
+              </p>
+            )}
+          </section>
+
+          <div className="h-px bg-[#E5E1D8]" />
+
+          {/* 2. MOODBOARD STRIP + COMPACT IMAGE/VIDEO DROPZONE */}
+          <section aria-label="Moodboard references">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#64625D]">
+                Moodboard &amp; Motion
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="inline-flex items-center gap-0.5 font-mono text-[9px] text-[#64625D] hover:text-[#141413]"
+                  title="Attach motion/hover video (MP4/WebM)"
+                >
+                  <Film className="h-2.5 w-2.5" />
+                  <span>+Vid</span>
+                </button>
+                <span className="font-mono text-[9px] text-[#64625D]">
+                  {imageAssets.length}/14
+                </span>
+              </div>
+            </div>
+
+            {/* Hidden File Inputs */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*,video/mp4,video/webm,video/quicktime"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) {
+                  void handleMediaFiles(e.target.files);
+                  e.target.value = '';
+                }
+              }}
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) {
+                  void handleMediaFiles(e.target.files);
+                  e.target.value = '';
+                }
+              }}
+            />
+
+            {/* Thumbnail Strip (live URL captures + uploads + webcam) */}
+            {imageAssets.length > 0 && (
+              <div className="mb-2 grid grid-cols-2 gap-1.5">
+                {imageAssets.map((img) => {
+                  const tooltipText = img.extractedCssSummary
+                    ? `${img.sourceDomain || img.label || 'Site'} — ${img.extractedCssSummary}`
+                    : img.label || img.filename || 'Moodboard reference';
+
+                  return (
+                    <div
+                      key={img.id}
+                      title={tooltipText}
+                      className="group relative aspect-[4/3] overflow-hidden rounded-[5px] border border-[#E5E1D8] bg-[#F5F3EE]"
+                    >
+                      <img
+                        src={img.previewUrl}
+                        alt={img.label || img.filename || 'Reference'}
+                        className="h-full w-full object-cover object-top"
+                      />
+
+                      {/* Domain / Modality Micro-Badge */}
+                      {img.sourceDomain ? (
+                        <span className="absolute bottom-1 left-1 right-1 inline-flex max-w-[calc(100%-8px)] items-center gap-0.5 truncate rounded bg-[#141413]/88 px-1 py-0.5 font-mono text-[8px] font-medium text-white">
+                          <span aria-hidden="true">🌐</span>
+                          <span className="truncate">{img.sourceDomain}</span>
+                        </span>
+                      ) : (
+                        <span className="absolute bottom-1 left-1 rounded bg-[#141413]/80 px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white">
+                          {img.modality === 'webcam_frame' ? 'CAM' : 'REF'}
+                        </span>
+                      )}
+
+                      {/* Extracted CSS DNA hover bar for captured sites */}
+                      {img.extractedCssSummary && (
+                        <div className="pointer-events-none absolute inset-x-0 top-0 bg-[#141413]/90 px-1.5 py-1 text-[8.5px] leading-tight text-[#F5F3EE] opacity-0 transition-opacity group-hover:opacity-100">
+                          <span className="line-clamp-2 font-mono">
+                            {img.extractedCssSummary}
+                          </span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveAsset(img.id);
+                        }}
+                        aria-label={`Remove ${img.sourceDomain || img.label || 'reference'}`}
+                        className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#141413]/85 text-white opacity-0 transition-opacity hover:bg-[#E03E2D] group-hover:opacity-100"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Ultra-Compact Unified Dropzone */}
             <div
               onDragOver={(e) => {
                 e.preventDefault();
-                setIsDraggingImages(true);
+                setIsDraggingMedia(true);
               }}
-              onDragLeave={() => setIsDraggingImages(false)}
+              onDragLeave={() => setIsDraggingMedia(false)}
               onDrop={(e) => {
                 e.preventDefault();
-                setIsDraggingImages(false);
+                setIsDraggingMedia(false);
                 if (e.dataTransfer.files?.length) {
-                  void handleImageFiles(e.dataTransfer.files);
+                  void handleMediaFiles(e.dataTransfer.files);
                 }
               }}
               onClick={() => imageInputRef.current?.click()}
-              className={`group cursor-pointer rounded-lg border border-dashed px-3 py-3 text-center transition-all ${
-                isDraggingImages
+              className={`group cursor-pointer rounded-[6px] border border-dashed px-2.5 py-2.5 text-center transition-colors ${
+                isDraggingMedia
                   ? 'border-[#E03E2D] bg-[#FDF1EF]'
                   : 'border-[#CFC9BC] bg-[#FAF8F4] hover:border-[#141413] hover:bg-[#F5F3EE]'
               }`}
             >
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.length) {
-                    void handleImageFiles(e.target.files);
-                    e.target.value = '';
-                  }
-                }}
-              />
-              <Upload className="mx-auto mb-1 h-4 w-4 text-[#64625D] group-hover:text-[#141413]" />
-              <p className="text-[11.5px] font-medium text-[#141413]">
-                Drop ANY live image or screenshot
+              <Upload className="mx-auto mb-1 h-3.5 w-3.5 text-[#64625D] group-hover:text-[#141413]" />
+              <p className="text-[10.5px] font-medium text-[#141413]">
+                Drop images or motion video
               </p>
-              <p className="mt-0.5 text-[10.5px] text-[#64625D]">
-                Pinterest, Dribbble, book covers, print scans
+              <p className="font-mono text-[9px] text-[#64625D]">
+                PNG · JPG · MP4 · WEBM
               </p>
             </div>
 
-            {/* Thumbnail Filmstrip */}
-            {imageAssets.length > 0 && (
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                {imageAssets.map((img) => (
-                  <div
-                    key={img.id}
-                    className="group relative aspect-[4/3] overflow-hidden rounded-md border border-[#E5E1D8] bg-[#F5F3EE]"
-                  >
-                    <img
-                      src={img.previewUrl}
-                      alt={img.label || img.filename || 'Reference'}
-                      className="h-full w-full object-cover"
-                    />
-                    <span className="absolute bottom-1 left-1 rounded bg-[#141413]/80 px-1 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-white">
-                      {img.modality === 'webcam_frame' ? 'CAM' : 'REF'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveAsset(img.id);
-                      }}
-                      aria-label={`Remove ${img.label || 'reference'}`}
-                      className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#141413]/85 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 3 Optional Quick Taste Starters */}
-            <div className="mt-2.5">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="font-mono text-[9.5px] uppercase tracking-wider text-[#64625D]">
-                  Optional Quick-Starts
-                </span>
-                <span className="text-[9.5px] text-[#64625D]">
-                  or drop live / webcam
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-1.5">
-                {QUICK_TASTE_STARTERS.map((starter) => (
-                  <button
-                    key={starter.id}
-                    type="button"
-                    onClick={() => handleStarterClick(starter)}
-                    className="flex items-center justify-between rounded-md border border-[#E5E1D8] bg-white px-2.5 py-1.5 text-left transition-colors hover:border-[#141413] hover:bg-[#FAF8F4]"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <div className="truncate text-[11px] font-medium text-[#141413]">
-                        {starter.title}
-                      </div>
-                      <div className="truncate text-[10px] text-[#64625D]">
-                        {starter.subtitle}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      {starter.swatches.map((hex) => (
-                        <span
-                          key={hex}
-                          style={{ backgroundColor: hex }}
-                          className="h-3.5 w-3.5 rounded-[3px] border border-[#141413]/15"
-                        />
-                      ))}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <div className="h-px bg-[#E5E1D8]" />
-
-          {/* 2. Live Webcam Capture (Physical World Reference) */}
-          <section aria-label="Live webcam reference capture">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11.5px] font-semibold text-[#141413]">
-                2. Physical Object (Webcam)
-              </span>
-              <span className="font-mono text-[9.5px] text-[#64625D]">
-                LIVE CAM
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setWebcamOpen(true)}
-              className="flex w-full items-center justify-between rounded-lg border border-[#E5E1D8] bg-[#FAF8F4] px-3 py-2 text-left transition-colors hover:border-[#141413] hover:bg-[#F5F3EE]"
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E5E1D8] bg-white text-[#141413]">
-                  <Camera className="h-3.5 w-3.5 text-[#E03E2D]" />
-                </span>
-                <div>
-                  <div className="text-[11.5px] font-medium text-[#141413]">
-                    Open Live Viewfinder
-                  </div>
-                  <div className="text-[10px] text-[#64625D]">
-                    Hold up a book, magazine, cup, or print
-                  </div>
-                </div>
-              </div>
-              <span className="font-mono text-[10px] text-[#141413]">SNAP</span>
-            </button>
-          </section>
-
-          <div className="h-px bg-[#E5E1D8]" />
-
-          {/* 3. Motion / Interaction Video */}
-          <section aria-label="Motion video reference">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11.5px] font-semibold text-[#141413]">
-                3. Motion / Hover Video
-              </span>
-              <span className="font-mono text-[9.5px] text-[#64625D]">
-                MP4 · WEBM
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => videoInputRef.current?.click()}
-              className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-[#CFC9BC] bg-[#FAF8F4] px-3 py-2 text-left transition-colors hover:border-[#141413] hover:bg-[#F5F3EE]"
-            >
-              <input
-                ref={videoInputRef}
-                type="file"
-                accept="video/mp4,video/webm,video/quicktime"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.length) {
-                    void handleVideoFiles(e.target.files);
-                    e.target.value = '';
-                  }
-                }}
-              />
-              <Film className="h-4 w-4 shrink-0 text-[#64625D]" />
-              <div className="min-w-0">
-                <div className="text-[11.5px] font-medium text-[#141413]">
-                  Attach interaction clip
-                </div>
-                <div className="truncate text-[10px] text-[#64625D]">
-                  Easing curves, hover physics, cadence
-                </div>
-              </div>
-            </button>
-
+            {/* Compact Attached Video Chips */}
             {videoAssets.length > 0 && (
-              <div className="mt-2 space-y-1.5">
+              <div className="mt-1.5 space-y-1">
                 {videoAssets.map((vid) => (
                   <div
                     key={vid.id}
-                    className="flex items-center gap-2 rounded-md border border-[#E5E1D8] bg-[#FAF8F4] p-1.5"
+                    className="flex items-center gap-1.5 rounded-[5px] border border-[#E5E1D8] bg-[#FAF8F4] p-1"
                   >
                     <video
                       src={vid.previewUrl}
@@ -575,173 +644,133 @@ export function TasteTray({
                       playsInline
                       autoPlay
                       loop
-                      className="h-11 w-16 shrink-0 rounded border border-[#E5E1D8] bg-[#141413] object-cover"
+                      className="h-7 w-10 shrink-0 rounded border border-[#E5E1D8] bg-[#141413] object-cover"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[11px] font-medium text-[#141413]">
+                      <div className="truncate text-[10px] font-medium text-[#141413]">
                         {vid.filename || vid.label}
                       </div>
-                      <div className="font-mono text-[9.5px] text-[#64625D]">
-                        motion_video · {formatBytes(vid.sizeBytes)}
+                      <div className="font-mono text-[8.5px] text-[#64625D]">
+                        motion · {formatBytes(vid.sizeBytes)}
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => onRemoveAsset(vid.id)}
                       aria-label="Remove video"
-                      className="flex h-6 w-6 items-center justify-center rounded text-[#64625D] hover:bg-white hover:text-[#E03E2D]"
+                      className="flex h-5 w-5 items-center justify-center rounded text-[#64625D] hover:text-[#E03E2D]"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-3 w-3" />
                     </button>
                   </div>
                 ))}
               </div>
             )}
+
+            {/* Minimal 1-Row Quick Swatch Starters */}
+            <div className="mt-2 flex items-center gap-1">
+              {QUICK_TASTE_STARTERS.map((starter) => (
+                <button
+                  key={starter.id}
+                  type="button"
+                  onClick={() => handleStarterClick(starter)}
+                  title={`${starter.title} — ${starter.subtitle}`}
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded border border-[#E5E1D8] bg-white px-1.5 py-1 text-[9.5px] font-medium text-[#141413] transition-colors hover:border-[#141413] hover:bg-[#FAF8F4]"
+                >
+                  <span
+                    style={{ backgroundColor: starter.swatches[2] }}
+                    className="h-2 w-2 shrink-0 rounded-full border border-[#141413]/20"
+                  />
+                  <span className="truncate">
+                    {starter.id === 'swiss_atelier'
+                      ? 'Swiss'
+                      : starter.id === 'kyoto_ceramic'
+                      ? 'Kyoto'
+                      : 'Braun'}
+                  </span>
+                </button>
+              ))}
+            </div>
           </section>
 
           <div className="h-px bg-[#E5E1D8]" />
 
-          {/* 4. Voice Art Direction Bar */}
-          <section aria-label="Voice art direction">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11.5px] font-semibold text-[#141413]">
-                4. Voice Art Direction
-              </span>
-              <span className="font-mono text-[9.5px] text-[#64625D]">
-                3.5-TRANSCRIBE
-              </span>
-            </div>
-
-            <div className="rounded-lg border border-[#E5E1D8] bg-[#FAF8F4] p-2.5">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={voice.toggleRecording}
-                  className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[11.5px] font-medium transition-colors ${
-                    voice.isRecording
-                      ? 'bg-[#E03E2D] text-white'
-                      : 'border border-[#E5E1D8] bg-white text-[#141413] hover:border-[#141413]'
-                  }`}
-                >
-                  {voice.isRecording ? (
-                    <>
-                      <Square className="h-3 w-3 fill-current" />
-                      <span className="font-mono text-[11px]">
-                        0:{String(voice.durationSec).padStart(2, '0')}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="h-3.5 w-3.5 text-[#E03E2D]" />
-                      <span>Speak</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Live Web Audio Waveform Bars */}
-                <div
-                  aria-hidden="true"
-                  className="flex h-7 flex-1 items-center justify-between gap-[2px] rounded border border-[#E5E1D8] bg-white px-2"
-                >
-                  {voice.levels.map((lvl, idx) => (
-                    <span
-                      key={idx}
-                      style={{
-                        height: `${Math.round(lvl * 100)}%`,
-                      }}
-                      className={`w-[3px] rounded-full transition-[height] duration-75 ${
-                        voice.isRecording
-                          ? 'bg-[#E03E2D]'
-                          : voiceAudioBase64
-                          ? 'bg-[#15803D]'
-                          : 'bg-[#D6D1C6]'
-                      }`}
-                    />
-                  ))}
+          {/* 3. COMPACT WEBCAM SHUTTER BUTTON */}
+          <section aria-label="Live webcam reference capture">
+            <button
+              type="button"
+              onClick={() => setWebcamOpen(true)}
+              className="flex w-full items-center justify-between rounded-[6px] border border-[#E5E1D8] bg-[#FAF8F4] px-2.5 py-2 text-left transition-colors hover:border-[#141413] hover:bg-[#F5F3EE]"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[#E5E1D8] bg-white text-[#E03E2D]">
+                  <Camera className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[11px] font-medium text-[#141413]">
+                    Webcam Object
+                  </div>
+                  <div className="truncate text-[9.5px] text-[#64625D]">
+                    Book, print, mug
+                  </div>
                 </div>
               </div>
-
-              {voice.isTranscribing && (
-                <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] text-[#B45309]">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Transcribing via gemini-3.5-transcribe…
-                </div>
-              )}
-
-              {voice.error && (
-                <p className="mt-1.5 text-[10.5px] text-[#E03E2D]">
-                  {voice.error}
-                </p>
-              )}
-
-              {voiceAudioBase64 && !voice.isRecording && (
-                <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-[#15803D]">
-                  <span>Raw voice clip attached</span>
-                  <button
-                    type="button"
-                    onClick={onClearVoiceAudio}
-                    className="text-[#64625D] underline hover:text-[#E03E2D]"
-                  >
-                    clear clip
-                  </button>
-                </div>
-              )}
-
-              <textarea
-                value={voiceTranscript}
-                onChange={(e) => onVoiceTranscriptChange(e.target.value)}
-                rows={2}
-                placeholder="Zero keyboard needed — speak above, or fine-tune transcript here…"
-                className="mt-2 w-full resize-none rounded border border-[#E5E1D8] bg-white px-2 py-1.5 text-[11.5px] leading-snug text-[#141413] placeholder:text-[#96928A] focus:border-[#141413] focus:outline-none"
-              />
-            </div>
+              <span className="shrink-0 font-mono text-[9.5px] font-semibold text-[#141413]">
+                SNAP
+              </span>
+            </button>
           </section>
         </div>
 
-        {/* Sticky Bottom Options & Primary Action */}
-        <div className="border-t border-[#E5E1D8] bg-[#FAF8F4] px-3.5 py-3">
-          <label className="mb-2.5 flex cursor-pointer items-center justify-between gap-2">
+        {/* Sticky Minimal Bottom Bar: Nano Banana 2.1 Toggle + Transform CTA */}
+        <div className="shrink-0 border-t border-[#E5E1D8] bg-[#FAF8F4] px-2.5 py-2.5">
+          <label className="mb-2 flex cursor-pointer items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-[11px] font-medium text-[#141413]">
-                Generate Bespoke Hero Art
+              <div className="truncate text-[10.5px] font-medium text-[#141413]">
+                Nano Banana 2.1 Art
               </div>
-              <div className="font-mono text-[9.5px] text-[#64625D]">
-                gemini-nano-banana-2.1 ·{' '}
-                {speedMode === 'fast_demo' ? 'fast default: OFF' : 'atelier default: ON'}
+              <div className="truncate font-mono text-[8.5px] text-[#64625D]">
+                {generateBespokeAssets ? 'Bespoke hero ON' : 'Hero art OFF'}
               </div>
             </div>
             <input
               type="checkbox"
               checked={generateBespokeAssets}
               onChange={(e) => onToggleBespokeAssets(e.target.checked)}
-              className="h-4 w-4 cursor-pointer accent-[#E03E2D]"
+              className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#E03E2D]"
             />
           </label>
 
           <button
             type="button"
-            disabled={isRunning}
             onClick={drawnCirclesCount > 0 ? onRunCircleTweak : onRunTransform}
-            className="flex w-full items-center justify-center gap-2 rounded-[7px] bg-[#E03E2D] px-3.5 py-2.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#C53222] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-1.5 rounded-[6px] bg-[#E03E2D] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#C53222]"
           >
             {isRunning ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Transforming Live App…</span>
+                <Plus className="h-3.5 w-3.5" />
+                <span>
+                  {drawnCirclesCount > 0
+                    ? `Queue Circle (${drawnCirclesCount})`
+                    : 'Queue Transform'}
+                </span>
+                {queueCount > 0 && (
+                  <span className="rounded bg-black/20 px-1 py-0.5 font-mono text-[9.5px]">
+                    +{queueCount}
+                  </span>
+                )}
               </>
             ) : drawnCirclesCount > 0 ? (
               <>
-                <Sparkles className="h-4 w-4" />
-                <span>
-                  Apply Circle &amp; Voice Tweak ({drawnCirclesCount})
-                </span>
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Apply Circle ({drawnCirclesCount})</span>
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" />
-                <span>Transform Live App</span>
-                <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">
-                  {speedMode === 'fast_demo' ? '<25s' : '4× Race'}
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Transform</span>
+                <span className="rounded bg-black/20 px-1 py-0.5 font-mono text-[9.5px]">
+                  {speedMode === 'fast_demo' ? '<25s' : '4×'}
                 </span>
               </>
             )}
@@ -791,7 +820,7 @@ export function TasteTray({
                 <Camera className="h-6 w-6 text-[#E03E2D]" />
                 <p className="text-[13px] font-medium">{webcamError}</p>
                 <p className="text-[11px] text-white/70">
-                  Check browser camera permissions or upload a photo in the Taste Tray.
+                  Check browser camera permissions or upload a photo in the References rail.
                 </p>
               </div>
             )}

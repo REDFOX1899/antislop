@@ -50,6 +50,23 @@
   4. **`StudioUiBuilder`**: Built **AntiSlop Studio** (`studio/`, Next.js 15.5) with a zero-slop archival editorial aesthetic (`Instrument Serif` + `DM Sans` + `JetBrains Mono`), 65%+ live interactive canvas, retina freehand Draw Circles + Voice-Only mic with Web Audio waveform, accessible Before/After wipe curtain, Webcam shutter, Motion Video dropper, 12-probe Decisions API rail, 4-Way Parallel Race strip, 5-Sigma Arena, Repo Connector modal, and Managed Agent shipper (`next build` compiled in `1.33s`, 0 warnings).
   5. **`BenchmarksDeployBuilder`**: Built 5-Sigma & Element 119 benchmark harness (`benchmarks/run-5sigma.ts`) with 9 rendered real-world stress PNG fixtures (including low-light tilted glare webcam magazine & 4-way conflicting chaos set), production Cloud Run stack (`deploy/Dockerfile`, `cloudbuild.yaml`, `deploy-cloudrun.sh`), and `scripts/dev.sh`.
 
+### 1:23 PM – 1:34 PM ET · V1 Live 5-Sigma Empirical Run & Honest Breaking-Point Discovery
+- Ran V1 live trials against `novaflow-slop`:
+  - **Text-Only Control Baseline (3 unseen styles):** Averaged **`0.0/100` Taste Index**, **`9.16/10` Slop Penalty**, **`1.28/10` Aesthetic Match**, proving naive text prompting collapses to AI slop.
+  - **AntiSlop V1 (`fast_demo`):** Improved to **`80.0/100` Taste (+80.0)**, **`2.65/10` Slop (-6.47)**, **`8.57/10` Aesthetic Match (+7.09)** on Swiss Editorial Print (`0.711` embedding cosine).
+- Caught **3 genuine V1 engineering failures** logged in [BREAKING_POINTS.md](BREAKING_POINTS.md): `fast_demo` latency (`124–144s` vs `<25s` target), hyper-strict `0.25` `contrastFailing` gate rejecting an `80/100` render at `0.273`, and subtle palette drift on `Warm Botanical Atelier`.
+
+### 1:35 PM – 1:50 PM ET · Wave 2 Parallel 3-Agent Upgrade Swarm (`0 Errors`)
+- **`FastEngineAndUrlCaptureBuilder`**:
+  - Implemented Single-Pass Fast Fusion (`runFastSinglePass` on `gemini-4-hydrogen`, `thinking_level: low`) + parallel `gemini-decision-1` & `gemini-embedding-2` scoring + calibrated `0.45` hard-fail gates.
+  - Built SSRF-hardened **`POST /api/reference/capture-url`** capturing live website screenshots + computed CSS font/color/radius/motion DNA (`https://www.connorhyatt.com/` captured live in **`5.2s`**: `Libre Baskerville 36px`, `Inter 16px`, `#FFFFFF`, `#171717`, `0px` radius, `Motion: detected`).
+- **`Studio292AtelierUpgrader`**:
+  - Upgraded **AntiSlop Studio** to minimal editable **`2 : 9 : 2`** proportions (draggable hairline resize + collapsible rails for >88% live canvas).
+  - Added Live Reference URL Snap bar (`connorhyatt.com` / `are.na` / any live URL), zero-flicker double-buffered iframe continuity, 1.4s luminous arrival reveal sweep + animated emerald/vermilion fix-glow halos, Continuous Voice + Live Edit Queue (`#1 Active · #2 Queued`), and inline SVG Decisions API Pipeline Graph (`next build` `1.66s`, `0` warnings).
+- **`PortfolioDemoAndDocsBuilder`**:
+  - Added 3rd instant-switch demo target app (`target-templates/portfolio-starter` — generic AI-slop developer portfolio with animated hero butterfly artwork `data-section="artwork"` + 5 nav sections, built in `1.01s`).
+  - Documented real origin story in [CASE_STUDY_ORIGIN.md](CASE_STUDY_ORIGIN.md) and V1 empirical results in [BREAKING_POINTS.md](BREAKING_POINTS.md).
+
 ---
 
 *(Subsequent phases will append real commit hashes, live latency metrics, Decisions API calibration logs, and deployment URLs as each parallel wave lands.)*

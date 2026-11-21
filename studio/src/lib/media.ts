@@ -4,6 +4,22 @@ export interface LocalMediaAsset extends MediaAssetInput {
   /** Local preview data URI or object URL for instant rendering in the Taste Tray */
   previewUrl: string;
   sizeBytes?: number;
+  /** Optional captured live website metadata for domain badge + extracted CSS DNA tooltip */
+  sourceUrl?: string;
+  sourceDomain?: string;
+  extractedCssSummary?: string;
+}
+
+export function extractDomainFromUrl(rawUrl: string): string {
+  try {
+    const normalized = /^https?:\/\//i.test(rawUrl.trim())
+      ? rawUrl.trim()
+      : `https://${rawUrl.trim()}`;
+    const parsed = new URL(normalized);
+    return parsed.hostname.replace(/^www\./i, '');
+  } catch {
+    return rawUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || rawUrl;
+  }
 }
 
 export function createAssetId(prefix = 'asset'): string {

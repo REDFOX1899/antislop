@@ -93,6 +93,16 @@ export class ViteManager {
       previewUrl: '/preview/',
       editableFiles: [],
     });
+
+    this.workspaces.set('portfolio-starter', {
+      id: 'portfolio-starter',
+      name: 'Dev Portfolio',
+      source: 'builtin',
+      localPath: path.join(REPO_ROOT, 'target-templates', 'portfolio-starter'),
+      framework: 'vite',
+      previewUrl: '/preview/',
+      editableFiles: [],
+    });
   }
 
   registerWorkspace(info: Omit<WorkspaceRepoInfo, 'active'>): WorkspaceRepoInfo {

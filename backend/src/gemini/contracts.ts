@@ -15,6 +15,14 @@ export interface GeneratedCandidateCode {
   modelUsed: string;
   files: Record<string, string>;
   diffSummary: string;
+  changedSections?: string[];
+  latencyMs: number;
+}
+
+export interface FastSinglePassResult {
+  manifest: DesignManifest;
+  candidate: GeneratedCandidateCode;
+  changedSections: string[];
   latencyMs: number;
 }
 
@@ -22,6 +30,7 @@ export interface SurgicalPatchResult {
   modelUsed: string;
   files: Record<string, string>;
   diffSummary: string;
+  changedSections?: string[];
   latencyMs: number;
 }
 
@@ -50,6 +59,15 @@ export interface GeminiCoreEngine {
     referenceImages: MediaAssetInput[];
     outputDir: string;
   }): Promise<BespokeAssetsResult>;
+  runFastSinglePass(params: {
+    assets: MediaAssetInput[];
+    sourceFiles: Record<string, string>;
+    voiceTranscript?: string;
+    textPrompt?: string;
+    annotatedScreenshotBase64?: string;
+    drawnCircles?: DrawnCircleAnnotation[];
+    generatedPublicPaths?: string[];
+  }): Promise<FastSinglePassResult>;
   generateCodeCandidates(params: {
     manifest?: DesignManifest;
     sourceFiles: Record<string, string>;
@@ -70,6 +88,7 @@ export interface GeminiCoreEngine {
     targetRegion?: TransformRunRequest['targetRegion'];
     instruction?: string;
     errorContext?: string;
+    speedMode?: ExecutionSpeedMode;
   }): Promise<SurgicalPatchResult>;
   evaluateVisualCandidate(params: {
     renderedDesktopBase64: string;

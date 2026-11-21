@@ -13,7 +13,7 @@ import type {
   TransformRunResult,
   WorkspaceRepoInfo,
 } from '@shared/types';
-import { CheckCircle2, ExternalLink, X, AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, X } from 'lucide-react';
 import {
   DEFAULT_PREVIEW_URL,
   getHealth,
@@ -32,8 +32,12 @@ import {
   stripToMediaAssetInput,
   type LocalMediaAsset,
 } from '@/lib/media';
-import { CriticRail } from './CriticRail';
-import { LiveCanvas, type LiveCanvasHandle } from './LiveCanvas';
+import { CriticRail, type QueuedEditSummary } from './CriticRail';
+import {
+  LiveCanvas,
+  type CanvasChangeSummary,
+  type LiveCanvasHandle,
+} from './LiveCanvas';
 import { ManagedAgentPanel } from './ManagedAgentPanel';
 import { RepoModal } from './RepoModal';
 import { SigmaArena } from './SigmaArena';
@@ -47,6 +51,30 @@ interface StudioToast {
   linkUrl?: string;
   linkLabel?: string;
 }
+
+interface QueuedEditJob {
+  id: string;
+  mode: TransformRunRequest['mode'];
+  label: string;
+  createdAt: number;
+  assets: LocalMediaAsset[];
+  voiceTranscript?: string;
+  voiceAudioBase64?: string;
+  voiceAudioMimeType?: string;
+  textPrompt?: string;
+  drawnCircles: DrawnCircleAnnotation[];
+  circleOverlayPngBase64?: string;
+  speedMode: ExecutionSpeedMode;
+  generateBespokeAssets: boolean;
+}
+
+const DEFAULT_LEFT_WIDTH = 228;
+const DEFAULT_RIGHT_WIDTH = 272;
+const COLLAPSED_RAIL_WIDTH = 42;
+const MIN_LEFT_WIDTH = 196;
+const MAX_LEFT_WIDTH = 340;
+const MIN_RIGHT_WIDTH = 236;
+const MAX_RIGHT_WIDTH = 400;
 
 function isFullRunResult(obj: unknown): obj is TransformRunResult {
   return (
@@ -62,9 +90,15 @@ export function StudioWorkbench() {
   const [speedMode, setSpeedMode] = useState<ExecutionSpeedMode>('fast_demo');
   const [generateBespokeAssets, setGenerateBespokeAssets] = useState(false);
 
-  // Collapsible rails — canvas defaults to >65% viewport, expandable to >85%
+  // Minimal 2 : 9 : 2 proportions — resizable hairline handles + collapsible rails
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [leftRailWidth, setLeftRailWidth] = useState(DEFAULT_LEFT_WIDTH);
+  const [rightRailWidth, setRightRailWidth] = useState(DEFAULT_RIGHT_WIDTH);
+  const [resizingSide, setResizingSide] = useState<'left' | 'right' | null>(null);
+  const dragStartRef = useRef<{ clientX: number; initialWidth: number } | null>(
+    null
+  );
 
   // Backend & Workspace state
   const [backendHealthy, setBackendHealthy] = useState(false);
@@ -74,7 +108,7 @@ export function StudioWorkbench() {
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [repoModalOpen, setRepoModalOpen] = useState(false);
 
-  // Multimodal Taste Tray & Canvas Annotations
+  // Multimodal References, Continuous Talk & Canvas Annotations
   const [assets, setAssets] = useState<LocalMediaAsset[]>([]);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceAudioBase64, setVoiceAudioBase64] = useState<string | undefined>();
@@ -82,12 +116,16 @@ export function StudioWorkbench() {
     string | undefined
   >();
   const [drawnCircles, setDrawnCircles] = useState<DrawnCircleAnnotation[]>([]);
+  const [drawMode, setDrawMode] = useState(false);
 
-  // Live Run + Telemetry State
+  // Live Run + Client-Side Edit Queue State
   const [isRunning, setIsRunning] = useState(false);
   const [activeModeRunning, setActiveModeRunning] = useState<
     TransformRunRequest['mode'] | null
   >(null);
+  const [activeJob, setActiveJob] = useState<QueuedEditJob | null>(null);
+  const [editQueue, setEditQueue] = useState<QueuedEditJob[]>([]);
+
   const [currentRunId, setCurrentRunId] = useState<string | undefined>();
   const [manifest, setManifest] = useState<DesignManifest | undefined>();
   const [scorecard, setScorecard] = useState<DecisionsScorecard | undefined>();
@@ -102,6 +140,13 @@ export function StudioWorkbench() {
   >();
   const [liveStatusText, setLiveStatusText] = useState<string | undefined>();
   const [liveModelTag, setLiveModelTag] = useState<string | undefined>();
+
+  // Post-Render Reveal Sweep, Fix-Glow Halos & What Changed Pill
+  const [lastAppliedCircles, setLastAppliedCircles] = useState<
+    DrawnCircleAnnotation[]
+  >([]);
+  const [lastRunSummary, setLastRunSummary] =
+    useState<CanvasChangeSummary | null>(null);
 
   // 5-Sigma Arena Cached Run Results
   const [baselineResult, setBaselineResult] =
@@ -121,6 +166,18 @@ export function StudioWorkbench() {
 
   const liveCanvasRef = useRef<LiveCanvasHandle | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const isRunningRef = useRef(false);
+  const activeJobRef = useRef<QueuedEditJob | null>(null);
+  const runStartScorecardRef = useRef<DecisionsScorecard | undefined>(undefined);
+  const latestScorecardRef = useRef<DecisionsScorecard | undefined>(undefined);
+
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  useEffect(() => {
+    latestScorecardRef.current = scorecard;
+  }, [scorecard]);
 
   const pushToast = useCallback(
     (
@@ -199,6 +256,46 @@ export function StudioWorkbench() {
     setGenerateBespokeAssets(nextMode === 'deep_atelier');
   };
 
+  // Pointer-capture column resize handlers for 2 : 9 : 2 rails
+  const startResize = (
+    side: 'left' | 'right',
+    e: React.PointerEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setResizingSide(side);
+    dragStartRef.current = {
+      clientX: e.clientX,
+      initialWidth: side === 'left' ? leftRailWidth : rightRailWidth,
+    };
+  };
+
+  const handleResizeMove = (
+    side: 'left' | 'right',
+    e: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (resizingSide !== side || !dragStartRef.current) return;
+    const delta = e.clientX - dragStartRef.current.clientX;
+    if (side === 'left') {
+      const next = Math.max(
+        MIN_LEFT_WIDTH,
+        Math.min(MAX_LEFT_WIDTH, Math.round(dragStartRef.current.initialWidth + delta))
+      );
+      setLeftRailWidth(next);
+    } else {
+      const next = Math.max(
+        MIN_RIGHT_WIDTH,
+        Math.min(MAX_RIGHT_WIDTH, Math.round(dragStartRef.current.initialWidth - delta))
+      );
+      setRightRailWidth(next);
+    }
+  };
+
+  const stopResize = () => {
+    setResizingSide(null);
+    dragStartRef.current = null;
+  };
+
   // Switch active target repo workspace
   const handleSwitchWorkspace = async (workspaceId: string) => {
     if (workspaceId === activeWorkspaceId && workspaces.length > 0) return;
@@ -213,10 +310,13 @@ export function StudioWorkbench() {
         setPreviewUrl(nextPreview);
       }
       setDrawnCircles([]);
+      setLastAppliedCircles([]);
+      setLastRunSummary(null);
       setBaselineScreenshotUrl(undefined);
       setFinalScreenshotUrl(undefined);
+      setScorecard(undefined);
+      setIterations([]);
       setReloadNonce((n) => n + 1);
-      setHmrPulseAt(Date.now());
       await refreshWorkspaces();
       pushToast(
         'success',
@@ -246,9 +346,11 @@ export function StudioWorkbench() {
       }
       setFinalScreenshotUrl(undefined);
       setDrawnCircles([]);
+      setLastAppliedCircles([]);
+      setLastRunSummary(null);
       setReloadNonce((n) => n + 1);
       setHmrPulseAt(Date.now());
-      pushToast('success', 'Target app reset cleanly to original AI Slop baseline.');
+      pushToast('success', 'Target app reset cleanly to original baseline.');
     } catch (err) {
       pushToast(
         'error',
@@ -310,120 +412,121 @@ export function StudioWorkbench() {
     }
   };
 
-  // Hydrate completed TransformRunResult into Studio + 5-Sigma Arena state
-  const hydrateRunResult = useCallback(
-    (result: TransformRunResult) => {
-      setCurrentRunId(result.runId);
-      if (result.manifest) setManifest(result.manifest);
-      if (result.baselineScreenshotUrl) {
-        setBaselineScreenshotUrl(result.baselineScreenshotUrl);
-      }
-      if (result.finalScreenshotUrl) {
-        setFinalScreenshotUrl(result.finalScreenshotUrl);
-      }
-      if (result.voiceTranscript && !voiceTranscript.trim()) {
-        setVoiceTranscript(result.voiceTranscript);
-      }
-      if (result.iterations?.length) {
-        setIterations(result.iterations);
-        const last = result.iterations[result.iterations.length - 1];
-        if (last?.scorecard) setScorecard(last.scorecard);
-        if (!result.finalScreenshotUrl && last?.screenshotUrl) {
-          setFinalScreenshotUrl(last.screenshotUrl);
-        }
-      }
+  // Hydrate completed TransformRunResult into Studio + Reveal Sweep + Fix-Glow + 5-Sigma Arena
+  const hydrateRunResult = useCallback((result: TransformRunResult) => {
+    const completedJob = activeJobRef.current;
 
-      if (result.mode === 'text_baseline') setBaselineResult(result);
-      else if (result.mode === 'antislop') setAntislopResult(result);
-      else if (result.mode === 'stress_test') setStressTestResult(result);
+    setCurrentRunId(result.runId);
+    if (result.manifest) setManifest(result.manifest);
+    if (result.baselineScreenshotUrl) {
+      setBaselineScreenshotUrl(result.baselineScreenshotUrl);
+    }
+    if (result.finalScreenshotUrl) {
+      setFinalScreenshotUrl(result.finalScreenshotUrl);
+    }
 
-      if (result.mode === 'circle_tweak') {
-        setDrawnCircles([]);
+    let finalScorecard: DecisionsScorecard | undefined;
+    let baselineScorecard = runStartScorecardRef.current;
+
+    if (result.iterations?.length) {
+      setIterations(result.iterations);
+      const baseIter = result.iterations.find(
+        (it) => it.phase === 'baseline_capture'
+      );
+      if (baseIter?.scorecard) {
+        baselineScorecard = baseIter.scorecard;
       }
+      const last = result.iterations[result.iterations.length - 1];
+      if (last?.scorecard) {
+        finalScorecard = last.scorecard;
+        setScorecard(last.scorecard);
+      }
+      if (!result.finalScreenshotUrl && last?.screenshotUrl) {
+        setFinalScreenshotUrl(last.screenshotUrl);
+      }
+    }
 
-      setReloadNonce((n) => n + 1);
-      setHmrPulseAt(Date.now());
+    if (result.mode === 'text_baseline') setBaselineResult(result);
+    else if (result.mode === 'antislop') setAntislopResult(result);
+    else if (result.mode === 'stress_test') setStressTestResult(result);
+
+    // Populate Fix-Glow regions & floating "What Changed" Pill
+    setLastAppliedCircles(completedJob?.drawnCircles ?? []);
+    setLastRunSummary({
+      completedAt: Date.now(),
+      mode: result.mode,
+      slopBefore: baselineScorecard?.metrics?.slopPenalty?.value,
+      slopAfter: finalScorecard?.metrics?.slopPenalty?.value,
+      matchAfter: finalScorecard?.metrics?.aestheticMatch?.value,
+      tasteBefore: baselineScorecard?.overallTasteScore,
+      tasteAfter: finalScorecard?.overallTasteScore,
+      latencyMs: result.totalLatencyMs,
+    });
+
+    activeJobRef.current = null;
+    setActiveJob(null);
+    setReloadNonce((n) => n + 1);
+    setHmrPulseAt(Date.now());
+    setIsRunning(false);
+    isRunningRef.current = false;
+    setActiveModeRunning(null);
+    setLiveStatusText(undefined);
+    setLiveModelTag(undefined);
+  }, []);
+
+  const finishRunWithError = useCallback(
+    (message: string) => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      activeJobRef.current = null;
+      setActiveJob(null);
       setIsRunning(false);
+      isRunningRef.current = false;
       setActiveModeRunning(null);
       setLiveStatusText(undefined);
       setLiveModelTag(undefined);
+      pushToast('error', message);
     },
-    [voiceTranscript]
+    [pushToast]
   );
 
-  // Core Transform / Circle-to-Tweak / Arena Run Orchestrator
-  const executeRun = useCallback(
-    async (
-      mode: TransformRunRequest['mode'],
-      options?: { textPrompt?: string }
-    ) => {
-      if (isRunning) return;
-
-      let effectiveAssets = [...assets];
-
-      // Helpful safeguard: in 5-Sigma Arena, auto-seed real procedural visual specimens if tray is empty
-      if (
-        (mode === 'antislop' || mode === 'stress_test') &&
-        effectiveAssets.length === 0 &&
-        !voiceTranscript.trim() &&
-        !voiceAudioBase64
-      ) {
-        if (activeTab === 'arena') {
-          if (mode === 'stress_test') {
-            // Seed 2 deliberately contrasting visual aesthetics for Element 119 chaos test!
-            effectiveAssets = [
-              buildQuickStarterVisualAsset(QUICK_TASTE_STARTERS[0]),
-              buildQuickStarterVisualAsset(QUICK_TASTE_STARTERS[2]),
-            ];
-            setAssets(effectiveAssets);
-          } else {
-            effectiveAssets = [
-              buildQuickStarterVisualAsset(QUICK_TASTE_STARTERS[0]),
-            ];
-            setAssets(effectiveAssets);
-          }
-        } else {
-          pushToast(
-            'info',
-            'Drop a moodboard image, snap a physical object via webcam, speak aloud, or tap an optional Quick-Start first.'
-          );
-          return;
-        }
-      }
-
+  // Execute a concrete frozen QueuedEditJob immediately
+  const startRunFromJob = useCallback(
+    async (job: QueuedEditJob) => {
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
 
+      activeJobRef.current = job;
+      runStartScorecardRef.current = latestScorecardRef.current;
+      isRunningRef.current = true;
+
+      setActiveJob(job);
       setIsRunning(true);
-      setActiveModeRunning(mode);
+      setActiveModeRunning(job.mode);
       setEvents([]);
       setThinkingBuffer('');
       setLiveStatusText(
-        mode === 'circle_tweak'
-          ? 'Applying surgical circle-to-tweak edit via gemini-4-hydrogen…'
-          : mode === 'text_baseline'
+        job.mode === 'circle_tweak'
+          ? `Surgical edit: "${job.label.slice(0, 56)}"`
+          : job.mode === 'text_baseline'
           ? 'Running text-only AI Slop baseline…'
-          : speedMode === 'fast_demo'
-          ? 'Fast Demo (<25s): Synthesizing taste & transforming live app…'
-          : 'Deep Atelier (4× Race): Carbon high thinking + parallel Neon coding…'
+          : job.speedMode === 'fast_demo'
+          ? 'Carbon + Neon synthesizing taste & live code'
+          : 'Deep Atelier 4× parallel candidate race'
       );
       setLiveModelTag(
-        mode === 'circle_tweak'
+        job.mode === 'circle_tweak'
           ? 'gemini-4-hydrogen'
-          : speedMode === 'deep_atelier'
+          : job.speedMode === 'deep_atelier'
           ? 'gemini-4-carbon'
           : 'gemini-4-neon'
       );
 
-      const overlayPng =
-        mode === 'circle_tweak'
-          ? liveCanvasRef.current?.exportOverlayPngBase64()
-          : undefined;
-
-      const firstCircle = drawnCircles[0];
+      const firstCircle = job.drawnCircles[0];
       const combinedInstruction = [
-        voiceTranscript.trim(),
-        ...drawnCircles
+        job.voiceTranscript?.trim(),
+        job.textPrompt?.trim(),
+        ...job.drawnCircles
           .map((c, idx) => (c.note ? `Circle #${idx + 1}: ${c.note}` : ''))
           .filter(Boolean),
       ]
@@ -431,37 +534,44 @@ export function StudioWorkbench() {
         .join(' | ');
 
       const payload: TransformRunRequest = {
-        mode,
-        speedMode,
-        assets: effectiveAssets.map(stripToMediaAssetInput),
-        voiceAudioBase64,
-        voiceAudioMimeType,
-        voiceTranscript: voiceTranscript.trim() || undefined,
+        mode: job.mode,
+        speedMode: job.speedMode,
+        assets: job.assets.map(stripToMediaAssetInput),
+        voiceAudioBase64: job.voiceAudioBase64,
+        voiceAudioMimeType: job.voiceAudioMimeType,
+        voiceTranscript: job.voiceTranscript?.trim() || undefined,
         textPrompt:
-          options?.textPrompt ||
-          (mode === 'stress_test'
+          job.textPrompt ||
+          (job.mode === 'stress_test'
             ? 'Reconcile conflicting editorial print and rugged industrial hardware aesthetics cleanly with zero slop or layout breakage.'
+            : job.mode === 'circle_tweak' && !job.voiceTranscript?.trim()
+            ? combinedInstruction ||
+              'Refine layout craft, typographic hierarchy, and spacing cleanly.'
             : undefined),
         parallelCandidates:
-          mode === 'text_baseline' || mode === 'circle_tweak'
+          job.mode === 'text_baseline' || job.mode === 'circle_tweak'
             ? 1
-            : speedMode === 'deep_atelier'
+            : job.speedMode === 'deep_atelier'
             ? 4
             : 1,
         maxIterations:
-          mode === 'circle_tweak'
+          job.mode === 'circle_tweak'
             ? 1
-            : speedMode === 'fast_demo'
+            : job.speedMode === 'fast_demo'
             ? 1
             : 2,
         generateBespokeAssets:
-          mode === 'text_baseline' || mode === 'circle_tweak'
+          job.mode === 'text_baseline' || job.mode === 'circle_tweak'
             ? false
-            : generateBespokeAssets,
-        drawnCircles: mode === 'circle_tweak' ? drawnCircles : undefined,
-        circleOverlayPngBase64: overlayPng,
+            : job.generateBespokeAssets,
+        drawnCircles:
+          job.mode === 'circle_tweak' && job.drawnCircles.length > 0
+            ? job.drawnCircles
+            : undefined,
+        circleOverlayPngBase64:
+          job.mode === 'circle_tweak' ? job.circleOverlayPngBase64 : undefined,
         targetRegion:
-          mode === 'circle_tweak' && firstCircle
+          job.mode === 'circle_tweak' && firstCircle
             ? {
                 x: firstCircle.x,
                 y: firstCircle.y,
@@ -477,16 +587,8 @@ export function StudioWorkbench() {
       try {
         const res = await startTransformRun(payload);
 
-        // If backend returned a finished TransformRunResult synchronously
-        if (
-          isFullRunResult(res) &&
-          res.status !== 'running'
-        ) {
+        if (isFullRunResult(res) && res.status !== 'running') {
           hydrateRunResult(res);
-          pushToast(
-            'success',
-            `Completed (${(res.totalLatencyMs / 1000).toFixed(1)}s) — live preview updated.`
-          );
           return;
         }
 
@@ -498,7 +600,6 @@ export function StudioWorkbench() {
           return;
         }
 
-        // Subscribe to real-time SSE StreamEvents
         unsubscribeRef.current = subscribeToRunStream(
           runId,
           (ev) => {
@@ -518,13 +619,9 @@ export function StudioWorkbench() {
                     : undefined;
                 if (baseUrl) setBaselineScreenshotUrl(baseUrl);
                 if (data?.scorecard) {
-                  setScorecard(data.scorecard as DecisionsScorecard);
-                }
-                break;
-              }
-              case 'voice_transcribed': {
-                if (typeof data?.transcript === 'string' && data.transcript.trim()) {
-                  setVoiceTranscript(data.transcript.trim());
+                  const snapCard = data.scorecard as DecisionsScorecard;
+                  runStartScorecardRef.current = snapCard;
+                  setScorecard(snapCard);
                 }
                 break;
               }
@@ -534,7 +631,9 @@ export function StudioWorkbench() {
                     ? data.delta
                     : ev.message || '';
                 if (chunk) {
-                  setThinkingBuffer((prev) => `${prev}${prev ? '\n' : ''}${chunk}`.slice(-1800));
+                  setThinkingBuffer((prev) =>
+                    `${prev}${prev ? '\n' : ''}${chunk}`.slice(-1800)
+                  );
                 }
                 break;
               }
@@ -584,34 +683,19 @@ export function StudioWorkbench() {
                 unsubscribeRef.current = null;
                 if (isFullRunResult(ev.payload)) {
                   hydrateRunResult(ev.payload);
-                  pushToast(
-                    'success',
-                    `Run completed in ${(ev.payload.totalLatencyMs / 1000).toFixed(1)}s.`
-                  );
                 } else {
                   getRunResult(runId)
-                    .then((full) => {
-                      hydrateRunResult(full);
-                      pushToast(
-                        'success',
-                        `Run completed in ${(full.totalLatencyMs / 1000).toFixed(1)}s.`
-                      );
-                    })
-                    .catch(() => {
-                      setIsRunning(false);
-                      setActiveModeRunning(null);
-                      setReloadNonce((n) => n + 1);
-                    });
+                    .then((full) => hydrateRunResult(full))
+                    .catch(() =>
+                      finishRunWithError(
+                        'Completed run could not be fetched from backend.'
+                      )
+                    );
                 }
                 break;
               }
               case 'run_error': {
-                unsubscribeRef.current?.();
-                unsubscribeRef.current = null;
-                setIsRunning(false);
-                setActiveModeRunning(null);
-                setLiveStatusText(undefined);
-                pushToast('error', ev.message || 'Transform run failed.');
+                finishRunWithError(ev.message || 'Transform run failed.');
                 break;
               }
               default:
@@ -619,50 +703,204 @@ export function StudioWorkbench() {
             }
           },
           () => {
-            // Stream closed unexpectedly — attempt one final GET /api/runs/:runId check
             getRunResult(runId)
               .then((full) => {
                 if (full.status !== 'running') {
                   hydrateRunResult(full);
                 } else {
-                  setIsRunning(false);
-                  setActiveModeRunning(null);
+                  finishRunWithError('Live stream closed before run completed.');
                 }
               })
               .catch(() => {
-                setIsRunning(false);
-                setActiveModeRunning(null);
+                finishRunWithError('Lost connection to AntiSlop run stream.');
               });
           }
         );
       } catch (err) {
-        setIsRunning(false);
-        setActiveModeRunning(null);
-        setLiveStatusText(undefined);
-        pushToast(
-          'error',
+        finishRunWithError(
           err instanceof Error
             ? err.message
             : 'Could not reach AntiSlop backend API.'
         );
       }
     },
+    [finishRunWithError, hydrateRunResult]
+  );
+
+  // Automatic seamless dequeue: the exact moment the active run finishes, launch the next queued edit!
+  useEffect(() => {
+    if (isRunning || editQueue.length === 0) return;
+    const [nextJob, ...rest] = editQueue;
+    setEditQueue(rest);
+    void startRunFromJob(nextJob);
+  }, [editQueue, isRunning, startRunFromJob]);
+
+  // Enqueue or immediately execute a Transform / Circle-to-Tweak / Arena Run
+  const enqueueOrExecuteRun = useCallback(
+    (
+      mode: TransformRunRequest['mode'],
+      options?: { textPrompt?: string }
+    ) => {
+      let effectiveAssets = [...assets];
+
+      // Helpful safeguard for 5-Sigma Arena or empty full transform
+      if (
+        (mode === 'antislop' || mode === 'stress_test') &&
+        effectiveAssets.length === 0 &&
+        !voiceTranscript.trim() &&
+        !voiceAudioBase64 &&
+        !options?.textPrompt?.trim()
+      ) {
+        if (activeTab === 'arena') {
+          if (mode === 'stress_test') {
+            effectiveAssets = [
+              buildQuickStarterVisualAsset(QUICK_TASTE_STARTERS[0]),
+              buildQuickStarterVisualAsset(QUICK_TASTE_STARTERS[2]),
+            ];
+            setAssets(effectiveAssets);
+          } else {
+            effectiveAssets = [
+              buildQuickStarterVisualAsset(QUICK_TASTE_STARTERS[0]),
+            ];
+            setAssets(effectiveAssets);
+          }
+        } else {
+          pushToast(
+            'info',
+            'Snap a live website URL, drop a moodboard image, snap webcam, or speak an edit first.'
+          );
+          return;
+        }
+      }
+
+      if (
+        mode === 'circle_tweak' &&
+        drawnCircles.length === 0 &&
+        !voiceTranscript.trim() &&
+        !voiceAudioBase64 &&
+        !options?.textPrompt?.trim()
+      ) {
+        pushToast('info', 'Circle a region on the canvas or speak an edit first.');
+        return;
+      }
+
+      const overlayPng =
+        mode === 'circle_tweak' && drawnCircles.length > 0
+          ? liveCanvasRef.current?.exportOverlayPngBase64()
+          : undefined;
+
+      const circleNotes = drawnCircles
+        .map((c) => c.note?.trim())
+        .filter(Boolean)
+        .join(' · ');
+      const siteAsset = effectiveAssets.find((a) => a.sourceDomain);
+
+      const label =
+        voiceTranscript.trim() ||
+        options?.textPrompt?.trim() ||
+        circleNotes ||
+        (mode === 'circle_tweak'
+          ? `Refine ${drawnCircles.length || 1} circled region${drawnCircles.length > 1 ? 's' : ''}`
+          : mode === 'text_baseline'
+          ? 'Text-only AI Slop baseline'
+          : mode === 'stress_test'
+          ? '5-Sigma conflict stress test'
+          : siteAsset?.sourceDomain
+          ? `Transform from ${siteAsset.sourceDomain}`
+          : 'Transform live app');
+
+      const job: QueuedEditJob = {
+        id: `job_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        mode,
+        label,
+        createdAt: Date.now(),
+        assets: effectiveAssets,
+        voiceTranscript: voiceTranscript.trim() || undefined,
+        voiceAudioBase64,
+        voiceAudioMimeType,
+        textPrompt: options?.textPrompt,
+        drawnCircles: mode === 'circle_tweak' ? [...drawnCircles] : [],
+        circleOverlayPngBase64: overlayPng,
+        speedMode,
+        generateBespokeAssets,
+      };
+
+      // Clear transient circle/voice draft right away so user can immediately queue another edit
+      if (mode === 'circle_tweak' || isRunningRef.current) {
+        setDrawnCircles([]);
+        setVoiceTranscript('');
+        setVoiceAudioBase64(undefined);
+        setVoiceAudioMimeType(undefined);
+      }
+
+      if (isRunningRef.current) {
+        setEditQueue((prev) => {
+          const next = [...prev, job];
+          pushToast(
+            'info',
+            `Queued #${next.length + 1}: "${job.label.slice(0, 52)}" — will run automatically.`
+          );
+          return next;
+        });
+        return;
+      }
+
+      void startRunFromJob(job);
+    },
     [
       activeTab,
       assets,
       drawnCircles,
       generateBespokeAssets,
-      hydrateRunResult,
-      isRunning,
       pushToast,
       speedMode,
+      startRunFromJob,
       voiceAudioBase64,
       voiceAudioMimeType,
       voiceTranscript,
     ]
   );
 
+  // Right-rail Talk & Circle submit handler (automatically chooses surgical edit or full transform)
+  const handleSubmitTalkEdit = useCallback(() => {
+    if (drawnCircles.length > 0) {
+      enqueueOrExecuteRun('circle_tweak');
+      return;
+    }
+    if (voiceTranscript.trim() || voiceAudioBase64) {
+      const mode: TransformRunRequest['mode'] =
+        assets.length > 0 && !scorecard ? 'antislop' : 'circle_tweak';
+      enqueueOrExecuteRun(mode);
+    }
+  }, [
+    assets.length,
+    drawnCircles.length,
+    enqueueOrExecuteRun,
+    scorecard,
+    voiceAudioBase64,
+    voiceTranscript,
+  ]);
+
+  const handleRemoveQueuedJob = useCallback((jobId: string) => {
+    setEditQueue((prev) => prev.filter((j) => j.id !== jobId));
+  }, []);
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+
+  const effectiveLeftWidth = leftCollapsed
+    ? COLLAPSED_RAIL_WIDTH
+    : leftRailWidth;
+  const effectiveRightWidth = rightCollapsed
+    ? COLLAPSED_RAIL_WIDTH
+    : rightRailWidth;
+
+  const queueSummaries: QueuedEditSummary[] = editQueue.map((j) => ({
+    id: j.id,
+    mode: j.mode,
+    label: j.label,
+    circlesCount: j.drawnCircles.length,
+    createdAt: j.createdAt,
+  }));
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F5F3EE] text-[#141413]">
@@ -687,87 +925,153 @@ export function StudioWorkbench() {
       {/* Active Studio Surface */}
       <main className="relative flex min-h-0 flex-1 overflow-hidden">
         {activeTab === 'canvas' && (
-          <>
-            <TasteTray
-              collapsed={leftCollapsed}
-              onToggleCollapse={() => setLeftCollapsed((v) => !v)}
-              assets={assets}
-              onAddAssets={(incoming) =>
-                setAssets((prev) => [...prev, ...incoming].slice(0, 16))
-              }
-              onRemoveAsset={(id) =>
-                setAssets((prev) => prev.filter((a) => a.id !== id))
-              }
-              onClearAssets={() => setAssets([])}
-              voiceTranscript={voiceTranscript}
-              onVoiceTranscriptChange={setVoiceTranscript}
-              voiceAudioBase64={voiceAudioBase64}
-              onVoiceRecorded={(out) => {
-                setVoiceAudioBase64(out.audioBase64);
-                setVoiceAudioMimeType(out.mimeType);
-                if (out.transcript) {
-                  setVoiceTranscript(out.transcript);
+          <div
+            style={{
+              gridTemplateColumns: `${effectiveLeftWidth}px minmax(0, 1fr) ${effectiveRightWidth}px`,
+            }}
+            className="relative grid h-full min-h-0 w-full flex-1"
+          >
+            {/* LEFT 2 RAIL — Live Site URL + Moodboard + Webcam + Transform */}
+            <div className="relative min-h-0 min-w-0">
+              <TasteTray
+                collapsed={leftCollapsed}
+                onToggleCollapse={() => setLeftCollapsed((v) => !v)}
+                assets={assets}
+                onAddAssets={(incoming) =>
+                  setAssets((prev) => [...prev, ...incoming].slice(0, 16))
                 }
-                pushToast(
-                  'info',
-                  out.transcript
-                    ? 'Voice art direction transcribed via gemini-3.5-transcribe.'
-                    : 'Voice audio clip attached to transform payload.'
-                );
-              }}
-              onClearVoiceAudio={() => {
-                setVoiceAudioBase64(undefined);
-                setVoiceAudioMimeType(undefined);
-              }}
-              generateBespokeAssets={generateBespokeAssets}
-              onToggleBespokeAssets={setGenerateBespokeAssets}
-              speedMode={speedMode}
-              drawnCirclesCount={drawnCircles.length}
-              isRunning={isRunning}
-              onRunTransform={() => void executeRun('antislop')}
-              onRunCircleTweak={() => void executeRun('circle_tweak')}
-            />
-
-            <LiveCanvas
-              ref={liveCanvasRef}
-              previewUrl={previewUrl}
-              reloadNonce={reloadNonce}
-              hmrPulseAt={hmrPulseAt}
-              baselineScreenshotUrl={baselineScreenshotUrl}
-              finalScreenshotUrl={finalScreenshotUrl}
-              drawnCircles={drawnCircles}
-              onDrawnCirclesChange={setDrawnCircles}
-              voiceTranscript={voiceTranscript}
-              onCanvasVoiceRecorded={(out) => {
-                setVoiceAudioBase64(out.audioBase64);
-                setVoiceAudioMimeType(out.mimeType);
-                if (out.transcript) {
-                  setVoiceTranscript(out.transcript);
+                onRemoveAsset={(id) =>
+                  setAssets((prev) => prev.filter((a) => a.id !== id))
                 }
-                pushToast(
-                  'info',
-                  out.transcript
-                    ? `Heard: "${out.transcript.slice(0, 80)}"`
-                    : 'Canvas voice note captured — click Apply Now.'
-                );
-              }}
-              onApplyCircleSpeak={() => void executeRun('circle_tweak')}
-              isRunning={isRunning}
-              liveStatusText={liveStatusText}
-              liveModelTag={liveModelTag}
-            />
+                onClearAssets={() => setAssets([])}
+                onSeedVoiceHint={(hint) => {
+                  if (!voiceTranscript.trim()) {
+                    setVoiceTranscript(hint);
+                  }
+                }}
+                onNotify={pushToast}
+                generateBespokeAssets={generateBespokeAssets}
+                onToggleBespokeAssets={setGenerateBespokeAssets}
+                speedMode={speedMode}
+                drawnCirclesCount={drawnCircles.length}
+                isRunning={isRunning}
+                queueCount={editQueue.length}
+                onRunTransform={() => enqueueOrExecuteRun('antislop')}
+                onRunCircleTweak={() => enqueueOrExecuteRun('circle_tweak')}
+              />
 
-            <CriticRail
-              collapsed={rightCollapsed}
-              onToggleCollapse={() => setRightCollapsed((v) => !v)}
-              scorecard={scorecard}
-              manifest={manifest}
-              iterations={iterations}
-              events={events}
-              isRunning={isRunning}
-              thinkingBuffer={thinkingBuffer}
-            />
-          </>
+              {/* Subtle Hairline Resize Handle (Left Rail <-> Center Canvas) */}
+              {!leftCollapsed && (
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize references rail"
+                  data-dragging={resizingSide === 'left' ? 'true' : 'false'}
+                  onPointerDown={(e) => startResize('left', e)}
+                  onPointerMove={(e) => handleResizeMove('left', e)}
+                  onPointerUp={stopResize}
+                  onPointerCancel={stopResize}
+                  onDoubleClick={() => setLeftRailWidth(DEFAULT_LEFT_WIDTH)}
+                  title="Drag to resize · Double-click to reset 2:9:2"
+                  className="atelier-resize-handle -right-[3px]"
+                />
+              )}
+            </div>
+
+            {/* CENTER 9 CANVAS — Zero-Flicker Live Preview + Reveal Sweep + Fix-Glow */}
+            <div className="min-h-0 min-w-0">
+              <LiveCanvas
+                ref={liveCanvasRef}
+                previewUrl={previewUrl}
+                reloadNonce={reloadNonce}
+                hmrPulseAt={hmrPulseAt}
+                baselineScreenshotUrl={baselineScreenshotUrl}
+                finalScreenshotUrl={finalScreenshotUrl}
+                drawnCircles={drawnCircles}
+                onDrawnCirclesChange={setDrawnCircles}
+                drawMode={drawMode}
+                onDrawModeChange={setDrawMode}
+                voiceTranscript={voiceTranscript}
+                onCanvasVoiceRecorded={(out) => {
+                  setVoiceAudioBase64(out.audioBase64);
+                  setVoiceAudioMimeType(out.mimeType);
+                  if (out.transcript) {
+                    setVoiceTranscript(out.transcript);
+                  }
+                  pushToast(
+                    'info',
+                    out.transcript
+                      ? `Heard: "${out.transcript.slice(0, 80)}"`
+                      : 'Voice note captured — apply or queue now.'
+                  );
+                }}
+                onApplyCircleSpeak={() => enqueueOrExecuteRun('circle_tweak')}
+                isRunning={isRunning}
+                queueCount={editQueue.length}
+                liveStatusText={liveStatusText}
+                liveModelTag={liveModelTag}
+                lastAppliedCircles={lastAppliedCircles}
+                lastRunSummary={lastRunSummary}
+                isResizingRails={resizingSide !== null}
+              />
+            </div>
+
+            {/* RIGHT 2 RAIL — Continuous Talk + Live Queue + Visual Decisions API Graph */}
+            <div className="relative min-h-0 min-w-0">
+              {/* Subtle Hairline Resize Handle (Center Canvas <-> Right Rail) */}
+              {!rightCollapsed && (
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize critic rail"
+                  data-dragging={resizingSide === 'right' ? 'true' : 'false'}
+                  onPointerDown={(e) => startResize('right', e)}
+                  onPointerMove={(e) => handleResizeMove('right', e)}
+                  onPointerUp={stopResize}
+                  onPointerCancel={stopResize}
+                  onDoubleClick={() => setRightRailWidth(DEFAULT_RIGHT_WIDTH)}
+                  title="Drag to resize · Double-click to reset 2:9:2"
+                  className="atelier-resize-handle -left-[3px]"
+                />
+              )}
+
+              <CriticRail
+                collapsed={rightCollapsed}
+                onToggleCollapse={() => setRightCollapsed((v) => !v)}
+                scorecard={scorecard}
+                manifest={manifest}
+                iterations={iterations}
+                events={events}
+                isRunning={isRunning}
+                activeModeRunning={activeModeRunning}
+                activeJobLabel={activeJob?.label}
+                thinkingBuffer={thinkingBuffer}
+                speedMode={speedMode}
+                assetsCount={assets.length}
+                drawMode={drawMode}
+                onToggleDrawMode={() => setDrawMode((v) => !v)}
+                drawnCirclesCount={drawnCircles.length}
+                voiceTranscript={voiceTranscript}
+                onVoiceTranscriptChange={setVoiceTranscript}
+                onVoiceRecorded={(out) => {
+                  setVoiceAudioBase64(out.audioBase64);
+                  setVoiceAudioMimeType(out.mimeType);
+                  if (out.transcript) {
+                    setVoiceTranscript(out.transcript);
+                  }
+                  pushToast(
+                    'info',
+                    out.transcript
+                      ? `Heard: "${out.transcript.slice(0, 80)}"`
+                      : 'Voice note captured — click Go or Queue.'
+                  );
+                }}
+                onSubmitTalkEdit={handleSubmitTalkEdit}
+                editQueue={queueSummaries}
+                onRemoveQueuedJob={handleRemoveQueuedJob}
+              />
+            </div>
+          </div>
         )}
 
         {activeTab === 'arena' && (
@@ -780,7 +1084,7 @@ export function StudioWorkbench() {
             antislopResult={antislopResult}
             stressTestResult={stressTestResult}
             onRunExperiment={(mode, prompt) =>
-              void executeRun(mode, { textPrompt: prompt })
+              enqueueOrExecuteRun(mode, { textPrompt: prompt })
             }
           />
         )}
@@ -848,6 +1152,8 @@ export function StudioWorkbench() {
           const resolvedNext = resolveBackendUrl(nextUrl);
           if (resolvedNext) setPreviewUrl(resolvedNext);
           setDrawnCircles([]);
+          setLastAppliedCircles([]);
+          setLastRunSummary(null);
           setReloadNonce((n) => n + 1);
           setHmrPulseAt(Date.now());
           void refreshWorkspaces();

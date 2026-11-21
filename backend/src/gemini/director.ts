@@ -263,7 +263,7 @@ function normalizeBespokeAssets(
   return parsed.slice(0, 2);
 }
 
-function normalizeManifest(
+export function normalizeManifest(
   raw: Record<string, unknown> | null,
   meta: {
     modalities: InputModality[];
@@ -403,8 +403,9 @@ function collectModalities(params: SynthesizeManifestParams): InputModality[] {
 
 /**
  * Multimodal Creative Director:
- * - `deep_atelier` or `stress_test`: `gemini-4-carbon` with `thinking_level: 'high'`
- * - `fast_demo`: `gemini-4-argon` with `thinking_level: 'low'` (sub-5s)
+ * - `stress_test`: `gemini-4-carbon` with `thinking_level: 'high'` (conflict resolution)
+ * - `deep_atelier`: `gemini-4-carbon` with `thinking_level: 'medium'` (~12-18s)
+ * - `fast_demo` fallback: `gemini-4-argon` with `thinking_level: 'low'` (sub-5s)
  */
 export async function synthesizeDesignManifest(
   params: SynthesizeManifestParams
@@ -412,7 +413,12 @@ export async function synthesizeDesignManifest(
   const startedAt = Date.now();
   const useDeepCarbon = params.speedMode === 'deep_atelier' || params.mode === 'stress_test';
   const model = useDeepCarbon ? ENV.GEMINI_MODEL_DIRECTOR : ENV.GEMINI_MODEL_FAST_CRITIC;
-  const thinkingLevel: 'low' | 'high' = useDeepCarbon ? 'high' : 'low';
+  const thinkingLevel: 'low' | 'medium' | 'high' =
+    params.mode === 'stress_test'
+      ? 'high'
+      : params.speedMode === 'deep_atelier'
+        ? 'medium'
+        : 'low';
   const modalities = collectModalities(params);
 
   return traceSpan(

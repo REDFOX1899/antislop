@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+:root {
+  --bg-canvas: #0b0f1f;
+  --bg-surface: #11182d;
+  --bg-surface-muted: #17203a;
+  --ink-primary: #f1f5f9;
+  --ink-secondary: #94a3b8;
+  --accent: #6366f1;
+  --accent-secondary: #a855f7;
+  --accent-contrast: #ffffff;
+  --border-subtle: rgba(129, 140, 248, 0.24);
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-duration: 200ms;
+  /* Intentionally brisk AI-slop floating motion — target for Circle-to-Tweak slowing */
+  --butterfly-float-duration: 1.75s;
+  --wing-flutter-duration: 0.72s;
+  --orb-pulse-duration: 2.1s;
+}
+
+@layer base {
+  html {
+    background-color: var(--bg-canvas);
+    color: var(--ink-primary);
+    font-family: var(--font-body);
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-color: var(--bg-canvas);
+    color: var(--ink-primary);
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+  }
+
+  :where(a, button, input, [tabindex]):focus-visible {
+    outline: 2px solid #818cf8;
+    outline-offset: 2px;
+  }
+}
+
+@keyframes as-butterfly-float {
+  0%,
+  100% {
+    transform: translate3d(0, -10px, 0) rotate(-3deg);
+  }
+  50% {
+    transform: translate3d(0, 12px, 0) rotate(4deg);
+  }
+}
+
+@keyframes as-wing-flutter-left {
+  0%,
+  100% {
+    transform: scaleX(1) rotate(0deg);
+    opacity: 0.96;
+  }
+  50% {
+    transform: scaleX(0.74) rotate(-5deg);
+    opacity: 0.82;
+  }
+}
+
+@keyframes as-wing-flutter-right {
+  0%,
+  100% {
+    transform: scaleX(1) rotate(0deg);
+    opacity: 0.96;
+  }
+  50% {
+    transform: scaleX(0.74) rotate(5deg);
+    opacity: 0.82;
+  }
+}
+
+@keyframes as-orb-pulse {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.95;
+  }
+}
+
+@layer components {
+  .slop-mesh-bg {
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(99, 102, 241, 0.24), transparent 36%),
+      radial-gradient(circle at 82% 18%, rgba(168, 85, 247, 0.2), transparent 34%),
+      radial-gradient(circle at 50% 80%, rgba(56, 189, 248, 0.12), transparent 40%);
+  }
+
+  .slop-card {
+    background: linear-gradient(155deg, rgba(23, 32, 58, 0.88), rgba(15, 23, 42, 0.92));
+    border: 1px solid rgba(129, 140, 248, 0.24);
+    box-shadow:
+      0 10px 30px -12px rgba(79, 70, 229, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition:
+      transform var(--motion-duration) var(--motion-ease),
+      border-color var(--motion-duration) var(--motion-ease),
+      box-shadow var(--motion-duration) var(--motion-ease);
+  }
+
+  .slop-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(168, 85, 247, 0.55);
+    box-shadow:
+      0 16px 38px -12px rgba(124, 58, 237, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .as-butterfly-float {
+    will-change: transform;
+    animation: as-butterfly-float var(--butterfly-float-duration) ease-in-out infinite;
+  }
+
+  .as-wing-left {
+    transform-origin: 180px 145px;
+    will-change: transform, opacity;
+    animation: as-wing-flutter-left var(--wing-flutter-duration) ease-in-out infinite;
+  }
+
+  .as-wing-right {
+    transform-origin: 180px 145px;
+    will-change: transform, opacity;
+    animation: as-wing-flutter-right var(--wing-flutter-duration) ease-in-out infinite;
+  }
+
+  .as-orb-glow {
+    transform-origin: 180px 145px;
+    will-change: transform, opacity;
+    animation: as-orb-pulse var(--orb-pulse-duration) ease-in-out infinite;
+  }
+
+  .as-motion-paused .as-butterfly-float,
+  .as-motion-paused .as-wing-left,
+  .as-motion-paused .as-wing-right,
+  .as-motion-paused .as-orb-glow {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .as-butterfly-float {
+      animation-duration: 16s;
+    }
+
+    .as-wing-left,
+    .as-wing-right {
+      animation-duration: 12s;
+    }
+
+    .as-orb-glow {
+      animation-duration: 14s;
+    }
+  }
+}

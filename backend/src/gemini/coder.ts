@@ -5,13 +5,20 @@ import type {
   DesignManifest,
   DrawnCircleAnnotation,
   ExecutionSpeedMode,
+  InputModality,
   MediaAssetInput,
   TransformRunRequest,
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
-import type { GeneratedCandidateCode, SurgicalPatchResult } from './contracts.js';
+import type {
+  FastSinglePassResult,
+  GeneratedCandidateCode,
+  SurgicalPatchResult,
+} from './contracts.js';
 import { traceSpan, withV1Client } from './clientPool.js';
+import { normalizeManifest } from './director.js';
 import {
+  estimateBase64Bytes,
   extractInteractionText,
   extractJsonObject,
   normalizeMimeType,
@@ -19,6 +26,16 @@ import {
   stripCodeFence,
   stripDataUriPrefix,
 } from './mediaUtils.js';
+
+export interface RunFastSinglePassParams {
+  assets: MediaAssetInput[];
+  sourceFiles: Record<string, string>;
+  voiceTranscript?: string;
+  textPrompt?: string;
+  annotatedScreenshotBase64?: string;
+  drawnCircles?: DrawnCircleAnnotation[];
+  generatedPublicPaths?: string[];
+}
 
 export interface GenerateCodeCandidatesParams {
   manifest?: DesignManifest;
@@ -41,6 +58,7 @@ export interface ApplySurgicalPatchParams {
   targetRegion?: TransformRunRequest['targetRegion'];
   instruction?: string;
   errorContext?: string;
+  speedMode?: ExecutionSpeedMode;
 }
 
 interface CandidateStrategy {
@@ -89,19 +107,81 @@ HARD TECHNICAL RULES (NON-NEGOTIABLE):
        "src/index.css": "...full file content...",
        "src/App.tsx": "...full file content..."
      },
-     "diffSummary": "Concise 1-2 sentence summary of aesthetic & structural changes"
+     "diffSummary": "Concise 1-2 sentence summary of aesthetic & structural changes",
+     "changedSections": ["hero", "palette", "typography", "navigation", "cards", "footer"]
    }
 2. NEVER invent npm packages! Only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Stick to standard widely available lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
 3. In \`index.html\`: load the DesignManifest's Google Fonts stylesheet cleanly (preconnect + stylesheet link), set a tasteful <title>, and preserve the existing \`<div id="root"></div>\` and \`<script type="module" src="/src/main.tsx"></script>\` entry script verbatim.
-4. In \`src/index.css\`: if the original CSS contains \`@import "tailwindcss";\`, YOU MUST PRESERVE \`@import "tailwindcss";\` on line 1! Define CSS variables (\`:root { --canvas: ...; --surface: ...; --ink-primary: ...; --accent: ...; }\`), set \`html, body { overflow-x: hidden; background-color: var(--canvas); color: var(--ink-primary); }\`, and add refined editorial typography & motion utilities.
+4. In \`src/index.css\`: if the original CSS contains \`@import "tailwindcss";\`, YOU MUST PRESERVE \`@import "tailwindcss";\` on line 1! Define CSS variables (\`:root { --canvas: ...; --surface: ...; --ink-primary: ...; --ink-secondary: ...; --accent: ...; --accent-contrast: ...; }\`), set \`html, body { overflow-x: hidden; background-color: var(--canvas); color: var(--ink-primary); }\`, and add refined editorial typography & motion utilities.
 5. In \`src/App.tsx\`:
    - MUST export \`export default function App()\` (or \`export default App\`).
+   - Keep \`src/App.tsx\` crisp, concise, and high-craft (~160-240 lines) with clean Tailwind v4 utilities + CSS variables and zero bloated boilerplate.
    - Strictly valid TypeScript JSX (zero unused variables/imports, properly typed state/handlers, zero syntax errors).
    - Responsive and ZERO horizontal overflow at 1440px desktop and 390px mobile.
    - ZERO broken images: if generated bespoke asset paths are provided (e.g. \`/generated/hero-primary.jpg\`), showcase them prominently in crisp editorial frames with \`object-cover\`. NEVER invent unverified external image URLs (no unsplash/example.com guesses that could 404).
-   - Achieve >= 4.5:1 WCAG AA contrast for all readable body text and buttons.
+   - STRICT WCAG AA CONTRAST: ALWAYS maintain >= 4.5:1 contrast between ALL readable text (headlines, body copy, captions, muted metadata, navigation links, inputs, and buttons) and their background canvas/surface/button fills! Never use pale washed-out grey ink on cream/white or dark muted ink on dark surfaces.
    - Preserve the real product/brand domain, core interactive functionality (tabs, interactive controls, forms, navigation), and authentic content while elevating copy away from generic AI buzzwords.
    - Strictly enforce the manifest's antiSlopBanList: NO purple/indigo AI gradients, NO glowing neon cards, NO generic dark-slate glassmorphism, NO sparkle emoji spam.`;
+
+const FAST_SINGLE_PASS_SYSTEM_INSTRUCTION = `You are AntiSlop's Single-Pass Creative Director + Principal Frontend Design Engineer.
+In ONE single ultra-fast pass, inspect the raw visual taste references (moodboards/website captures/webcam frames) and any spoken/written direction, synthesize a cohesive editorial DesignManifest, and rewrite the target React + TypeScript + Tailwind CSS UI into museum-grade craft with ZERO generic "AI slop".
+
+HARD TECHNICAL & SPEED RULES (NON-NEGOTIABLE):
+1. Return ONLY a single strictly valid JSON object with this EXACT shape (no markdown commentary outside JSON):
+   {
+     "manifest": {
+       "vibeTitle": "2-5 word evocative atelier title",
+       "editorialRationale": "2 incisive sentences explaining palette, typography pairing, and structural rhythm.",
+       "tokens": {
+         "palette": {
+           "canvas": "#...",
+           "surface": "#...",
+           "surfaceMuted": "#...",
+           "inkPrimary": "#...",
+           "inkSecondary": "#...",
+           "accent": "#...",
+           "accentContrast": "#...",
+           "borderSubtle": "rgba(...)"
+         },
+         "typography": {
+           "displayFont": "Real Google Font",
+           "bodyFont": "Real Google Font",
+           "monoFont": "Real Google Font",
+           "googleFontsUrl": "https://fonts.googleapis.com/css2?family=...&display=swap",
+           "headlineTracking": "-0.03em",
+           "editorialScaleRatio": 1.333,
+           "bodyLineHeight": 1.6
+         },
+         "geometry": {
+           "borderRadiusSm": "2px",
+           "borderRadiusMd": "4px",
+           "borderRadiusLg": "8px",
+           "borderStyle": "1px solid var(--border-subtle)",
+           "elevationPhilosophy": "flat-editorial"
+         },
+         "motion": {
+           "easingCurve": "cubic-bezier(0.22, 1, 0.36, 1)",
+           "hoverDurationMs": 200,
+           "entranceStyle": "Restrained editorial reveal",
+           "microInteractionNotes": "Crisp hairline underlines and poised ink shifts"
+         },
+         "layoutDirectives": ["Asymmetric editorial grid", "Generous negative space", "Zero horizontal overflow"],
+         "antiSlopBanList": ["No purple/indigo AI gradients", "No dark-navy neon cards", "No sparkle emoji spam"]
+       }
+     },
+     "files": {
+       "index.html": "...full concise HTML loading the exact Google Fonts URL...",
+       "src/index.css": "...full concise Tailwind v4 + CSS variable stylesheet...",
+       "src/App.tsx": "...full crisp, high-craft React component (~160-240 lines)..."
+     },
+     "diffSummary": "Concise 1-2 sentence summary of aesthetic & structural changes",
+     "changedSections": ["hero", "palette", "typography", "navigation", "layout", "footer"]
+   }
+2. CONCISE HIGH-CRAFT CODE FOR SPEED: Keep \`src/App.tsx\` crisp at ~160-240 lines (clean Tailwind v4 + CSS variables, compact data arrays, zero bloated boilerplate or massive inline SVG walls) and \`src/index.css\` concise (~35-60 lines) so generation finishes fast with publication-grade visual precision!
+3. STRICT WCAG AA CONTRAST (>= 4.5:1): ALWAYS guarantee >= 4.5:1 foreground-to-background contrast across ALL text, eyebrows, captions, nav links, and buttons! Ensure \`inkPrimary\` and \`inkSecondary\` are decisively dark on light canvases (or decisively bright on dark canvases), and \`accentContrast\` has >= 4.5:1 contrast on \`accent\` buttons.
+4. NEVER invent npm packages! Only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Use only standard lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
+5. Preserve \`@import "tailwindcss";\` on line 1 of \`src/index.css\` if present in original, and preserve \`<div id="root"></div>\` + \`<script type="module" src="/src/main.tsx"></script>\` in \`index.html\`.
+6. ZERO broken images (NEVER invent external image URLs), ZERO horizontal overflow at 1440px desktop and 390px mobile, and preserve the real product/brand domain and core interactive controls while purging all AI slop clichés.`;
 
 const BASELINE_SYSTEM_INSTRUCTION = `You are a frontend developer updating a React + TypeScript + Tailwind CSS application based on the user's text request.
 Return ONLY a strictly valid JSON object with the exact shape:
@@ -119,6 +199,54 @@ Rules:
 - Preserve '<div id="root"></div>' and '<script type="module" src="/src/main.tsx"></script>' in index.html.
 - Ensure src/App.tsx has a valid 'export default' and compiles cleanly with TypeScript.
 - Do not use broken external image URLs.`;
+
+function normalizeChangedSections(raw: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(raw)) return fallback;
+  const cleaned = raw
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .map((v) => v.trim().toLowerCase().slice(0, 40));
+  return cleaned.length > 0 ? Array.from(new Set(cleaned)).slice(0, 10) : fallback;
+}
+
+function selectCoreFilesForFastPass(sourceFiles: Record<string, string>): Record<string, string> {
+  const preferredOrder = ['index.html', 'src/index.css', 'src/App.tsx', 'src/App.jsx', 'src/styles.css'];
+  const selected: Record<string, string> = {};
+
+  for (const key of preferredOrder) {
+    if (sourceFiles[key] !== undefined) {
+      selected[key] = sourceFiles[key];
+    }
+  }
+
+  // Fallback for non-standard repo structures (e.g. cloned GitHub repo)
+  if (Object.keys(selected).length < 3) {
+    for (const [filePath, content] of Object.entries(sourceFiles)) {
+      if (Object.keys(selected).length >= 3) break;
+      if (selected[filePath] !== undefined) continue;
+      if (
+        filePath.endsWith('.html') ||
+        filePath.endsWith('.css') ||
+        /app\.(tsx|jsx|ts|js)$/i.test(filePath) ||
+        /page\.(tsx|jsx)$/i.test(filePath)
+      ) {
+        selected[filePath] = content;
+      }
+    }
+  }
+
+  if (Object.keys(selected).length === 0) {
+    for (const [filePath, content] of Object.entries(sourceFiles).slice(0, 3)) {
+      selected[filePath] = content;
+    }
+  }
+
+  // Keep prompt payload crisp so input processing stays fast
+  const trimmed: Record<string, string> = {};
+  for (const [filePath, content] of Object.entries(selected)) {
+    trimmed[filePath] = content.length > 14_000 ? `${content.slice(0, 14_000)}\n/* ...truncated for fast pass... */` : content;
+  }
+  return trimmed;
+}
 
 function formatSourceFilesForPrompt(sourceFiles: Record<string, string>): string {
   return Object.entries(sourceFiles)
@@ -274,7 +402,7 @@ async function runSingleCandidateGeneration(args: {
   );
 
   userPromptSections.push(
-    `Output ONLY valid JSON matching { "files": { "index.html": "...", "src/index.css": "...", "src/App.tsx": "..." }, "diffSummary": "..." }.`
+    `Output ONLY valid JSON matching { "files": { "index.html": "...", "src/index.css": "...", "src/App.tsx": "..." }, "diffSummary": "...", "changedSections": ["hero", "palette", "typography", ...] }.`
   );
 
   const interaction = await withV1Client((client) =>
@@ -290,7 +418,11 @@ async function runSingleCandidateGeneration(args: {
   );
 
   const rawText = extractInteractionText(interaction);
-  const parsed = extractJsonObject<{ files?: unknown; diffSummary?: unknown }>(rawText);
+  const parsed = extractJsonObject<{
+    files?: unknown;
+    diffSummary?: unknown;
+    changedSections?: unknown;
+  }>(rawText);
   if (!parsed) return null;
 
   const files = sanitizeAndValidateFiles(parsed.files, args.sourceFiles);
@@ -301,14 +433,237 @@ async function runSingleCandidateGeneration(args: {
       ? parsed.diffSummary.trim()
       : `${args.strategy.label}: transformed ${Object.keys(files).join(', ')}`;
 
+  const changedSections = normalizeChangedSections(parsed.changedSections, [
+    'hero',
+    'palette',
+    'typography',
+    'layout',
+  ]);
+
   return {
     candidateId: uuidv4(),
     strategyLabel: args.strategy.label,
     modelUsed: args.model,
     files,
     diffSummary,
+    changedSections,
     latencyMs: Date.now() - startedAt,
   };
+}
+
+/**
+ * Single-Pass Fast Fusion (`fast_demo` <25s live judging):
+ * Sends raw reference images (max 3) + voice transcript + concise core source files
+ * (`index.html`, `src/index.css`, `src/App.tsx`) in ONE SINGLE `gemini-4-hydrogen`
+ * (`thinking_level: 'low'`) call returning manifest + rewritten files + changedSections.
+ */
+export async function runFastSinglePass(
+  params: RunFastSinglePassParams
+): Promise<FastSinglePassResult> {
+  const startedAt = Date.now();
+  const model = ENV.GEMINI_MODEL_PATCHER;
+
+  return traceSpan(
+    'antislop.coder.runFastSinglePass',
+    'llm',
+    {
+      model,
+      thinkingLevel: 'low',
+      assetCount: params.assets.length,
+      hasVoiceTranscript: Boolean(params.voiceTranscript),
+      hasTextPrompt: Boolean(params.textPrompt),
+      hasAnnotatedScreenshot: Boolean(params.annotatedScreenshotBase64),
+    },
+    async () => {
+      const coreFiles = selectCoreFilesForFastPass(params.sourceFiles);
+      const inputBlocks: Interactions.Content[] = [];
+      const modalitySet = new Set<InputModality>();
+
+      // Attach up to 3 raw reference images (+ at most 1 small motion video if provided)
+      let addedImages = 0;
+      let addedVideos = 0;
+      for (const asset of params.assets) {
+        modalitySet.add(asset.modality);
+        if (asset.modality === 'voice_audio') continue;
+
+        const binary = await resolveAssetBinary(asset);
+        if (!binary) continue;
+
+        if (asset.modality === 'motion_video' || binary.mimeType.startsWith('video/')) {
+          if (addedVideos >= 1 || estimateBase64Bytes(binary.base64) > 8_000_000) continue;
+          addedVideos += 1;
+          inputBlocks.push({
+            type: 'text',
+            text: `[Motion Reference Video${asset.label ? ` — ${asset.label}` : ''}]: Match its motion easing, tempo, and visual poise.`,
+          });
+          inputBlocks.push({
+            type: 'video',
+            data: binary.base64,
+            mime_type: binary.mimeType,
+          });
+        } else if (binary.mimeType.startsWith('image/')) {
+          if (addedImages >= 3) continue;
+          addedImages += 1;
+          inputBlocks.push({
+            type: 'text',
+            text: `[Reference Taste Anchor #${addedImages}${asset.label ? ` (${asset.label})` : ''}]: Extract exact palette, material surface, typography character, and editorial grid discipline.`,
+          });
+          inputBlocks.push({
+            type: 'image',
+            data: binary.base64,
+            mime_type: binary.mimeType,
+          });
+        }
+      }
+
+      if (params.voiceTranscript && params.voiceTranscript.trim()) {
+        modalitySet.add('voice_audio');
+      }
+
+      if (params.annotatedScreenshotBase64) {
+        modalitySet.add('region_annotation');
+        const { base64, detectedMime } = stripDataUriPrefix(params.annotatedScreenshotBase64);
+        if (base64.length > 16) {
+          const circleCoords = (params.drawnCircles ?? [])
+            .map(
+              (c, idx) =>
+                `Circle #${idx + 1}: x=${c.x.toFixed(2)}, y=${c.y.toFixed(2)}, w=${c.width.toFixed(2)}, h=${c.height.toFixed(2)}${c.note ? ` (${c.note})` : ''}`
+            )
+            .join('\n');
+          inputBlocks.push({
+            type: 'text',
+            text:
+              `[ANNOTATED UI CANVAS WITH RED CIRCLES]: Prioritize transforming the encircled regions while harmonizing the full page.` +
+              (circleCoords ? `\nCircle coordinates [0..1]:\n${circleCoords}` : ''),
+          });
+          inputBlocks.push({
+            type: 'image',
+            data: base64,
+            mime_type: normalizeMimeType(detectedMime, 'image/png'),
+          });
+        }
+      }
+
+      if (modalitySet.size === 0) {
+        modalitySet.add('moodboard_image');
+      }
+
+      const briefSections: string[] = [
+        'SINGLE-PASS FAST FUSION BRIEF: Transform this UI in ONE cohesive, high-craft pass faithful to the attached visual taste references.',
+      ];
+
+      if (params.voiceTranscript && params.voiceTranscript.trim()) {
+        briefSections.push(`Spoken Voice Creative Direction:\n"${params.voiceTranscript.trim()}"`);
+      }
+      if (params.textPrompt && params.textPrompt.trim()) {
+        briefSections.push(`Additional Creative Direction:\n"${params.textPrompt.trim()}"`);
+      }
+      if (params.generatedPublicPaths && params.generatedPublicPaths.length > 0) {
+        briefSections.push(
+          `Available Local Public Images:\n${params.generatedPublicPaths.map((p) => `- "${p}"`).join('\n')}`
+        );
+      }
+
+      briefSections.push(
+        'CRAFT & CONTRAST CHECKLIST:\n- Keep src/App.tsx concise (~160-240 lines) with crisp Tailwind v4 utilities + CSS variables.\n- Enforce >= 4.5:1 WCAG AA contrast on EVERY text node, label, nav link, and button.\n- Zero horizontal overflow, zero broken images, zero generic purple/indigo AI slop gradients.'
+      );
+
+      briefSections.push(
+        `CURRENT CORE SOURCE FILES TO REWRITE:\n${formatSourceFilesForPrompt(coreFiles)}`
+      );
+
+      briefSections.push(
+        `Output ONLY strictly valid JSON matching { "manifest": { "vibeTitle", "editorialRationale", "tokens": { ... } }, "files": { "index.html": "...", "src/index.css": "...", "src/App.tsx": "..." }, "diffSummary": "...", "changedSections": ["hero", "palette", "typography", ...] }.`
+      );
+
+      inputBlocks.push({
+        type: 'text',
+        text: briefSections.join('\n\n'),
+      });
+
+      const attemptOnce = async (attemptModel: string): Promise<FastSinglePassResult | null> => {
+        const interaction = await withV1Client((client) =>
+          client.interactions.create({
+            model: attemptModel,
+            system_instruction: FAST_SINGLE_PASS_SYSTEM_INSTRUCTION,
+            input: [
+              {
+                type: 'user_input',
+                content: inputBlocks,
+              },
+            ],
+            generation_config: {
+              thinking_level: 'low',
+            },
+            store: false,
+          })
+        );
+
+        const rawText = extractInteractionText(interaction);
+        const parsed = extractJsonObject<{
+          manifest?: Record<string, unknown>;
+          files?: unknown;
+          diffSummary?: unknown;
+          changedSections?: unknown;
+        }>(rawText);
+
+        if (!parsed) return null;
+
+        const files = sanitizeAndValidateFiles(parsed.files, params.sourceFiles);
+        if (Object.keys(files).length === 0) return null;
+
+        const latencyMs = Date.now() - startedAt;
+        const manifest = normalizeManifest(
+          parsed.manifest && typeof parsed.manifest === 'object' ? parsed.manifest : null,
+          {
+            modalities: Array.from(modalitySet),
+            modelUsed: attemptModel,
+            latencyMs,
+            mode: 'antislop',
+          }
+        );
+
+        const changedSections = normalizeChangedSections(parsed.changedSections, [
+          'hero',
+          'palette',
+          'typography',
+          'navigation',
+          'layout',
+        ]);
+
+        const diffSummary =
+          typeof parsed.diffSummary === 'string' && parsed.diffSummary.trim().length > 0
+            ? parsed.diffSummary.trim()
+            : `Fast Fusion (${manifest.vibeTitle}): transformed ${Object.keys(files).join(', ')}`;
+
+        const candidate: GeneratedCandidateCode = {
+          candidateId: uuidv4(),
+          strategyLabel: `Fast Fusion — ${manifest.vibeTitle}`,
+          modelUsed: attemptModel,
+          files,
+          diffSummary,
+          changedSections,
+          latencyMs,
+        };
+
+        return {
+          manifest,
+          candidate,
+          changedSections,
+          latencyMs,
+        };
+      };
+
+      const first = await attemptOnce(model);
+      if (first) return first;
+
+      // Single fast fallback attempt if first JSON output failed validation
+      const retry = await attemptOnce(model);
+      if (retry) return retry;
+
+      throw new Error('Fast Single-Pass Fusion failed to produce valid manifest and source files');
+    }
+  );
 }
 
 /**
@@ -378,7 +733,7 @@ export async function generateCodeCandidates(
         throw new Error('Fast-demo code generation failed to produce valid source files');
       }
 
-      // Mode 3: Deep Atelier — N parallel candidate architectures on gemini-4-neon across dual Tier-3 keys
+      // Mode 3: Deep Atelier — N parallel candidate architectures on gemini-4-neon (low thinking) across dual Tier-3 keys
       const count = Math.min(4, Math.max(1, params.parallelCount || ENV.ANTISLOP_PARALLEL_CANDIDATES));
       const strategies = CURATED_STRATEGIES.slice(0, count);
 
@@ -386,7 +741,7 @@ export async function generateCodeCandidates(
         strategies.map((strategy) =>
           runSingleCandidateGeneration({
             model: ENV.GEMINI_MODEL_ARCHITECT,
-            thinkingLevel: 'medium',
+            thinkingLevel: 'low',
             strategy,
             manifest: params.manifest,
             sourceFiles: params.sourceFiles,
@@ -411,7 +766,7 @@ export async function generateCodeCandidates(
       // Emergency fallback onto gemini-4-hydrogen so a live demo never hard-crashes
       const fallback = await runSingleCandidateGeneration({
         model: ENV.GEMINI_MODEL_PATCHER,
-        thinkingLevel: 'medium',
+        thinkingLevel: 'low',
         strategy: CURATED_STRATEGIES[0],
         manifest: params.manifest,
         sourceFiles: params.sourceFiles,
@@ -440,8 +795,8 @@ function summarizeFailingScorecard(scorecard: DecisionsScorecard): string {
     });
 
   const domLines: string[] = [
-    `Horizontal overflow: ${scorecard.domAudit.horizontalOverflowPx}px (must be <= 8px)`,
-    `Overlapping text nodes: ${scorecard.domAudit.overlappingTextNodes} (must be 0)`,
+    `Horizontal overflow: ${scorecard.domAudit.horizontalOverflowPx}px (must be <= 12px)`,
+    `Overlapping text nodes: ${scorecard.domAudit.overlappingTextNodes} (must be <= 2)`,
     `Broken images: ${scorecard.domAudit.brokenImageCount} (must be 0)`,
     `Console errors: ${scorecard.domAudit.consoleErrorCount} (must be 0)`,
   ];
@@ -457,7 +812,7 @@ function summarizeFailingScorecard(scorecard: DecisionsScorecard): string {
 }
 
 /**
- * Ultra-fast surgical patcher on `gemini-4-hydrogen` (`thinking_level: 'medium'`)
+ * Ultra-fast surgical patcher on `gemini-4-hydrogen` (`thinking_level: 'low' | 'medium'`)
  * powering both Circle-and-Speak direct manipulation and the Decisions API Critic Loop.
  */
 export async function applySurgicalPatch(
@@ -465,12 +820,14 @@ export async function applySurgicalPatch(
 ): Promise<SurgicalPatchResult> {
   const startedAt = Date.now();
   const model = ENV.GEMINI_MODEL_PATCHER;
+  const thinkingLevel: 'low' | 'medium' = params.speedMode === 'deep_atelier' ? 'medium' : 'low';
 
   return traceSpan(
     'antislop.coder.applySurgicalPatch',
     'llm',
     {
       model,
+      thinkingLevel,
       hasAnnotatedScreenshot: Boolean(params.annotatedScreenshotBase64),
       hasCurrentScreenshot: Boolean(params.currentScreenshotBase64),
       drawnCircleCount: params.drawnCircles?.length ?? 0,
@@ -542,7 +899,7 @@ export async function applySurgicalPatch(
       }
 
       const directiveSections: string[] = [
-        'SURGICAL PATCH BRIEF: Apply targeted, high-precision fixes to the codebase without breaking working functionality or visual coherence.',
+        'SURGICAL PATCH BRIEF: Apply targeted, high-precision fixes to the codebase without breaking working functionality or visual coherence. ALWAYS maintain >= 4.5:1 WCAG AA contrast between ink and canvas/surface/buttons.',
       ];
 
       if (params.instruction && params.instruction.trim()) {
@@ -588,7 +945,7 @@ export async function applySurgicalPatch(
       );
 
       directiveSections.push(
-        `Return ONLY a strictly valid JSON object { "files": { ...updated full file contents... }, "diffSummary": "Concise summary of surgical fixes applied" }.`
+        `Return ONLY a strictly valid JSON object { "files": { ...updated full file contents... }, "diffSummary": "Concise summary of surgical fixes applied", "changedSections": ["hero", "contrast", ...] }.`
       );
 
       inputBlocks.push({
@@ -607,14 +964,18 @@ export async function applySurgicalPatch(
             },
           ],
           generation_config: {
-            thinking_level: 'medium',
+            thinking_level: thinkingLevel,
           },
           store: false,
         })
       );
 
       const rawText = extractInteractionText(interaction);
-      const parsed = extractJsonObject<{ files?: unknown; diffSummary?: unknown }>(rawText);
+      const parsed = extractJsonObject<{
+        files?: unknown;
+        diffSummary?: unknown;
+        changedSections?: unknown;
+      }>(rawText);
       const files = parsed ? sanitizeAndValidateFiles(parsed.files, params.sourceFiles) : {};
 
       if (Object.keys(files).length === 0) {
@@ -622,6 +983,7 @@ export async function applySurgicalPatch(
           modelUsed: model,
           files: {},
           diffSummary: 'Surgical patch produced no valid file updates; keeping previous build.',
+          changedSections: [],
           latencyMs: Date.now() - startedAt,
         };
       }
@@ -631,10 +993,18 @@ export async function applySurgicalPatch(
           ? parsed.diffSummary.trim()
           : `Surgical patch updated ${Object.keys(files).join(', ')}`;
 
+      const changedSections = normalizeChangedSections(
+        parsed?.changedSections,
+        params.drawnCircles && params.drawnCircles.length > 0
+          ? ['circled-region', 'layout']
+          : ['polish', 'contrast', 'layout']
+      );
+
       return {
         modelUsed: model,
         files,
         diffSummary,
+        changedSections,
         latencyMs: Date.now() - startedAt,
       };
     }

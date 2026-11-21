@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import type {
@@ -192,6 +193,52 @@ export function createApiRouter(): Router {
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/reference/capture-url
+   * Captures a live public website screenshot (1440x900 JPEG) + computed CSS DNA
+   * as an instant moodboard_image MediaAssetInput for AntiSlop.
+   */
+  router.post('/reference/capture-url', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as { url?: string };
+      const rawUrl = typeof body.url === 'string' ? body.url.trim() : '';
+      if (!rawUrl) {
+        res.status(400).json({ error: 'url is required' });
+        return;
+      }
+
+      const captured = await puppeteerAuditor.captureReferenceWebsite(rawUrl);
+      let hostname = 'reference-site';
+      try {
+        hostname = new URL(captured.url).hostname.replace(/^www\./i, '') || hostname;
+      } catch {
+        // Keep safe fallback hostname
+      }
+
+      res.json({
+        asset: {
+          id: `url-${Date.now().toString(36)}-${randomUUID().slice(0, 6)}`,
+          modality: 'moodboard_image' as const,
+          mimeType: captured.mimeType,
+          dataBase64: captured.screenshotBase64,
+          fileUrl: captured.screenshotUrl,
+          filename: `${hostname}.jpg`,
+          label: `${hostname} (Live URL)`,
+        },
+        url: captured.url,
+        title: captured.title,
+        screenshotUrl: captured.screenshotUrl,
+        extractedCssSummary: captured.extractedCssSummary,
+        cssDna: captured.cssDna,
+        latencyMs: captured.latencyMs,
+      });
+    } catch (err) {
+      const msg = errorMessage(err);
+      const isClientError = /required|Invalid URL|Unsupported URL|Blocked|embedded credentials/i.test(msg);
+      res.status(isClientError ? 400 : 502).json({ error: msg });
     }
   });
 
