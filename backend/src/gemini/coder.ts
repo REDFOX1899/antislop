@@ -98,7 +98,7 @@ const SAFE_EXTERNAL_PACKAGES = new Set<string>([
   'tailwind-merge',
 ]);
 
-const CODER_SYSTEM_INSTRUCTION = `You are a Principal Frontend Design Engineer at AntiSlop. You rewrite React + TypeScript + Tailwind CSS UIs into unmistakable, bespoke, museum-grade web craft that completely eliminates generic "AI slop".
+const CODER_SYSTEM_INSTRUCTION = `You are a Principal Frontend Design Engineer at AntiSlop. You rewrite frontend web UIs (React + TypeScript + Tailwind CSS OR Vanilla HTML/CSS/JS, strictly matching the target repository's native stack) into unmistakable, bespoke, museum-grade web craft that completely eliminates generic "AI slop".
 
 HARD TECHNICAL RULES (NON-NEGOTIABLE):
 1. Return ONLY a single strictly valid JSON object with the exact shape:
@@ -109,14 +109,13 @@ HARD TECHNICAL RULES (NON-NEGOTIABLE):
      "diffSummary": "Concise 1-2 sentence summary of aesthetic & structural changes",
      "changedSections": ["hero", "palette", "typography", "navigation", "cards", "footer"]
    }
-   CRITICAL STACK MATCHING: Edit ONLY the exact file paths provided in the target repository! If it is a React/Vite repo (index.html, src/index.css, src/App.tsx), rewrite those exact files. If it is a vanilla HTML/CSS/JS repo (index.html, styles.css, app.js, content.js), edit those exact files directly in vanilla HTML/CSS/JS — NEVER invent src/App.tsx or React imports on a vanilla static repo!
-2. NEVER invent npm packages! Only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Stick to standard widely available lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
-3. In \`index.html\`: load the DesignManifest's Google Fonts stylesheet cleanly (preconnect + stylesheet link), set a tasteful <title>, and preserve the existing mount container (\`<div id="root"></div>\` or \`<div id="app"></div>\`) and entry \`<script type="module" ...>\` verbatim.
-4. In \`src/index.css\`: if the original CSS contains \`@import "tailwindcss";\`, YOU MUST PRESERVE \`@import "tailwindcss";\` on line 1! Define CSS variables (\`:root { --canvas: ...; --surface: ...; --ink-primary: ...; --ink-secondary: ...; --accent: ...; --accent-contrast: ...; }\`), set \`html, body { overflow-x: hidden; background-color: var(--canvas); color: var(--ink-primary); }\`, and add refined editorial typography & motion utilities.
-5. In \`src/App.tsx\`:
-   - MUST export \`export default function App()\` (or \`export default App\`).
-   - Keep \`src/App.tsx\` crisp, concise, and high-craft (~160-240 lines) with clean Tailwind v4 utilities + CSS variables and zero bloated boilerplate.
-   - Strictly valid TypeScript JSX (zero unused variables/imports, properly typed state/handlers, zero syntax errors).
+   CRITICAL STACK MATCHING: Edit ONLY the exact file paths provided in the target repository! If it is a React/Vite repo (e.g. index.html, src/index.css, src/App.tsx), rewrite those exact files. If it is a vanilla HTML/CSS/JS repo (e.g. index.html, styles.css, app.js, script.js, content.js), edit those exact files directly in vanilla HTML/CSS/JS — NEVER invent src/App.tsx or React/JSX imports on a vanilla static repo!
+2. NEVER invent npm packages! On React repos, only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Stick to standard widely available lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
+3. In \`index.html\`: load the DesignManifest's Google Fonts stylesheet cleanly (preconnect + stylesheet link), set a tasteful <title>, and preserve the existing mount container (\`<div id="root"></div>\` + \`<script type="module" src="/src/main.tsx"></script>\` on Vite/React repos, OR \`<div id="app"></div>\`, \`<canvas>\`, and \`<script src="...">\` tags on vanilla repos) verbatim.
+4. In CSS files (\`src/index.css\` or \`styles.css\`): if the original CSS contains \`@import "tailwindcss";\`, YOU MUST PRESERVE \`@import "tailwindcss";\` on line 1! Define CSS variables (\`:root { --canvas: ...; --surface: ...; --ink-primary: ...; --ink-secondary: ...; --accent: ...; --accent-contrast: ...; }\`), set \`html, body { overflow-x: hidden; background-color: var(--canvas); color: var(--ink-primary); }\`, and add refined editorial typography, 3D spatial depth, & motion utilities.
+5. In \`src/App.tsx\` (React repos) or vanilla JS/HTML files (vanilla repos):
+   - On React repos, MUST export \`export default function App()\` (or \`export default App\`), stay crisp (~160-240 lines), and compile cleanly with TypeScript JSX (zero unused variables/imports).
+   - On vanilla repos, keep all DOM selectors, \`<canvas>\` IDs, and script bindings intact with zero syntax errors.
    - Responsive and ZERO horizontal overflow at 1440px desktop and 390px mobile.
    - ZERO broken images: if generated bespoke asset paths are provided (e.g. \`/generated/hero-primary.jpg\`), showcase them prominently in crisp editorial frames with \`object-cover\`. NEVER invent unverified external image URLs (no unsplash/example.com guesses that could 404).
    - STRICT WCAG AA CONTRAST: ALWAYS maintain >= 4.5:1 contrast between ALL readable text (headlines, body copy, captions, muted metadata, navigation links, inputs, and buttons) and their background canvas/surface/button fills! Never use pale washed-out grey ink on cream/white or dark muted ink on dark surfaces.
@@ -126,7 +125,7 @@ HARD TECHNICAL RULES (NON-NEGOTIABLE):
 ${ANTISLOP_DESIGN_CRAFT_DISTILLED}`;
 
 const FAST_SINGLE_PASS_SYSTEM_INSTRUCTION = `You are AntiSlop's Single-Pass Creative Director + Principal Frontend Design Engineer.
-In ONE single ultra-fast pass, inspect the raw visual taste references (moodboards/website captures/webcam frames) and any spoken/written direction, synthesize a cohesive editorial DesignManifest, and rewrite the target React + TypeScript + Tailwind CSS UI into museum-grade craft with ZERO generic "AI slop".
+In ONE single ultra-fast pass, inspect the raw visual taste references (moodboards/website captures/webcam frames) and any spoken/written direction, synthesize a cohesive editorial DesignManifest, and rewrite the target frontend UI (matching its native stack: React/Vite/Tailwind OR Vanilla HTML/CSS/JS) into museum-grade craft with ZERO generic "AI slop".
 
 HARD TECHNICAL & SPEED RULES (NON-NEGOTIABLE):
 1. Return ONLY a single strictly valid JSON object with this EXACT shape (no markdown commentary outside JSON):
@@ -159,7 +158,7 @@ HARD TECHNICAL & SPEED RULES (NON-NEGOTIABLE):
            "borderRadiusMd": "4px",
            "borderRadiusLg": "8px",
            "borderStyle": "1px solid var(--border-subtle)",
-           "elevationPhilosophy": "flat-editorial"
+           "elevationPhilosophy": "soft-architectural"
          },
          "motion": {
            "easingCurve": "cubic-bezier(0.22, 1, 0.36, 1)",
@@ -167,41 +166,37 @@ HARD TECHNICAL & SPEED RULES (NON-NEGOTIABLE):
            "entranceStyle": "Restrained editorial reveal",
            "microInteractionNotes": "Crisp hairline underlines and poised ink shifts"
          },
-         "layoutDirectives": ["Asymmetric editorial grid", "Generous negative space", "Zero horizontal overflow"],
+         "layoutDirectives": ["Asymmetric editorial grid", "CSS 3D perspective depth", "Zero horizontal overflow"],
          "antiSlopBanList": ["No purple/indigo AI gradients", "No dark-navy neon cards", "No sparkle emoji spam"]
        }
      },
      "files": {
-       "index.html": "...full concise HTML loading the exact Google Fonts URL...",
-       "src/index.css": "...full concise Tailwind v4 + CSS variable stylesheet...",
-       "src/App.tsx": "...full crisp, high-craft React component (~160-240 lines)..."
+       "<exact target file key from the prompt>": "...full updated file content..."
      },
      "diffSummary": "Concise 1-2 sentence summary of aesthetic & structural changes",
      "changedSections": ["hero", "palette", "typography", "navigation", "layout", "footer"]
    }
-2. CONCISE HIGH-CRAFT CODE FOR SPEED: Keep \`src/App.tsx\` crisp at ~160-240 lines (clean Tailwind v4 + CSS variables, compact data arrays, zero bloated boilerplate or massive inline SVG walls) and \`src/index.css\` concise (~35-60 lines) so generation finishes fast with publication-grade visual precision!
+2. STACK FIDELITY & CONCISE CODE FOR SPEED: Edit ONLY the exact target file keys listed in the prompt!
+   - If React/Vite stack: keep \`src/App.tsx\` crisp (~160-240 lines) with Tailwind v4 + CSS variables, preserve \`@import "tailwindcss";\` on line 1 of \`src/index.css\` if present, and preserve \`<div id="root"></div>\` + \`<script type="module" src="/src/main.tsx"></script>\` in \`index.html\`.
+   - If Vanilla HTML/CSS/JS stack (e.g. \`index.html\`, \`styles.css\`, \`app.js\`, \`script.js\`, \`main.js\`): edit those exact vanilla files in place! NEVER invent \`src/App.tsx\`, \`src/index.css\`, or React/JSX imports! Preserve existing \`<div id="app">\`, \`<canvas>\`, and \`<script src="...">\` tags verbatim.
 3. STRICT WCAG AA CONTRAST (>= 4.5:1): ALWAYS guarantee >= 4.5:1 foreground-to-background contrast across ALL text, eyebrows, captions, nav links, and buttons! Ensure \`inkPrimary\` and \`inkSecondary\` are decisively dark on light canvases (or decisively bright on dark canvases), and \`accentContrast\` has >= 4.5:1 contrast on \`accent\` buttons.
-4. NEVER invent npm packages! Only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Use only standard lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
-5. Preserve \`@import "tailwindcss";\` on line 1 of \`src/index.css\` if present in original, and preserve \`<div id="root"></div>\` + \`<script type="module" src="/src/main.tsx"></script>\` in \`index.html\`.
-6. ZERO broken images (NEVER invent external image URLs), ZERO horizontal overflow at 1440px desktop and 390px mobile, and preserve the real product/brand domain and core interactive controls while purging all AI slop clichés.
+4. NEVER invent npm packages! On React repos, only import from 'react', 'lucide-react', or packages ALREADY imported in the provided source files. Use only standard lucide-react icons (ArrowUpRight, ArrowRight, Check, ChevronRight, Compass, Clock, Eye, Globe, Layers, Mail, MapPin, Menu, Minus, Play, Plus, Shield, Sliders, Star, Terminal, X, Zap).
+5. ZERO broken images (NEVER invent external image URLs), ZERO horizontal overflow at 1440px desktop and 390px mobile, and preserve the real product/brand domain and core interactive controls while purging all AI slop clichés.
 
 ${ANTISLOP_DESIGN_CRAFT_DISTILLED}`;
 
-const BASELINE_SYSTEM_INSTRUCTION = `You are a frontend developer updating a React + TypeScript + Tailwind CSS application based on the user's text request.
+const BASELINE_SYSTEM_INSTRUCTION = `You are a frontend developer updating a web application (React/Vite OR Vanilla HTML/CSS/JS, matching the provided source files) based on the user's text request.
 Return ONLY a strictly valid JSON object with the exact shape:
 {
   "files": {
-    "index.html": "...full file content...",
-    "src/index.css": "...full file content...",
-    "src/App.tsx": "...full file content..."
+    "<exact target file key from the provided source files>": "...full file content..."
   },
   "diffSummary": "Brief summary of changes"
 }
 Rules:
-- Only import from 'react', 'lucide-react', or packages already imported in the source files.
-- Preserve '@import "tailwindcss";' in src/index.css if present in the original.
-- Preserve '<div id="root"></div>' and '<script type="module" src="/src/main.tsx"></script>' in index.html.
-- Ensure src/App.tsx has a valid 'export default' and compiles cleanly with TypeScript.
+- Match the repository's native stack: NEVER invent src/App.tsx or React imports on a vanilla HTML/CSS/JS repo.
+- On React repos, only import from 'react', 'lucide-react', or packages already imported in the source files, preserve '@import "tailwindcss";' in src/index.css if present, and preserve '<div id="root"></div>' + '<script type="module" src="/src/main.tsx"></script>' in index.html.
+- On vanilla repos, preserve existing '<div id="app">', '<canvas>', and '<script src="..."> tags in index.html.
 - Do not use broken external image URLs.`;
 
 function normalizeChangedSections(raw: unknown, fallback: string[]): string[] {
@@ -213,24 +208,35 @@ function normalizeChangedSections(raw: unknown, fallback: string[]): string[] {
 }
 
 function selectCoreFilesForFastPass(sourceFiles: Record<string, string>): Record<string, string> {
-  const preferredOrder = ['index.html', 'src/index.css', 'src/App.tsx', 'src/App.jsx', 'src/styles.css'];
+  const preferredOrder = [
+    'index.html',
+    'styles.css',
+    'app.js',
+    'script.js',
+    'main.js',
+    'src/index.css',
+    'src/App.tsx',
+    'src/App.jsx',
+    'src/styles.css',
+  ];
   const selected: Record<string, string> = {};
 
   for (const key of preferredOrder) {
+    if (Object.keys(selected).length >= 4) break;
     if (sourceFiles[key] !== undefined) {
       selected[key] = sourceFiles[key];
     }
   }
 
   // Fallback for non-standard repo structures (e.g. cloned GitHub repo)
-  if (Object.keys(selected).length < 3) {
+  if (Object.keys(selected).length < 4) {
     for (const [filePath, content] of Object.entries(sourceFiles)) {
-      if (Object.keys(selected).length >= 3) break;
+      if (Object.keys(selected).length >= 4) break;
       if (selected[filePath] !== undefined) continue;
       if (
         filePath.endsWith('.html') ||
         filePath.endsWith('.css') ||
-        /app\.(tsx|jsx|ts|js)$/i.test(filePath) ||
+        /(^|\/)(app|script|main|content)\.(tsx|jsx|ts|js)$/i.test(filePath) ||
         /page\.(tsx|jsx)$/i.test(filePath)
       ) {
         selected[filePath] = content;
@@ -239,7 +245,7 @@ function selectCoreFilesForFastPass(sourceFiles: Record<string, string>): Record
   }
 
   if (Object.keys(selected).length === 0) {
-    for (const [filePath, content] of Object.entries(sourceFiles).slice(0, 3)) {
+    for (const [filePath, content] of Object.entries(sourceFiles).slice(0, 4)) {
       selected[filePath] = content;
     }
   }
@@ -298,6 +304,7 @@ function sanitizeAndValidateFiles(
 
   const allowedPackages = collectExistingPackages(originalFiles);
   const validated: Record<string, string> = {};
+  const isReactRepo = Object.keys(originalFiles).some((k) => /\.(tsx|jsx)$/i.test(k));
   const originalHasTailwindV4 = Object.entries(originalFiles).some(
     ([k, v]) => k.endsWith('.css') && v.includes('@import "tailwindcss"')
   );
@@ -306,6 +313,15 @@ function sanitizeAndValidateFiles(
     if (typeof rawVal !== 'string') continue;
     const filePath = rawKey.trim().replace(/^\/+/, '');
     if (!filePath || filePath.includes('..')) continue;
+
+    // Never allow invented React files on a vanilla HTML/CSS/JS repo
+    if (
+      !isReactRepo &&
+      originalFiles[filePath] === undefined &&
+      /^(src\/)?(App\.(tsx|jsx)|index\.css)$/i.test(filePath)
+    ) {
+      continue;
+    }
 
     let content = stripCodeFence(rawVal);
     if (content.trim().length < 20) continue;
@@ -331,6 +347,10 @@ function sanitizeAndValidateFiles(
       const originalHtml = originalFiles[filePath] || '';
       const expectsRootId = originalHtml.includes('id="root"');
       if (expectsRootId && !content.includes('root')) {
+        continue;
+      }
+      const expectsAppId = originalHtml.includes('id="app"');
+      if (expectsAppId && !content.includes('app')) {
         continue;
       }
       if (!content.includes('<html') && !content.includes('<body') && !content.includes('<div')) {
@@ -406,12 +426,25 @@ async function runSingleCandidateGeneration(args: {
     }
   }
 
+  const targetKeys = Object.keys(args.sourceFiles);
+  const isReactStack = targetKeys.some((k) => /\.(tsx|jsx)$/i.test(k));
+  const filesShapeExample = targetKeys
+    .slice(0, 8)
+    .map((k) => `"${k}": "..."`)
+    .join(', ');
+
+  userPromptSections.push(
+    isReactStack
+      ? `NATIVE STACK: Vite/React (${targetKeys.join(', ')}). Preserve <div id="root"></div> and <script type="module" src="/src/main.tsx"></script> in index.html.`
+      : `NATIVE STACK: Vanilla HTML/CSS/JS (${targetKeys.join(', ')}). NEVER invent src/App.tsx or React imports. Preserve existing <div id="app">, <canvas>, and <script src="..."> bindings.`
+  );
+
   userPromptSections.push(
     `CURRENT SOURCE FILES TO TRANSFORM:\n${formatSourceFilesForPrompt(args.sourceFiles)}`
   );
 
   userPromptSections.push(
-    `Output ONLY valid JSON matching { "files": { "index.html": "...", "src/index.css": "...", "src/App.tsx": "..." }, "diffSummary": "...", "changedSections": ["hero", "palette", "typography", ...] }.`
+    `Output ONLY valid JSON matching { "files": { ${filesShapeExample} }, "diffSummary": "...", "changedSections": ["hero", "palette", "typography", ...] }.`
   );
 
   const interaction = await withV1Client((client) =>
@@ -557,6 +590,12 @@ export async function runFastSinglePass(
         modalitySet.add('moodboard_image');
       }
 
+      const coreFileKeys = Object.keys(coreFiles);
+      const isReactStack =
+        coreFileKeys.some((k) => /\.(tsx|jsx)$/i.test(k)) ||
+        Object.keys(params.sourceFiles).some((k) => /\.(tsx|jsx)$/i.test(k));
+      const filesShapeExample = coreFileKeys.map((k) => `"${k}": "..."`).join(', ');
+
       const briefSections: string[] = [
         'SINGLE-PASS FAST FUSION BRIEF: Transform this UI in ONE cohesive, high-craft pass faithful to the attached visual taste references.',
       ];
@@ -569,12 +608,20 @@ export async function runFastSinglePass(
       }
       if (params.generatedPublicPaths && params.generatedPublicPaths.length > 0) {
         briefSections.push(
-          `Available Local Public Images:\n${params.generatedPublicPaths.map((p) => `- "${p}"`).join('\n')}`
+          `Available Local Public Images:\n${params.generatedPublicPaths.map((p) => `- "${p}" (render prominently via <img src="${p}" ... /> with aspect ratio discipline and object-cover)`).join('\n')}`
         );
       }
 
       briefSections.push(
-        'CRAFT & CONTRAST CHECKLIST:\n- Keep src/App.tsx concise (~160-240 lines) with crisp Tailwind v4 utilities + CSS variables.\n- Enforce >= 4.5:1 WCAG AA contrast on EVERY text node, label, nav link, and button.\n- Zero horizontal overflow, zero broken images, zero generic purple/indigo AI slop gradients.'
+        [
+          'CRAFT, STACK & CONTRAST CHECKLIST:',
+          `- EXACT TARGET FILE KEYS TO REWRITE: ${coreFileKeys.map((k) => `"${k}"`).join(', ')}.`,
+          isReactStack
+            ? '- VITE/REACT STACK: Keep src/App.tsx concise (~160-240 lines) with Tailwind v4 + CSS variables; preserve <div id="root"></div> and /src/main.tsx in index.html.'
+            : `- VANILLA HTML/CSS/JS STACK: Edit ONLY ${coreFileKeys.join(', ')} in vanilla HTML/CSS/JS. NEVER invent src/App.tsx or React imports. Preserve existing <div id="app">, <canvas>, and <script src="..."> bindings.`,
+          '- Enforce >= 4.5:1 WCAG AA contrast on EVERY text node, label, nav link, and button.',
+          '- Apply CSS 3D perspective(1200px) depth + specular top-edge hairlines + zero horizontal overflow, zero broken images, zero generic purple/indigo AI slop gradients.',
+        ].join('\n')
       );
 
       briefSections.push(
@@ -582,7 +629,7 @@ export async function runFastSinglePass(
       );
 
       briefSections.push(
-        `Output ONLY strictly valid JSON matching { "manifest": { "vibeTitle", "editorialRationale", "tokens": { ... } }, "files": { "index.html": "...", "src/index.css": "...", "src/App.tsx": "..." }, "diffSummary": "...", "changedSections": ["hero", "palette", "typography", ...] }.`
+        `Output ONLY strictly valid JSON matching { "manifest": { "vibeTitle", "editorialRationale", "tokens": { ... } }, "files": { ${filesShapeExample} }, "diffSummary": "...", "changedSections": ["hero", "palette", "typography", ...] }.`
       );
 
       inputBlocks.push({
@@ -666,8 +713,8 @@ export async function runFastSinglePass(
       const first = await attemptOnce(model);
       if (first) return first;
 
-      // Single fast fallback attempt if first JSON output failed validation
-      const retry = await attemptOnce(model);
+      // Retry Attempt 2 using gemini-4-neon (thinking_level: 'low') if hydrogen failed validation
+      const retry = await attemptOnce(ENV.GEMINI_MODEL_ARCHITECT);
       if (retry) return retry;
 
       throw new Error('Fast Single-Pass Fusion failed to produce valid manifest and source files');

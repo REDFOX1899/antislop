@@ -5,6 +5,7 @@ import path from 'node:path';
 import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ENV } from './config/env.js';
+import { liveVoiceUpgradeHandler } from './gemini/liveVoiceDirector.js';
 import { createApiRouter } from './routes/api.js';
 import { puppeteerAuditor, SCREENSHOTS_DIR } from './sandbox/puppeteerAuditor.js';
 import { viteManager } from './sandbox/viteManager.js';
@@ -182,8 +183,12 @@ async function bootstrap(): Promise<void> {
 
   const httpServer = http.createServer(app);
 
-  // Proxy WebSocket HMR upgrades cleanly on the same port as HTTP
+  // Route Gemini Live Voice Director WS upgrades (/api/live/ws) before Vite HMR proxy upgrades
   httpServer.on('upgrade', (req, socket, head) => {
+    if (req.url?.startsWith('/api/live/ws')) {
+      liveVoiceUpgradeHandler(req, socket, head);
+      return;
+    }
     wsUpgradeHandler(req, socket, head);
   });
 

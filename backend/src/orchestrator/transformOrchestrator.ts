@@ -14,7 +14,7 @@ import type {
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
 import type { GeneratedCandidateCode } from '../gemini/contracts.js';
-import { generateTargetedArtwork } from '../gemini/assets.js';
+import { generateBespokeAssets, generateTargetedArtwork } from '../gemini/assets.js';
 import { geminiEngine } from '../gemini/index.js';
 import { eventBus } from '../sandbox/eventBus.js';
 import { puppeteerAuditor, type PuppeteerAuditCapture } from '../sandbox/puppeteerAuditor.js';
@@ -40,10 +40,122 @@ function sanitizeAssets(assets?: MediaAssetInput[]): MediaAssetInput[] {
   }));
 }
 
-function summarizeSourceFiles(files: Record<string, string>): string {
-  return Object.entries(files)
+function cleanTextFragment(raw: string): string {
+  return raw
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\{[^}]*\}/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function summarizeSourceFiles(files: Record<string, string>): string {
+  const keys = Object.keys(files);
+  const isReactStack = keys.some((k) => /\.(tsx|jsx)$/i.test(k));
+  const stackLabel = isReactStack ? 'React / Vite / TypeScript' : 'Vanilla HTML / CSS / JS';
+
+  const htmlEntry = files['index.html'] || Object.entries(files).find(([k]) => k.endsWith('.html'))?.[1] || '';
+  const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(htmlEntry);
+  const pageTitle = titleMatch ? cleanTextFragment(titleMatch[1]).slice(0, 140) : '';
+
+  const headings: string[] = [];
+  const navAndBrandItems: string[] = [];
+  const productStrings: string[] = [];
+
+  const prioritizedKeys = [
+    'index.html',
+    'src/data/content.ts',
+    'src/data/content.tsx',
+    'src/data/products.ts',
+    'content.js',
+    'src/App.tsx',
+    'src/App.jsx',
+    'app.js',
+    ...keys,
+  ];
+  const seenKeys = new Set<string>();
+
+  for (const key of prioritizedKeys) {
+    if (seenKeys.has(key) || files[key] === undefined) continue;
+    seenKeys.add(key);
+    const content = files[key];
+
+    // Extract <h1> and <h2> headings
+    const headingRe = /<h[12][^>]*>([\s\S]*?)<\/h[12]>/gi;
+    let hm: RegExpExecArray | null;
+    while ((hm = headingRe.exec(content)) !== null && headings.length < 8) {
+      const txt = cleanTextFragment(hm[1]);
+      if (txt.length >= 3 && txt.length <= 120 && !headings.includes(txt)) {
+        headings.push(txt);
+      }
+    }
+
+    // Extract nav links from <nav> or <a>
+    const navMatch = /<nav[^>]*>([\s\S]*?)<\/nav>/i.exec(content);
+    if (navMatch) {
+      const linkRe = /<a[^>]*>([\s\S]*?)<\/a>/gi;
+      let lm: RegExpExecArray | null;
+      while ((lm = linkRe.exec(navMatch[1])) !== null && navAndBrandItems.length < 10) {
+        const txt = cleanTextFragment(lm[1]);
+        if (txt.length >= 2 && txt.length <= 40 && !navAndBrandItems.includes(txt)) {
+          navAndBrandItems.push(txt);
+        }
+      }
+    }
+
+    // Extract structured domain/content strings (brand, headline, product names, descriptions)
+    if (
+      /content\.(ts|tsx|js)$|products\.(ts|js)$|index\.html$|App\.(tsx|jsx)$|app\.js$/i.test(key)
+    ) {
+      const propRe =
+        /\b(?:brandName|brand|siteName|title|headline|subheadline|tagline|name|category|label|description|eyebrow|role)\s*:\s*(['"`])((?:\\.|(?!\1).){3,140})\1/gi;
+      let pm: RegExpExecArray | null;
+      while ((pm = propRe.exec(content)) !== null && productStrings.length < 18) {
+        const val = pm[2].replace(/\s+/g, ' ').trim();
+        if (val && !productStrings.includes(val) && !/^https?:\/\//i.test(val) && !val.startsWith('#')) {
+          productStrings.push(val);
+        }
+      }
+    }
+  }
+
+  const fileList = Object.entries(files)
+    .slice(0, 12)
     .map(([file, content]) => `- ${file} (${content.split('\n').length} lines, ${content.length} chars)`)
     .join('\n');
+
+  const sections: string[] = [
+    `WEBSITE DOMAIN & CONTENT SUMMARY`,
+    `Stack: ${stackLabel}`,
+    pageTitle ? `Title: ${pageTitle}` : null,
+    headings.length > 0 ? `Headings: ${headings.join(' | ')}` : null,
+    navAndBrandItems.length > 0 ? `Navigation: ${navAndBrandItems.join(' · ')}` : null,
+    productStrings.length > 0 ? `Domain & Product Copy: ${productStrings.join(' | ')}` : null,
+    `Editable Files:\n${fileList}`,
+  ].filter((s): s is string => Boolean(s));
+
+  return sections.join('\n').slice(0, 1600);
+}
+
+function buildInlineSvgFallbackDataUri(manifest?: DesignManifest): string {
+  const canvas = manifest?.tokens.palette.canvas || '#141418';
+  const surface = manifest?.tokens.palette.surface || '#1E2028';
+  const accent = manifest?.tokens.palette.accent || '#C85A32';
+  const ink = manifest?.tokens.palette.inkSecondary || '#8C8C98';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${canvas}"/><stop offset="100%" stop-color="${surface}"/></linearGradient></defs><rect width="1200" height="675" fill="url(#g)"/><circle cx="880" cy="260" r="190" fill="none" stroke="${accent}" stroke-opacity="0.45" stroke-width="1.5"/><rect x="140" y="140" width="920" height="395" fill="none" stroke="${ink}" stroke-opacity="0.22" stroke-width="1"/><line x1="140" y1="440" x2="1060" y2="440" stroke="${accent}" stroke-opacity="0.35" stroke-width="1"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function sanitizeMissingGeneratedAssetRef(
+  files: Record<string, string>,
+  missingUrl: string,
+  manifest?: DesignManifest
+): void {
+  const fallbackUri = buildInlineSvgFallbackDataUri(manifest);
+  for (const [key, content] of Object.entries(files)) {
+    if (content.includes(missingUrl)) {
+      files[key] = content.split(missingUrl).join(fallbackUri);
+    }
+  }
 }
 
 function buildErrorContext(capture: PuppeteerAuditCapture, viteError: string | null): string | undefined {
@@ -565,6 +677,7 @@ export class TransformOrchestrator {
         outputDir,
         publicPrefix,
         referenceImages,
+        projectContextSummary: summarizeSourceFiles(currentFiles),
       });
 
       if (art) {
@@ -929,7 +1042,7 @@ export class TransformOrchestrator {
     const sourceFiles = await snapshotManager.readEditableFiles(wsPath);
     const currentCodeSummary = summarizeSourceFiles(sourceFiles);
     const isFastDemo = speedMode === 'fast_demo';
-    const useFastSinglePass = isFastDemo && req.mode === 'antislop' && !shouldGenerateAssets;
+    const useFastSinglePass = isFastDemo && req.mode === 'antislop';
 
     let manifest: DesignManifest;
     let rawCandidates: GeneratedCandidateCode[];
@@ -939,40 +1052,104 @@ export class TransformOrchestrator {
       // ULTRA-FAST SINGLE-PASS FUSION (<25s live judging):
       // ONE single gemini-4-hydrogen (thinking_level: 'low') call fuses raw moodboard images + voice + code
       // directly into manifest + concise rewritten files + changedSections!
+      // When shouldGenerateAssets is enabled, generate domain-grounded hero art in parallel via Promise.all!
+      const plannedHeroPath = '/generated/hero-primary.jpg';
+      const generatedOutputDir = path.join(wsPath, 'public', 'generated');
+
       eventBus.emit(
         run.runId,
         'director_thinking',
-        `Fast Single-Pass Fusion analyzing ${req.assets.length} reference artifact(s) & crafting UI in one pass...`,
+        shouldGenerateAssets
+          ? `Fast Single-Pass Fusion + Nano Banana 2.1 running in parallel on ${req.assets.length} reference artifact(s)...`
+          : `Fast Single-Pass Fusion analyzing ${req.assets.length} reference artifact(s) & crafting UI in one pass...`,
         {
           iteration: 1,
           model: ENV.GEMINI_MODEL_PATCHER,
-          payload: { fastSinglePass: true },
+          payload: { fastSinglePass: true, shouldGenerateAssets },
         }
       );
 
       eventBus.emit(
         run.runId,
         'candidate_started',
-        'Running Single-Pass Fast Fusion (Manifest + Code in 1 Gemini 4 Hydrogen call)...',
+        shouldGenerateAssets
+          ? 'Running Single-Pass Fast Fusion in parallel with domain-grounded Nano Banana art...'
+          : 'Running Single-Pass Fast Fusion (Manifest + Code in 1 Gemini 4 Hydrogen call)...',
         {
           iteration: 1,
           model: ENV.GEMINI_MODEL_PATCHER,
-          payload: { parallelCount: 1, shouldGenerateAssets: false, fastSinglePass: true },
+          payload: { parallelCount: 1, shouldGenerateAssets, fastSinglePass: true },
         }
       );
 
-      const fastResult = await geminiEngine.runFastSinglePass({
+      const fastPassPromise = geminiEngine.runFastSinglePass({
         assets: req.assets,
         sourceFiles,
         voiceTranscript,
         textPrompt: req.textPrompt,
         annotatedScreenshotBase64,
         drawnCircles: req.drawnCircles,
+        ...(shouldGenerateAssets ? { generatedPublicPaths: [plannedHeroPath] } : {}),
       });
+
+      const parallelArtPromise = shouldGenerateAssets
+        ? generateTargetedArtwork({
+            instruction:
+              [
+                req.textPrompt,
+                voiceTranscript,
+                'Primary editorial hero visual depicting this website’s core product/subject in harmony with the reference taste.',
+              ]
+                .filter(Boolean)
+                .join(' — '),
+            outputDir: generatedOutputDir,
+            publicPrefix: '/generated',
+            referenceImages,
+            projectContextSummary: currentCodeSummary,
+            targetStem: 'hero-primary',
+            aspectRatio: '16:9',
+            styleMode: 'editorial_hero',
+          }).catch((err) => {
+            console.warn('[TransformOrchestrator] Fast parallel Nano Banana art failed gracefully:', err);
+            return null;
+          })
+        : Promise.resolve(null);
+
+      const [fastResult, parallelArt] = await Promise.all([fastPassPromise, parallelArtPromise]);
 
       manifest = fastResult.manifest;
       run.manifest = manifest;
       modelsInvoked.add(manifest.modelUsed);
+
+      if (shouldGenerateAssets) {
+        if (parallelArt) {
+          modelsInvoked.add(ENV.GEMINI_MODEL_IMAGE_GEN);
+          generatedAssetUrls = [parallelArt.publicUrl];
+          eventBus.emit(
+            run.runId,
+            'asset_generated',
+            `Generated domain-grounded hero artwork: ${parallelArt.publicUrl} (${parallelArt.latencyMs}ms)`,
+            {
+              iteration: 1,
+              model: ENV.GEMINI_MODEL_IMAGE_GEN,
+              payload: { publicUrl: parallelArt.publicUrl, latencyMs: parallelArt.latencyMs },
+            }
+          );
+
+          if (parallelArt.publicUrl !== plannedHeroPath) {
+            for (const [fileKey, content] of Object.entries(fastResult.candidate.files)) {
+              if (content.includes(plannedHeroPath)) {
+                fastResult.candidate.files[fileKey] = content
+                  .split(plannedHeroPath)
+                  .join(parallelArt.publicUrl);
+              }
+            }
+          }
+        } else {
+          // Fallback safety: prevent broken /generated/hero-primary.jpg <img> if Nano Banana timed out
+          sanitizeMissingGeneratedAssetRef(fastResult.candidate.files, plannedHeroPath, manifest);
+        }
+      }
 
       eventBus.emit(run.runId, 'manifest_ready', `Synthesized Design Manifest: "${manifest.vibeTitle}"`, {
         iteration: 1,
@@ -1043,12 +1220,12 @@ export class TransformOrchestrator {
       const generatedOutputDir = path.join(wsPath, 'public', 'generated');
 
       const assetGenPromise = shouldGenerateAssets
-        ? geminiEngine
-            .generateBespokeAssets({
-              manifest,
-              referenceImages,
-              outputDir: generatedOutputDir,
-            })
+        ? generateBespokeAssets({
+            manifest,
+            referenceImages,
+            outputDir: generatedOutputDir,
+            projectContextSummary: currentCodeSummary,
+          })
             .then((res) => {
               if (res.publicUrls.length > 0) {
                 modelsInvoked.add(ENV.GEMINI_MODEL_IMAGE_GEN);

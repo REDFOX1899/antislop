@@ -27,6 +27,7 @@ import {
   startTransformRun,
   subscribeToRunStream,
   switchWorkspace,
+  type WorkspaceRecommendation,
 } from '@/lib/api';
 import {
   QUICK_TASTE_STARTERS,
@@ -42,6 +43,7 @@ import {
   type QueuedEditSummary,
   type TechnicalMissionId,
 } from './CriticRail';
+import { DecisionMatrixModal } from './DecisionMatrixModal';
 import { LandingHub } from './LandingHub';
 import {
   LiveCanvas,
@@ -140,6 +142,7 @@ export function StudioWorkbench() {
   const [loadingMissionId, setLoadingMissionId] =
     useState<TechnicalMissionId | null>(null);
   const [repoModalOpen, setRepoModalOpen] = useState(false);
+  const [deepAuditOpen, setDeepAuditOpen] = useState(false);
 
   // Multimodal References, Continuous Talk & Canvas Annotations
   const [assets, setAssets] = useState<LocalMediaAsset[]>([]);
@@ -682,6 +685,149 @@ export function StudioWorkbench() {
     [pushToast]
   );
 
+  const attachRunStreamById = useCallback(
+    (
+      runId: string,
+      options?: {
+        label?: string;
+        mode?: TransformRunRequest['mode'];
+        modelTag?: string;
+      }
+    ) => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+
+      setCurrentRunId(runId);
+      if (options?.label) {
+        isRunningRef.current = true;
+        setIsRunning(true);
+        setActiveModeRunning(options.mode ?? 'antislop');
+        setEvents([]);
+        setThinkingBuffer('');
+        setLiveStatusText(`Live Voice · "${options.label.slice(0, 56)}"`);
+        setLiveModelTag(options.modelTag ?? 'gemini-3.8-live');
+      }
+
+      unsubscribeRef.current = subscribeToRunStream(
+        runId,
+        (ev) => {
+          setEvents((prev) => [...prev.slice(-90), ev]);
+          if (ev.message) setLiveStatusText(ev.message);
+          if (ev.model) setLiveModelTag(ev.model);
+
+          const data = ev.payload as Record<string, unknown> | undefined;
+
+          switch (ev.type) {
+            case 'snapshot_captured': {
+              const baseUrl =
+                typeof data?.baselineScreenshotUrl === 'string'
+                  ? data.baselineScreenshotUrl
+                  : typeof data?.screenshotUrl === 'string'
+                  ? data.screenshotUrl
+                  : undefined;
+              if (baseUrl) setBaselineScreenshotUrl(baseUrl);
+              if (data?.scorecard) {
+                const snapCard = data.scorecard as DecisionsScorecard;
+                runStartScorecardRef.current = snapCard;
+                setScorecard(snapCard);
+              }
+              break;
+            }
+            case 'director_thinking': {
+              const chunk =
+                typeof data?.delta === 'string'
+                  ? data.delta
+                  : ev.message || '';
+              if (chunk) {
+                setThinkingBuffer((prev) =>
+                  `${prev}${prev ? '\n' : ''}${chunk}`.slice(-1800)
+                );
+              }
+              break;
+            }
+            case 'manifest_ready': {
+              if (data && 'vibeTitle' in data) {
+                setManifest(data as unknown as DesignManifest);
+              } else if (data?.manifest) {
+                setManifest(data.manifest as DesignManifest);
+              }
+              break;
+            }
+            case 'candidate_scored': {
+              if (data?.scorecard) {
+                setScorecard(data.scorecard as DecisionsScorecard);
+              }
+              break;
+            }
+            case 'iteration_complete': {
+              const iter = (
+                data && 'scorecard' in data ? data : data?.iteration
+              ) as CriticIteration | undefined;
+              if (iter && typeof iter === 'object') {
+                setIterations((prev) => {
+                  const filtered = prev.filter(
+                    (p) => p.iteration !== iter.iteration
+                  );
+                  return [...filtered, iter].sort(
+                    (a, b) => a.iteration - b.iteration
+                  );
+                });
+                if (iter.scorecard) setScorecard(iter.scorecard);
+                if (iter.screenshotUrl) {
+                  setFinalScreenshotUrl(iter.screenshotUrl);
+                }
+              }
+              setReloadNonce((n) => n + 1);
+              setHmrPulseAt(Date.now());
+              break;
+            }
+            case 'hmr_reloaded': {
+              setReloadNonce((n) => n + 1);
+              setHmrPulseAt(Date.now());
+              break;
+            }
+            case 'run_completed': {
+              unsubscribeRef.current?.();
+              unsubscribeRef.current = null;
+              if (isFullRunResult(ev.payload)) {
+                hydrateRunResult(ev.payload);
+              } else {
+                getRunResult(runId)
+                  .then((full) => hydrateRunResult(full))
+                  .catch(() =>
+                    finishRunWithError(
+                      'Completed run could not be fetched from backend.'
+                    )
+                  );
+              }
+              break;
+            }
+            case 'run_error': {
+              finishRunWithError(ev.message || 'Transform run failed.');
+              break;
+            }
+            default:
+              break;
+          }
+        },
+        () => {
+          getRunResult(runId)
+            .then((full) => {
+              if (full.status !== 'running') {
+                hydrateRunResult(full);
+              } else {
+                finishRunWithError('Live stream closed before run completed.');
+              }
+            })
+            .catch(() => {
+              finishRunWithError('Lost connection to AntiSlop run stream.');
+            });
+        }
+      );
+    },
+    [finishRunWithError, hydrateRunResult]
+  );
+
   // Execute a concrete frozen QueuedEditJob immediately
   const startRunFromJob = useCallback(
     async (job: QueuedEditJob) => {
@@ -792,122 +938,7 @@ export function StudioWorkbench() {
           return;
         }
 
-        unsubscribeRef.current = subscribeToRunStream(
-          runId,
-          (ev) => {
-            setEvents((prev) => [...prev.slice(-90), ev]);
-            if (ev.message) setLiveStatusText(ev.message);
-            if (ev.model) setLiveModelTag(ev.model);
-
-            const data = ev.payload as Record<string, unknown> | undefined;
-
-            switch (ev.type) {
-              case 'snapshot_captured': {
-                const baseUrl =
-                  typeof data?.baselineScreenshotUrl === 'string'
-                    ? data.baselineScreenshotUrl
-                    : typeof data?.screenshotUrl === 'string'
-                    ? data.screenshotUrl
-                    : undefined;
-                if (baseUrl) setBaselineScreenshotUrl(baseUrl);
-                if (data?.scorecard) {
-                  const snapCard = data.scorecard as DecisionsScorecard;
-                  runStartScorecardRef.current = snapCard;
-                  setScorecard(snapCard);
-                }
-                break;
-              }
-              case 'director_thinking': {
-                const chunk =
-                  typeof data?.delta === 'string'
-                    ? data.delta
-                    : ev.message || '';
-                if (chunk) {
-                  setThinkingBuffer((prev) =>
-                    `${prev}${prev ? '\n' : ''}${chunk}`.slice(-1800)
-                  );
-                }
-                break;
-              }
-              case 'manifest_ready': {
-                if (data && 'vibeTitle' in data) {
-                  setManifest(data as unknown as DesignManifest);
-                } else if (data?.manifest) {
-                  setManifest(data.manifest as DesignManifest);
-                }
-                break;
-              }
-              case 'candidate_scored': {
-                if (data?.scorecard) {
-                  setScorecard(data.scorecard as DecisionsScorecard);
-                }
-                break;
-              }
-              case 'iteration_complete': {
-                const iter = (
-                  data && 'scorecard' in data ? data : data?.iteration
-                ) as CriticIteration | undefined;
-                if (iter && typeof iter === 'object') {
-                  setIterations((prev) => {
-                    const filtered = prev.filter(
-                      (p) => p.iteration !== iter.iteration
-                    );
-                    return [...filtered, iter].sort(
-                      (a, b) => a.iteration - b.iteration
-                    );
-                  });
-                  if (iter.scorecard) setScorecard(iter.scorecard);
-                  if (iter.screenshotUrl) {
-                    setFinalScreenshotUrl(iter.screenshotUrl);
-                  }
-                }
-                setReloadNonce((n) => n + 1);
-                setHmrPulseAt(Date.now());
-                break;
-              }
-              case 'hmr_reloaded': {
-                setReloadNonce((n) => n + 1);
-                setHmrPulseAt(Date.now());
-                break;
-              }
-              case 'run_completed': {
-                unsubscribeRef.current?.();
-                unsubscribeRef.current = null;
-                if (isFullRunResult(ev.payload)) {
-                  hydrateRunResult(ev.payload);
-                } else {
-                  getRunResult(runId)
-                    .then((full) => hydrateRunResult(full))
-                    .catch(() =>
-                      finishRunWithError(
-                        'Completed run could not be fetched from backend.'
-                      )
-                    );
-                }
-                break;
-              }
-              case 'run_error': {
-                finishRunWithError(ev.message || 'Transform run failed.');
-                break;
-              }
-              default:
-                break;
-            }
-          },
-          () => {
-            getRunResult(runId)
-              .then((full) => {
-                if (full.status !== 'running') {
-                  hydrateRunResult(full);
-                } else {
-                  finishRunWithError('Live stream closed before run completed.');
-                }
-              })
-              .catch(() => {
-                finishRunWithError('Lost connection to AntiSlop run stream.');
-              });
-          }
-        );
+        attachRunStreamById(runId);
       } catch (err) {
         finishRunWithError(
           err instanceof Error
@@ -916,7 +947,7 @@ export function StudioWorkbench() {
         );
       }
     },
-    [finishRunWithError, hydrateRunResult]
+    [attachRunStreamById, finishRunWithError, hydrateRunResult]
   );
 
   // Automatic seamless dequeue
@@ -931,7 +962,7 @@ export function StudioWorkbench() {
   const enqueueOrExecuteRun = useCallback(
     (
       mode: TransformRunRequest['mode'],
-      options?: { textPrompt?: string }
+      options?: { textPrompt?: string; generateBespokeAssets?: boolean }
     ) => {
       let effectiveAssets = [...assets];
 
@@ -1013,7 +1044,10 @@ export function StudioWorkbench() {
         drawnCircles: mode === 'circle_tweak' ? [...drawnCircles] : [],
         circleOverlayPngBase64: overlayPng,
         speedMode,
-        generateBespokeAssets,
+        generateBespokeAssets:
+          options?.generateBespokeAssets !== undefined
+            ? options.generateBespokeAssets
+            : generateBespokeAssets,
       };
 
       if (mode === 'circle_tweak' || isRunningRef.current) {
@@ -1154,6 +1188,18 @@ export function StudioWorkbench() {
     }
   };
 
+  const handleApplyRecommendation = useCallback(
+    (rec: WorkspaceRecommendation) => {
+      setGenerateBespokeAssets(rec.enableBespokeArt);
+      setVoiceTranscript(rec.prompt);
+      enqueueOrExecuteRun(rec.mode, {
+        textPrompt: rec.prompt,
+        generateBespokeAssets: rec.enableBespokeArt,
+      });
+    },
+    [enqueueOrExecuteRun]
+  );
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const activeWorkspaceDisplay = activeWorkspace
     ? formatWorkspaceDisplay(activeWorkspace)
@@ -1287,6 +1333,7 @@ export function StudioWorkbench() {
         onToggleTheme={toggleTheme}
         directorOpen={!rightCollapsed}
         onToggleDirector={() => setRightCollapsed((v) => !v)}
+        onOpenDeepAudit={() => setDeepAuditOpen(true)}
         onGoLanding={goToLanding}
       />
 
@@ -1328,6 +1375,8 @@ export function StudioWorkbench() {
                 onTabChange={handleTabChange}
                 onResetBaseline={() => void handleResetBaseline()}
                 resettingBaseline={resettingBaseline}
+                activeWorkspaceId={activeWorkspaceId}
+                onApplyRecommendation={handleApplyRecommendation}
               />
 
               {/* Hairline Resize Handle nested cleanly inside the 14px gutter */}
@@ -1378,6 +1427,14 @@ export function StudioWorkbench() {
                   );
                 }}
                 onApplyCircleSpeak={() => enqueueOrExecuteRun('circle_tweak')}
+                onLiveRunStarted={(runId, instruction) => {
+                  attachRunStreamById(runId, {
+                    label: instruction,
+                    mode: 'antislop',
+                    modelTag: 'gemini-3.8-live',
+                  });
+                  pushToast('info', `Gemini 3.8 Live executing: "${instruction.slice(0, 60)}"`);
+                }}
                 isRunning={isRunning}
                 queueCount={editQueue.length}
                 liveStatusText={liveStatusText}
@@ -1478,6 +1535,18 @@ export function StudioWorkbench() {
       </main>
 
       {repoModal}
+
+      <DecisionMatrixModal
+        open={deepAuditOpen}
+        onClose={() => setDeepAuditOpen(false)}
+        screenshotUrl={finalScreenshotUrl || baselineScreenshotUrl}
+        workspaceId={activeWorkspaceId}
+        brandSummary={workspaceCardTitle}
+        onApplySurgicalFix={(surgicalPrompt) => {
+          setVoiceTranscript(surgicalPrompt);
+          enqueueOrExecuteRun('antislop', { textPrompt: surgicalPrompt });
+        }}
+      />
     </div>
   );
 }

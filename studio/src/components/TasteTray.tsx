@@ -11,11 +11,17 @@ import {
   ImagePlus,
   Loader2,
   Plus,
+  RefreshCw,
   Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
-import { captureReferenceUrl, resolveBackendUrl } from '@/lib/api';
+import {
+  captureReferenceUrl,
+  fetchWorkspaceRecommendations,
+  resolveBackendUrl,
+  type WorkspaceRecommendation,
+} from '@/lib/api';
 import {
   QUICK_TASTE_STARTERS,
   buildQuickStarterVisualAsset,
@@ -56,6 +62,8 @@ interface TasteTrayProps {
   onTabChange?: (tab: StudioTab) => void;
   onResetBaseline?: () => void;
   resettingBaseline?: boolean;
+  activeWorkspaceId?: string;
+  onApplyRecommendation?: (rec: WorkspaceRecommendation) => void;
 }
 
 export function TasteTray({
@@ -79,6 +87,8 @@ export function TasteTray({
   onTabChange,
   onResetBaseline,
   resettingBaseline = false,
+  activeWorkspaceId,
+  onApplyRecommendation,
 }: TasteTrayProps) {
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -93,6 +103,66 @@ export function TasteTray({
   const [mirrorCamera, setMirrorCamera] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const [recommendations, setRecommendations] = useState<WorkspaceRecommendation[]>([]);
+  const [brandSummary, setBrandSummary] = useState<string>('');
+  const [loadingRecs, setLoadingRecs] = useState<boolean>(true);
+  const [recsRefreshTick, setRecsRefreshTick] = useState<number>(0);
+
+  const assetSummaryText = assets
+    .map((a) => a.sourceDomain || a.label || a.filename)
+    .filter(Boolean)
+    .slice(0, 6)
+    .join(', ');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRecs(true);
+
+    const delayMs = recsRefreshTick > 0 ? 0 : 300;
+    const timer = window.setTimeout(async () => {
+      const summaryParts = [
+        activeWorkspaceId ? `workspace:${activeWorkspaceId}` : '',
+        assetSummaryText,
+      ].filter(Boolean);
+      const res = await fetchWorkspaceRecommendations(
+        summaryParts.length > 0 ? summaryParts.join(' · ') : undefined
+      );
+      if (cancelled) return;
+      setRecommendations(res.recommendations.slice(0, 4));
+      setBrandSummary(res.brandSummary);
+      setLoadingRecs(false);
+    }, delayMs);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeWorkspaceId, assets.length, assetSummaryText, recsRefreshTick]);
+
+  const handleApplyRecommendationClick = useCallback(
+    (rec: WorkspaceRecommendation) => {
+      if (onApplyRecommendation) {
+        onApplyRecommendation(rec);
+        return;
+      }
+      onSeedVoiceHint?.(rec.prompt);
+      onToggleBespokeAssets(rec.enableBespokeArt);
+      if (rec.mode === 'circle_tweak' && drawnCirclesCount > 0) {
+        onRunCircleTweak();
+      } else {
+        onRunTransform();
+      }
+    },
+    [
+      drawnCirclesCount,
+      onApplyRecommendation,
+      onRunCircleTweak,
+      onRunTransform,
+      onSeedVoiceHint,
+      onToggleBespokeAssets,
+    ]
+  );
 
   const imageAssets = assets.filter(
     (a) => a.modality === 'moodboard_image' || a.modality === 'webcam_frame'
@@ -742,6 +812,87 @@ export function TasteTray({
                 </>
               )}
             </button>
+          </section>
+
+          <div className="h-px bg-[var(--border-subtle)]" />
+
+          {/* 4. AI RECOMMENDED: Workspace-grounded suggestions filling the left rail */}
+          <section aria-label="AI Recommended" className="space-y-2.5">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Sparkles
+                  className="h-3 w-3 shrink-0 text-[var(--cobalt-ice)]"
+                  aria-hidden="true"
+                />
+                <h2 className="truncate text-[11.5px] font-medium tracking-[0.01em] text-[var(--ink-primary)]">
+                  AI Recommended
+                </h2>
+              </div>
+              <button
+                type="button"
+                disabled={loadingRecs}
+                onClick={() => setRecsRefreshTick((t) => t + 1)}
+                title="Refresh AI recommendations"
+                aria-label="Refresh AI recommendations"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-secondary)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--cobalt-ice)] disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-3 w-3 ${loadingRecs ? 'animate-spin text-[var(--cobalt-ice)]' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            {brandSummary && (
+              <p className="line-clamp-2 px-1 text-[10.5px] leading-snug text-[var(--ink-secondary)]">
+                {brandSummary}
+              </p>
+            )}
+
+            {recommendations.length === 0 && loadingRecs ? (
+              <div className="space-y-2" aria-label="Loading recommendations">
+                {[0, 1, 2].map((idx) => (
+                  <div
+                    key={idx}
+                    className="animate-pulse space-y-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]/50 p-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="h-2.5 w-16 rounded bg-[var(--bg-subtle-hover)]" />
+                      <div className="h-3.5 w-12 rounded-full bg-[var(--bg-subtle-hover)]" />
+                    </div>
+                    <div className="h-3 w-5/6 rounded bg-[var(--bg-subtle-hover)]" />
+                    <div className="h-2.5 w-full rounded bg-[var(--bg-subtle-hover)]" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {recommendations.map((rec) => (
+                  <li key={rec.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyRecommendationClick(rec)}
+                      className="group flex w-full flex-col gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]/65 p-2.5 text-left transition-colors hover:border-[var(--cobalt-border)] hover:bg-[var(--cobalt-tint)]"
+                    >
+                      <div className="flex w-full items-center justify-between gap-1.5">
+                        <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--cobalt-ice)]">
+                          {rec.badge}
+                        </span>
+                        <span className="shrink-0 rounded-full border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] px-1.5 py-0.5 font-mono text-[8.5px] font-medium text-[var(--cobalt-ice)] transition-colors group-hover:border-[var(--cobalt-core)] group-hover:bg-[var(--cobalt-core)] group-hover:text-white">
+                          Apply →
+                        </span>
+                      </div>
+                      <span className="line-clamp-2 text-[11.5px] font-medium leading-snug text-[var(--ink-primary)]">
+                        {rec.title}
+                      </span>
+                      <span className="line-clamp-2 text-[10.5px] leading-snug text-[var(--ink-secondary)]">
+                        {rec.rationale}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
 

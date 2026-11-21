@@ -30,6 +30,437 @@ interface ManagedAgentPanelProps {
   onOpenPr: () => void;
 }
 
+type StageVisualState = 'idle' | 'active' | 'verified' | 'failed';
+
+function extractRepoSlug(repoUrl: string): string {
+  const cleaned = repoUrl.trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  const parts = cleaned.split('/').filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+  }
+  return cleaned || 'REDFOX1899/antislop';
+}
+
+function stagePalette(state: StageVisualState) {
+  if (state === 'verified') {
+    return {
+      fill: 'var(--svg-pass-fill)',
+      stroke: 'var(--svg-pass-stroke)',
+      badgeBg: 'var(--emerald-bg)',
+      badgeStroke: 'var(--emerald-border)',
+      accent: 'var(--emerald)',
+      title: 'var(--svg-title-fill)',
+      sub: 'var(--svg-sub-fill)',
+      badgeLabel: 'VERIFIED',
+    };
+  }
+  if (state === 'active') {
+    return {
+      fill: 'var(--svg-active-fill)',
+      stroke: 'var(--svg-active-stroke)',
+      badgeBg: 'var(--cobalt-tint)',
+      badgeStroke: 'var(--cobalt-border)',
+      accent: 'var(--cobalt-ice)',
+      title: 'var(--svg-title-fill)',
+      sub: 'var(--svg-sub-fill)',
+      badgeLabel: 'ACTIVE',
+    };
+  }
+  if (state === 'failed') {
+    return {
+      fill: 'var(--vermilion-bg)',
+      stroke: 'var(--vermilion)',
+      badgeBg: 'var(--vermilion-bg)',
+      badgeStroke: 'var(--vermilion-border)',
+      accent: 'var(--vermilion)',
+      title: 'var(--svg-title-fill)',
+      sub: 'var(--svg-sub-fill)',
+      badgeLabel: 'FAILED',
+    };
+  }
+  return {
+    fill: 'var(--svg-idle-fill)',
+    stroke: 'var(--svg-idle-stroke)',
+    badgeBg: 'var(--bg-subtle)',
+    badgeStroke: 'var(--border-subtle)',
+    accent: 'var(--ink-secondary)',
+    title: 'var(--svg-title-fill)',
+    sub: 'var(--svg-sub-fill)',
+    badgeLabel: 'IDLE',
+  };
+}
+
+function ManagedAgentExecutionFlow({
+  shipping,
+  events,
+  environmentId,
+  interactionId,
+  buildPassed,
+  repoUrl,
+  lastPr,
+}: {
+  shipping: boolean;
+  events: ManagedAgentEvent[];
+  environmentId?: string;
+  interactionId?: string;
+  buildPassed: boolean | null;
+  repoUrl: string;
+  lastPr: GitHubPrResponse | null;
+}) {
+  const eventTypes = new Set(events.map((e) => e.type));
+  const hasError = eventTypes.has('error') || buildPassed === false;
+  const toolCallsCount = events.filter((e) => e.type === 'tool_call').length;
+  const stepDeltasCount = events.filter((e) => e.type === 'step_delta').length;
+  const repoSlug = extractRepoSlug(repoUrl);
+
+  const stage1Verified =
+    Boolean(interactionId) ||
+    eventTypes.has('agent_created') ||
+    eventTypes.has('sandbox_ready') ||
+    eventTypes.has('step_delta') ||
+    eventTypes.has('tool_call') ||
+    eventTypes.has('hook_verify') ||
+    eventTypes.has('completed');
+  const stage1: StageVisualState = stage1Verified
+    ? 'verified'
+    : shipping
+    ? 'active'
+    : 'idle';
+
+  const stage2Verified =
+    Boolean(environmentId) ||
+    eventTypes.has('sandbox_ready') ||
+    eventTypes.has('step_delta') ||
+    eventTypes.has('tool_call') ||
+    eventTypes.has('hook_verify') ||
+    eventTypes.has('completed');
+  const stage2: StageVisualState = stage2Verified
+    ? 'verified'
+    : shipping && stage1Verified
+    ? 'active'
+    : 'idle';
+
+  const stage3Verified =
+    eventTypes.has('tool_call') ||
+    eventTypes.has('hook_verify') ||
+    eventTypes.has('completed') ||
+    stepDeltasCount >= 2;
+  const stage3: StageVisualState = stage3Verified
+    ? 'verified'
+    : shipping && (stage2Verified || eventTypes.has('step_delta'))
+    ? 'active'
+    : 'idle';
+
+  const stage4Verified =
+    eventTypes.has('hook_verify') ||
+    eventTypes.has('completed') ||
+    buildPassed !== null;
+  const stage4: StageVisualState = stage4Verified
+    ? 'verified'
+    : shipping && (stage3Verified || eventTypes.has('tool_call') || eventTypes.has('step_delta'))
+    ? 'active'
+    : 'idle';
+
+  const stage5Verified =
+    buildPassed === true ||
+    eventTypes.has('completed') ||
+    Boolean(lastPr);
+  const stage5: StageVisualState = hasError
+    ? 'failed'
+    : stage5Verified
+    ? 'verified'
+    : shipping && (eventTypes.has('hook_verify') || stage4Verified)
+    ? 'active'
+    : 'idle';
+
+  const stages: Array<{
+    num: string;
+    title: string;
+    sub: string;
+    telemetry: string;
+    state: StageVisualState;
+  }> = [
+    {
+      num: '01',
+      title: 'Agent Init',
+      sub: 'antigravity-preview-09-2026',
+      telemetry: interactionId
+        ? `${repoSlug.slice(0, 18)} · ${interactionId.slice(0, 8)}`
+        : repoSlug.slice(0, 26),
+      state: stage1,
+    },
+    {
+      num: '02',
+      title: 'Linux Sandbox',
+      sub: 'environment: remote',
+      telemetry: environmentId
+        ? `env: ${environmentId.slice(0, 16)}`
+        : 'isolated Linux VM',
+      state: stage2,
+    },
+    {
+      num: '03',
+      title: 'Mount Repo + SKILL.md',
+      sub: 'repository + .agents/skills',
+      telemetry: stage3Verified
+        ? 'repo & skills mounted'
+        : stage3 === 'active'
+        ? 'cloning repo + skills…'
+        : 'pending mount',
+      state: stage3,
+    },
+    {
+      num: '04',
+      title: 'Multi-File Surgery',
+      sub: 'React / Vanilla JS edits',
+      telemetry:
+        toolCallsCount > 0
+          ? `${toolCallsCount} tool call${toolCallsCount > 1 ? 's' : ''}`
+          : stage4 === 'active'
+          ? 'patching workspace…'
+          : 'awaiting diff',
+      state: stage4,
+    },
+    {
+      num: '05',
+      title: 'Build Gate & PR',
+      sub: 'npm run build exit 0',
+      telemetry: lastPr
+        ? `PR #${lastPr.prNumber} opened`
+        : buildPassed === true
+        ? 'exit 0 verified'
+        : hasError
+        ? 'verification failed'
+        : stage5 === 'active'
+        ? 'running build hook…'
+        : 'exit-0 hook gate',
+      state: stage5,
+    },
+  ];
+
+  const overallStatusLabel = hasError
+    ? 'BUILD GATE FAILED'
+    : stage5 === 'verified'
+    ? 'VERIFIED · EXIT 0'
+    : shipping
+    ? 'STREAMING LIVE'
+    : 'READY TO DISPATCH';
+
+  return (
+    <section
+      aria-label="Managed Agent 5-Stage Execution Flow"
+      className="rounded-[16px] border border-[var(--border-card)] bg-[var(--bg-card)] px-5 py-4 shadow-[var(--shadow-card)]"
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-primary)]">
+            5-Stage Remote Execution Flow
+          </span>
+          <span className="rounded-full border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] px-2 py-0.5 font-mono text-[9.5px] text-[var(--cobalt-ice)]">
+            antislop-repo-surgeon
+          </span>
+        </div>
+
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold ${
+            hasError
+              ? 'border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] text-[var(--vermilion)]'
+              : stage5 === 'verified'
+              ? 'border-[var(--emerald-border)] bg-[var(--emerald-bg)] text-[var(--emerald)]'
+              : shipping
+              ? 'border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] text-[var(--cobalt-ice)]'
+              : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)]'
+          }`}
+        >
+          {shipping && !hasError && (
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--cobalt-ice)] animate-studio-pulse" />
+          )}
+          {overallStatusLabel}
+        </span>
+      </div>
+
+      <div className="overflow-x-auto pb-1">
+        <svg
+          viewBox="0 0 1052 98"
+          className="h-auto min-w-[760px] w-full overflow-visible"
+          role="img"
+          aria-label="5-stage live Antigravity Managed Agent execution flow from Agent Init to Build Gate and PR"
+        >
+          <defs>
+            <marker
+              id="ma-arrow-idle"
+              viewBox="0 0 8 8"
+              refX="6"
+              refY="4"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--svg-idle-arrow)" />
+            </marker>
+            <marker
+              id="ma-arrow-active"
+              viewBox="0 0 8 8"
+              refX="6"
+              refY="4"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--cobalt-ice)" />
+            </marker>
+            <marker
+              id="ma-arrow-ok"
+              viewBox="0 0 8 8"
+              refX="6"
+              refY="4"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--emerald)" />
+            </marker>
+            <marker
+              id="ma-arrow-fail"
+              viewBox="0 0 8 8"
+              refX="6"
+              refY="4"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--vermilion)" />
+            </marker>
+          </defs>
+
+          {stages.map((st, idx) => {
+            const x = 4 + idx * 212;
+            const w = 192;
+            const pal = stagePalette(st.state);
+            const nextStage = stages[idx + 1];
+
+            return (
+              <g key={st.num}>
+                <rect
+                  x={x}
+                  y={6}
+                  width={w}
+                  height={84}
+                  rx={10}
+                  fill={pal.fill}
+                  stroke={pal.stroke}
+                  strokeWidth={st.state === 'idle' ? '1.1' : '1.75'}
+                />
+
+                {/* Top Badge Row: Step Number + Live State Pill */}
+                <text
+                  x={x + 12}
+                  y={23}
+                  fill={pal.accent}
+                  className="font-mono text-[9.5px] font-bold"
+                >
+                  {st.num}
+                </text>
+
+                <rect
+                  x={x + w - 66}
+                  y={12}
+                  width={54}
+                  height={15}
+                  rx={7.5}
+                  fill={pal.badgeBg}
+                  stroke={pal.badgeStroke}
+                  strokeWidth="0.8"
+                />
+                {st.state === 'active' && (
+                  <circle
+                    cx={x + w - 58}
+                    cy={19.5}
+                    r="2.3"
+                    fill="var(--cobalt-ice)"
+                    className="animate-studio-pulse"
+                  />
+                )}
+                <text
+                  x={st.state === 'active' ? x + w - 36 : x + w - 39}
+                  y={22}
+                  textAnchor="middle"
+                  fill={pal.accent}
+                  className="font-mono text-[7.5px] font-bold"
+                >
+                  {pal.badgeLabel}
+                </text>
+
+                {/* Stage Title */}
+                <text
+                  x={x + 12}
+                  y={44}
+                  fill={pal.title}
+                  className="font-sans text-[12px] font-semibold"
+                >
+                  {st.title}
+                </text>
+
+                {/* API / Environment Sub-label */}
+                <text
+                  x={x + 12}
+                  y={60}
+                  fill={pal.accent}
+                  className="font-mono text-[9.5px]"
+                >
+                  {st.sub}
+                </text>
+
+                {/* Live Telemetry Line */}
+                <text
+                  x={x + 12}
+                  y={77}
+                  fill={pal.sub}
+                  className="font-mono text-[9px]"
+                >
+                  {st.telemetry}
+                </text>
+
+                {/* Connector Arrow to Next Stage */}
+                {nextStage && (
+                  <line
+                    x1={x + w + 2}
+                    y1={48}
+                    x2={x + w + 16}
+                    y2={48}
+                    stroke={
+                      nextStage.state === 'failed'
+                        ? 'var(--vermilion)'
+                        : nextStage.state === 'verified'
+                        ? 'var(--emerald)'
+                        : nextStage.state === 'active'
+                        ? 'var(--cobalt-ice)'
+                        : 'var(--svg-idle-arrow)'
+                    }
+                    strokeWidth={nextStage.state === 'idle' ? '1.35' : '1.9'}
+                    className={
+                      nextStage.state === 'active' ? 'atelier-svg-flow' : undefined
+                    }
+                    markerEnd={
+                      nextStage.state === 'failed'
+                        ? 'url(#ma-arrow-fail)'
+                        : nextStage.state === 'verified'
+                        ? 'url(#ma-arrow-ok)'
+                        : nextStage.state === 'active'
+                        ? 'url(#ma-arrow-active)'
+                        : 'url(#ma-arrow-idle)'
+                    }
+                  />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 export function ManagedAgentPanel({
   defaultRepoUrl,
   defaultBranch,
@@ -40,7 +471,7 @@ export function ManagedAgentPanel({
   onOpenPr,
 }: ManagedAgentPanelProps) {
   const [repoUrl, setRepoUrl] = useState(
-    defaultRepoUrl || 'https://github.com/Shantanu0119/antislop'
+    defaultRepoUrl || 'https://github.com/REDFOX1899/antislop'
   );
   const [branch, setBranch] = useState(defaultBranch || 'main');
   const [runBuildHook, setRunBuildHook] = useState(true);
@@ -161,6 +592,17 @@ export function ManagedAgentPanel({
             <span>1-Click Open GitHub PR</span>
           </button>
         </div>
+
+        {/* 5-Stage Live Managed Agent Execution Flow */}
+        <ManagedAgentExecutionFlow
+          shipping={shipping}
+          events={events}
+          environmentId={environmentId}
+          interactionId={interactionId}
+          buildPassed={buildPassed}
+          repoUrl={repoUrl}
+          lastPr={lastPr}
+        />
 
         {/* Configuration + Remote Linux Sandbox Stream */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

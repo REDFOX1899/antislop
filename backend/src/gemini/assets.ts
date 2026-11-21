@@ -11,6 +11,7 @@ export interface GenerateBespokeAssetsParams {
   manifest: DesignManifest;
   referenceImages: MediaAssetInput[];
   outputDir: string;
+  projectContextSummary?: string;
 }
 
 const PER_ASSET_TIMEOUT_MS = 28_000;
@@ -71,15 +72,21 @@ async function generateSingleAsset(
   slot: BespokeAssetPrompt,
   manifest: DesignManifest,
   refBlocks: Interactions.ImageContent[],
-  outputDir: string
+  outputDir: string,
+  projectContextSummary?: string
 ): Promise<{ filePath: string; publicUrl: string } | null> {
   const promptText = [
     `Create a bespoke, gallery-grade editorial visual for the UI hero/surface slot "${slot.slotId}" matching the aesthetic "${manifest.vibeTitle}".`,
+    projectContextSummary && projectContextSummary.trim()
+      ? `TARGET WEBSITE DOMAIN & SUBJECT CONTEXT (depict this site's actual product/subject, NEVER unrelated off-topic filler):\n${projectContextSummary.trim().slice(0, 900)}`
+      : null,
     `Art Direction Prompt: ${slot.prompt}`,
     `Color & Material Harmony: ground=${manifest.tokens.palette.canvas}, surface=${manifest.tokens.palette.surface}, primary ink=${manifest.tokens.palette.inkPrimary}, accent=${manifest.tokens.palette.accent}.`,
     `Aspect Ratio target: ${slot.aspectRatio}.`,
-    `Strict Constraints: Harmonize lighting, palette, and tactile texture directly with the provided moodboard reference images. ABSOLUTELY ZERO text, typography, watermarks, UI buttons, or logos inside the image. Pure museum-grade editorial art direction.`,
-  ].join('\n');
+    `Strict Constraints: Depict the target website's real domain subject while harmonizing lighting, palette, and tactile texture directly with the provided moodboard reference images. ABSOLUTELY ZERO text, typography, watermarks, UI buttons, or logos inside the image. Pure museum-grade editorial art direction.`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const inputBlocks: Interactions.Content[] = [
     ...refBlocks,
@@ -164,12 +171,19 @@ export async function generateTargetedArtwork(params: {
   outputDir: string;
   publicPrefix: string;
   referenceImages?: MediaAssetInput[];
+  projectContextSummary?: string;
+  targetStem?: string;
+  aspectRatio?: '16:9' | '4:3' | '1:1' | '3:4';
+  styleMode?: 'isolated_subject' | 'editorial_hero';
 }): Promise<{ filePath: string; publicUrl: string; latencyMs: number } | null> {
   const start = Date.now();
+  const styleMode = params.styleMode || 'isolated_subject';
+  const aspectRatio = params.aspectRatio || (styleMode === 'editorial_hero' ? '16:9' : '3:4');
+
   return traceSpan(
     'antislop.assets.generateTargetedArtwork',
     'llm',
-    { model: ENV.GEMINI_MODEL_IMAGE_GEN, instruction: params.instruction.slice(0, 140) },
+    { model: ENV.GEMINI_MODEL_IMAGE_GEN, styleMode, instruction: params.instruction.slice(0, 140) },
     async () => {
       const refBlocks: Interactions.ImageContent[] = [];
       for (const ref of (params.referenceImages || []).slice(0, 3)) {
@@ -178,12 +192,31 @@ export async function generateTargetedArtwork(params: {
         refBlocks.push({ type: 'image', data: bin.base64, mime_type: bin.mimeType });
       }
 
-      const promptText = [
-        `Generate a single striking, museum-grade studio artwork fulfilling this user visual change request: "${params.instruction}".`,
-        `Composition: Center the single main subject prominently with a dramatic, unmistakable silhouette against a PURE SOLID WHITE (#FFFFFF) background.`,
-        `Style: High-contrast artistic editorial photography/illustration with deep luminous cobalt blue and crisp charcoal ink shading so it looks extraordinary both directly and when sampled by a halftone dot-matrix canvas shader.`,
-        `Strict Rules: ABSOLUTELY ZERO text, letters, numbers, UI chrome, borders, or watermarks.`,
-      ].join('\n');
+      const domainLine =
+        params.projectContextSummary && params.projectContextSummary.trim()
+          ? `TARGET WEBSITE DOMAIN & SUBJECT CONTEXT:\n${params.projectContextSummary.trim().slice(0, 900)}`
+          : null;
+
+      const promptText =
+        styleMode === 'editorial_hero'
+          ? [
+              `Generate a single striking, museum-grade editorial hero photograph/artwork grounded in this website's actual domain and subject matter.`,
+              domainLine,
+              `Creative Direction: "${params.instruction}".`,
+              `Visual Calibration: Harmonize lighting, tactile materials, and color palette directly with any attached moodboard reference images. Depict the actual product, craft, or subject of this website — NEVER unrelated abstract spheres or off-topic filler.`,
+              `Strict Rules: ABSOLUTELY ZERO text, letters, numbers, UI chrome, borders, or watermarks inside the image.`,
+            ]
+              .filter(Boolean)
+              .join('\n')
+          : [
+              `Generate a single striking, museum-grade studio artwork fulfilling this user visual change request: "${params.instruction}".`,
+              domainLine,
+              `Composition: Center the single main subject prominently with a dramatic, unmistakable silhouette against a PURE SOLID WHITE (#FFFFFF) background.`,
+              `Style: High-contrast artistic editorial photography/illustration with deep luminous cobalt blue and crisp charcoal ink shading so it looks extraordinary both directly and when sampled by a halftone dot-matrix canvas shader.`,
+              `Strict Rules: ABSOLUTELY ZERO text, letters, numbers, UI chrome, borders, or watermarks.`,
+            ]
+              .filter(Boolean)
+              .join('\n');
 
       const userInputStep: Interactions.Step[] = [
         {
@@ -202,7 +235,7 @@ export async function generateTargetedArtwork(params: {
               response_modalities: ['image'],
               generation_config: {
                 image_config: {
-                  aspect_ratio: '3:4',
+                  aspect_ratio: aspectRatio,
                   image_size: '1K',
                 },
               },
@@ -235,7 +268,10 @@ export async function generateTargetedArtwork(params: {
       if (!generated) return null;
 
       const ext = extensionForMime(generated.mimeType);
-      const fileName = `antislop-art-${Date.now().toString(36)}${ext}`;
+      const safeStem = params.targetStem
+        ? params.targetStem.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '-')
+        : '';
+      const fileName = `${safeStem || `antislop-art-${Date.now().toString(36)}`}${ext}`;
       const fullPath = path.join(params.outputDir, fileName);
 
       await fs.mkdir(params.outputDir, { recursive: true });
@@ -295,7 +331,9 @@ export async function generateBespokeAssets(
             ];
 
       const settled = await Promise.allSettled(
-        slots.map((slot) => generateSingleAsset(slot, params.manifest, refBlocks, params.outputDir))
+        slots.map((slot) =>
+          generateSingleAsset(slot, params.manifest, refBlocks, params.outputDir, params.projectContextSummary)
+        )
       );
 
       const generatedPaths: string[] = [];

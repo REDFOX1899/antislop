@@ -10,6 +10,8 @@ import {
 } from 'react';
 import type { DrawnCircleAnnotation, TransformRunRequest } from '@shared/types';
 import {
+  AudioLines,
+  Box,
   Code2,
   Columns2,
   Loader2,
@@ -17,7 +19,9 @@ import {
   Monitor,
   Pencil,
   Plus,
+  Radio,
   RefreshCw,
+  Send,
   Smartphone,
   Sparkles,
   Square,
@@ -26,8 +30,10 @@ import {
   X,
 } from 'lucide-react';
 import { getWorkspaceFiles, resolveBackendUrl } from '@/lib/api';
+import { useLiveVoiceSession } from '@/lib/useLiveVoiceSession';
 import { useVoiceRecorder } from '@/lib/useVoiceRecorder';
 import { GeminiSparkleMark } from './BrandMarks';
+import { CobaltCube3D } from './CobaltCube3D';
 import { CodeDiffModal } from './CodeDiffModal';
 
 export interface LiveCanvasHandle {
@@ -65,6 +71,7 @@ interface LiveCanvasProps {
     transcript: string;
   }) => void;
   onApplyCircleSpeak: () => void;
+  onLiveRunStarted?: (runId: string, instruction: string) => void;
   isRunning: boolean;
   queueCount: number;
   liveStatusText?: string;
@@ -96,6 +103,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       voiceTranscript,
       onCanvasVoiceRecorded,
       onApplyCircleSpeak,
+      onLiveRunStarted,
       isRunning,
       queueCount,
       liveStatusText,
@@ -108,6 +116,11 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
   ) {
     const [viewportMode, setViewportMode] = useState<'desktop' | 'mobile'>('desktop');
     const [compareMode, setCompareMode] = useState(false);
+    const [spatial3DMode, setSpatial3DMode] = useState(false);
+    const [stageTilt, setStageTilt] = useState({ x: 0, y: 0 });
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+    const [liveTextDraft, setLiveTextDraft] = useState('');
+    const [dismissedLiveError, setDismissedLiveError] = useState<string | null>(null);
     const [wipePercent, setWipePercent] = useState(50);
     const [manualReload, setManualReload] = useState(0);
     const [editingCircleId, setEditingCircleId] = useState<string | null>(null);
@@ -140,6 +153,37 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
 
     const resolvedBaseline = resolveBackendUrl(baselineScreenshotUrl);
     const resolvedFinal = resolveBackendUrl(finalScreenshotUrl);
+
+    const liveVoice = useLiveVoiceSession({ onLiveRunStarted });
+    const isLiveActive =
+      liveVoice.status === 'connecting' || liveVoice.status === 'live';
+
+    useEffect(() => {
+      if (typeof window === 'undefined') return;
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      setPrefersReducedMotion(mq.matches);
+      const onChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+      mq.addEventListener?.('change', onChange);
+      return () => mq.removeEventListener?.('change', onChange);
+    }, []);
+
+    useEffect(() => {
+      if (drawMode && spatial3DMode) {
+        setSpatial3DMode(false);
+      }
+    }, [drawMode, spatial3DMode]);
+
+    useEffect(() => {
+      if (!spatial3DMode) {
+        setStageTilt({ x: 0, y: 0 });
+      }
+    }, [spatial3DMode]);
+
+    useEffect(() => {
+      if (liveVoice.status !== 'error') {
+        setDismissedLiveError(null);
+      }
+    }, [liveVoice.status]);
 
     const canvasVoice = useVoiceRecorder((out) => {
       onCanvasVoiceRecorded({
@@ -522,6 +566,36 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
       return parts.join(' · ');
     })();
 
+    const handleStagePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!spatial3DMode || prefersReducedMotion) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const nx = Math.max(-1, Math.min(1, ((e.clientX - rect.left) / rect.width) * 2 - 1));
+      const ny = Math.max(-1, Math.min(1, ((e.clientY - rect.top) / rect.height) * 2 - 1));
+      setStageTilt({ x: nx, y: ny });
+    };
+
+    const handleStagePointerLeave = () => {
+      if (!spatial3DMode) return;
+      setStageTilt({ x: 0, y: 0 });
+    };
+
+    const handleLiveTextSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const trimmed = liveTextDraft.trim();
+      if (!trimmed) return;
+      if (liveVoice.sendTextMessage(trimmed)) {
+        setLiveTextDraft('');
+      }
+    };
+
+    const toggleSpatial3D = () => {
+      if (!spatial3DMode && drawMode) {
+        onDrawModeChange(false);
+      }
+      setSpatial3DMode((prev) => !prev);
+    };
+
     return (
       /* Floating 16px-radius Deep Obsidian Card (#080A0E, rgba(255,255,255,0.09) hairline) */
       <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-[var(--border-card)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
@@ -673,6 +747,32 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               )}
             </div>
 
+            {/* 2b. Real-Time Two-Way Gemini 3.8 Live Voice Director Toggle */}
+            <button
+              type="button"
+              onClick={liveVoice.toggleSession}
+              aria-pressed={isLiveActive}
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cobalt-ice)] ${
+                isLiveActive
+                  ? 'bg-[var(--cobalt-core)] text-white shadow-[0_0_20px_-4px_rgba(66,133,244,0.75)] ring-1 ring-[#8AB4F8]/50'
+                  : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
+              }`}
+              title="Start real-time two-way voice director (Gemini 3.8 Live)"
+            >
+              {isLiveActive ? (
+                <AudioLines className="h-3.5 w-3.5 motion-safe:animate-pulse" aria-hidden="true" />
+              ) : (
+                <Radio className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              <span>
+                {liveVoice.status === 'connecting'
+                  ? 'Connecting…'
+                  : liveVoice.status === 'live'
+                  ? 'Live · 3.8'
+                  : 'Live'}
+              </span>
+            </button>
+
             {/* 3. </> Diff Ghost Control */}
             <button
               type="button"
@@ -686,6 +786,22 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
             >
               <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Diff</span>
+            </button>
+
+            {/* 3b. Interactive 3D Spatial Stage Toggle */}
+            <button
+              type="button"
+              onClick={toggleSpatial3D}
+              aria-pressed={spatial3DMode}
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cobalt-ice)] ${
+                spatial3DMode
+                  ? 'bg-[var(--cobalt-tint)] text-[var(--cobalt-ice)] ring-1 ring-[var(--cobalt-border)]'
+                  : 'text-[var(--ink-secondary)] hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]'
+              }`}
+              title="Inspect live canvas in 3D spatial depth view"
+            >
+              <Box className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>3D</span>
             </button>
 
             {/* 4. Before / After Ghost Toggle (shown ONLY when baseline exists!) */}
@@ -792,13 +908,44 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
         )}
 
         {/* Pure Unobstructed Interactive Live Website Stage inside Sculptural Browser Bezel */}
-        <div className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
+        <div
+          onPointerMove={handleStagePointerMove}
+          onPointerLeave={handleStagePointerLeave}
+          style={spatial3DMode ? { perspective: '1600px' } : undefined}
+          className="atelier-stage-grid relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3"
+        >
           <div
-            ref={stageRef}
-            className={`studio-browser-bezel relative flex h-full flex-col overflow-hidden rounded-[12px] bg-[var(--bg-card-elevated)] transition-[width] duration-200 ${
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: spatial3DMode
+                ? prefersReducedMotion
+                  ? 'rotateX(9deg) rotateY(-10deg) scale(0.90)'
+                  : `rotateX(${(11 - stageTilt.y * 4.5).toFixed(2)}deg) rotateY(${(-12 + stageTilt.x * 5.5).toFixed(2)}deg) scale(0.90)`
+                : 'rotateX(0deg) rotateY(0deg) scale(1)',
+              transition: prefersReducedMotion
+                ? 'none'
+                : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+            className={`relative flex h-full items-center justify-center transition-[width] duration-200 ${
               viewportMode === 'mobile' ? 'w-[390px] max-w-full' : 'w-full'
             }`}
           >
+            {spatial3DMode && (
+              <div
+                aria-hidden="true"
+                style={{
+                  transform: 'translateZ(-28px)',
+                  backgroundImage:
+                    'linear-gradient(to right, rgba(66,133,244,0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(66,133,244,0.16) 1px, transparent 1px), radial-gradient(circle at 50% 45%, rgba(26,115,232,0.24), transparent 72%)',
+                  backgroundSize: '28px 28px, 28px 28px, 100% 100%',
+                }}
+                className="pointer-events-none absolute -inset-3 rounded-[16px] border border-[#4285F4]/35 bg-[#050A14]/80 shadow-[0_30px_80px_-20px_rgba(11,87,208,0.55)]"
+              />
+            )}
+            <div
+              ref={stageRef}
+              className="studio-browser-bezel relative flex h-full w-full flex-col overflow-hidden rounded-[12px] bg-[var(--bg-card-elevated)]"
+            >
             {/* Minimal 28px Code-Wiki macOS Window Bezel Chrome */}
             <div className="group flex h-[28px] shrink-0 items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card-elevated)] px-3 select-none">
               <div className="flex items-center gap-1.5" aria-hidden="true">
@@ -1079,12 +1226,14 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   </div>
                 ))}
 
-              {/* Minimal Floating Bottom-Center Cobalt Status Pill while Building */}
+              {/* Minimal Floating Cobalt Status Pill while Building */}
               {isRunning && (
                 <div
                   role="status"
                   aria-live="polite"
-                  className="pointer-events-none absolute bottom-3 left-1/2 z-30 flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border border-[rgba(138,180,248,0.32)] bg-[#080A0E]/95 px-3.5 py-1.5 text-[#F1F3F4] shadow-[var(--shadow-float)]"
+                  className={`pointer-events-none absolute left-1/2 z-30 flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border border-[rgba(138,180,248,0.32)] bg-[#080A0E]/95 px-3.5 py-1.5 text-[#F1F3F4] shadow-[var(--shadow-float)] ${
+                    isLiveActive ? 'top-3' : 'bottom-3'
+                  }`}
                 >
                   <span className="h-2 w-2 shrink-0 rounded-full bg-[#4285F4] animate-studio-pulse" />
                   <span className="truncate font-mono text-[10.5px]">
@@ -1106,6 +1255,7 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
               {/* Subtle Auto-Dismissing 3-Step First-Visit Whisper */}
               {!hasRunOnce &&
                 !isRunning &&
+                !isLiveActive &&
                 drawnCircles.length === 0 &&
                 !dismissedHint &&
                 !compareMode && (
@@ -1132,7 +1282,276 @@ export const LiveCanvas = forwardRef<LiveCanvasHandle, LiveCanvasProps>(
                   </div>
                 )}
             </div>
+            </div>
+
+            {/* 3 Subtle Floating Spatial Depth Badges inside 3D Scene */}
+            {spatial3DMode && (
+              <>
+                <div
+                  aria-hidden="true"
+                  style={{ transform: 'translateZ(26px)' }}
+                  className="pointer-events-none absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full border border-[#8AB4F8]/40 bg-[#080A0E]/90 px-2.5 py-1 font-mono text-[10px] font-medium text-[#8AB4F8] shadow-lg backdrop-blur-md"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#34D399]" />
+                  <span>Layer 01 · Live DOM</span>
+                </div>
+                <div
+                  aria-hidden="true"
+                  style={{ transform: 'translateZ(36px)' }}
+                  className="pointer-events-none absolute bottom-4 left-4 z-30 flex items-center gap-1.5 rounded-full border border-[#4285F4]/45 bg-[#080A0E]/90 px-2.5 py-1 font-mono text-[10px] font-medium text-[#A8C7FA] shadow-lg backdrop-blur-md"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#4285F4]" />
+                  <span>Layer 02 · Multimodal Shader/Art</span>
+                </div>
+                <div
+                  aria-hidden="true"
+                  style={{ transform: 'translateZ(46px)' }}
+                  className="pointer-events-none absolute bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full border border-[#34D399]/45 bg-[#080A0E]/90 px-2.5 py-1 font-mono text-[10px] font-medium text-[#34D399] shadow-lg backdrop-blur-md"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#34D399]" />
+                  <span>Layer 03 · Decision-1 Guard</span>
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Quick Exit 3D Chip */}
+          {spatial3DMode && (
+            <button
+              type="button"
+              onClick={() => setSpatial3DMode(false)}
+              className="absolute right-5 top-5 z-40 inline-flex items-center gap-1.5 rounded-full border border-[#8AB4F8]/45 bg-[#080A0E]/92 px-3 py-1.5 font-mono text-[11px] font-medium text-[#E8EAED] shadow-lg backdrop-blur-md transition-colors hover:border-[#8AB4F8] hover:bg-[#0B57D0]/30 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8AB4F8]"
+            >
+              <Box className="h-3.5 w-3.5 text-[#8AB4F8]" aria-hidden="true" />
+              <span>Exit 3D</span>
+            </button>
+          )}
+
+          {/* Post-Circle Quick Action Bar */}
+          {drawnCircles.length > 0 && !drawMode && !isRunning && (
+            <div
+              className={`absolute left-1/2 z-40 flex max-w-[94%] -translate-x-1/2 items-center gap-1.5 rounded-full border border-[rgba(255,90,79,0.38)] bg-[#080A0E]/92 p-1.5 text-[#F1F3F4] shadow-[0_16px_42px_-12px_rgba(0,0,0,0.88)] backdrop-blur-xl ${
+                isLiveActive ? 'bottom-[100px]' : 'bottom-4'
+              }`}
+            >
+              <span className="hidden pl-2.5 pr-1 font-mono text-[10.5px] text-[#9AA0A6] sm:inline">
+                {drawnCircles.length} circle{drawnCircles.length > 1 ? 's' : ''}
+              </span>
+              <button
+                type="button"
+                onClick={onApplyCircleSpeak}
+                className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[var(--vermilion)] px-3 text-[11.5px] font-medium text-white transition-colors hover:bg-[var(--vermilion-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8AB4F8]"
+              >
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                <span>Apply Circled Edit</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void liveVoice.startSession()}
+                disabled={isLiveActive}
+                className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#8AB4F8]/35 bg-[#1A73E8]/25 px-3 text-[11.5px] font-medium text-[#A8C7FA] transition-colors hover:bg-[#1A73E8]/40 hover:text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8AB4F8]"
+              >
+                <Radio className="h-3 w-3" aria-hidden="true" />
+                <span>Speak Live</span>
+              </button>
+              <button
+                type="button"
+                onClick={clearCircles}
+                className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-medium text-[#9AA0A6] transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8AB4F8]"
+              >
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+                <span>Clear</span>
+              </button>
+            </div>
+          )}
+
+          {/* Live Voice Error Notice */}
+          {liveVoice.status === 'error' &&
+            liveVoice.error &&
+            dismissedLiveError !== liveVoice.error && (
+              <div
+                role="alert"
+                className="absolute bottom-4 left-1/2 z-40 flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--vermilion-border)] bg-[#080A0E]/95 py-1.5 pl-3.5 pr-2 text-[11.5px] text-[#F1F3F4] shadow-xl backdrop-blur-md"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--vermilion)]" />
+                <span className="truncate">{liveVoice.error}</span>
+                <button
+                  type="button"
+                  onClick={() => void liveVoice.startSession()}
+                  className="shrink-0 rounded-full bg-[#1A73E8] px-2.5 py-0.5 text-[10.5px] font-medium text-white hover:bg-[#0B57D0]"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedLiveError(liveVoice.error)}
+                  aria-label="Dismiss voice error"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#9AA0A6] hover:bg-white/10 hover:text-white"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
+          {/* Floating Gemini 3.8 Live Voice Director HUD */}
+          {isLiveActive && (
+            <div
+              role="region"
+              aria-label="Gemini 3.8 Live Voice Director"
+              className="absolute bottom-4 left-1/2 z-40 flex w-[min(680px,95%)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-[rgba(138,180,248,0.34)] bg-[#080A0E]/92 p-2.5 text-[#F1F3F4] shadow-[0_20px_54px_-12px_rgba(11,87,208,0.58)] backdrop-blur-xl"
+            >
+              {/* Cobalt 3D Core scaled cleanly inside a 52px container */}
+              <div
+                className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#8AB4F8]/30 bg-[#040812]"
+                aria-hidden="true"
+              >
+                <div
+                  style={{
+                    transform: `scale(${(
+                      (52 / 160) *
+                      (prefersReducedMotion ? 1 : 1 + liveVoice.outputLevel * 0.14)
+                    ).toFixed(4)})`,
+                  }}
+                  className="flex h-[160px] w-[160px] shrink-0 items-center justify-center motion-safe:transition-transform motion-safe:duration-75"
+                >
+                  <CobaltCube3D
+                    variant="hero"
+                    size={1.25}
+                    className="h-[160px] w-[160px]"
+                    ariaLabel="Gemini 3.8 Live Voice Core"
+                  />
+                </div>
+              </div>
+
+              {/* Dual Waveforms + Live Captions + Quick Text Command */}
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#8AB4F8]">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          liveVoice.status === 'connecting'
+                            ? 'bg-[var(--amber)] animate-pulse'
+                            : liveVoice.isGeminiSpeaking
+                            ? 'bg-[#34D399]'
+                            : 'bg-[#4285F4]'
+                        }`}
+                      />
+                      {liveVoice.status === 'connecting'
+                        ? 'Connecting 3.8 Live…'
+                        : liveVoice.isGeminiSpeaking
+                        ? 'Gemini Speaking'
+                        : 'Live · Listening'}
+                    </span>
+
+                    {/* Dual Live Audio Waveform Bars (Emerald Gemini + Cobalt User) */}
+                    <div
+                      className="flex items-center gap-2.5 pl-1"
+                      aria-hidden="true"
+                    >
+                      <div
+                        className="flex h-3.5 items-end gap-[2px]"
+                        title="Gemini audio level"
+                      >
+                        {[0.55, 0.9, 1, 0.8, 0.5].map((weight, i) => {
+                          const h = Math.max(
+                            22,
+                            Math.min(100, Math.round((0.16 + liveVoice.outputLevel * weight * 1.15) * 100))
+                          );
+                          return (
+                            <span
+                              key={i}
+                              style={{ height: `${h}%` }}
+                              className="w-[2.5px] rounded-full bg-[#34D399] motion-safe:transition-[height] motion-safe:duration-75"
+                            />
+                          );
+                        })}
+                      </div>
+                      <div
+                        className="flex h-3.5 items-end gap-[2px]"
+                        title="Microphone audio level"
+                      >
+                        {[0.5, 0.85, 1, 0.85, 0.55].map((weight, i) => {
+                          const h = Math.max(
+                            22,
+                            Math.min(100, Math.round((0.16 + liveVoice.inputLevel * weight * 1.15) * 100))
+                          );
+                          return (
+                            <span
+                              key={i}
+                              style={{ height: `${h}%` }}
+                              className="w-[2.5px] rounded-full bg-[#4285F4] motion-safe:transition-[height] motion-safe:duration-75"
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick text/command poke inside HUD */}
+                  <form
+                    onSubmit={handleLiveTextSubmit}
+                    className="flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.04] pl-2.5 pr-1 py-0.5"
+                  >
+                    <input
+                      type="text"
+                      value={liveTextDraft}
+                      onChange={(e) => setLiveTextDraft(e.target.value)}
+                      placeholder="Type to Live…"
+                      aria-label="Send quick text command to Gemini Live"
+                      className="w-28 bg-transparent text-[11px] text-[#F1F3F4] placeholder:text-[#6E747B] focus:outline-none sm:w-36"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!liveTextDraft.trim() || liveVoice.status !== 'live'}
+                      aria-label="Send command to Gemini Live"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1A73E8] text-white transition-colors hover:bg-[#4285F4] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#8AB4F8]"
+                    >
+                      <Send className="h-2.5 w-2.5" aria-hidden="true" />
+                    </button>
+                  </form>
+                </div>
+
+                {/* Real-time You: and Gemini: captions */}
+                <div className="flex flex-col gap-0.5 text-[11px] leading-snug">
+                  <p className="truncate text-[#C4C7C5]">
+                    <span className="mr-1.5 font-mono text-[10px] font-semibold text-[#8AB4F8]">
+                      You:
+                    </span>
+                    {liveVoice.userTranscript ? (
+                      liveVoice.userTranscript
+                    ) : (
+                      <span className="text-[#6E747B]">
+                        Speak naturally — interrupt anytime…
+                      </span>
+                    )}
+                  </p>
+                  <p className="truncate text-[#E8EAED]">
+                    <span className="mr-1.5 font-mono text-[10px] font-semibold text-[#34D399]">
+                      Gemini:
+                    </span>
+                    {liveVoice.geminiTranscript ? (
+                      liveVoice.geminiTranscript
+                    ) : (
+                      <span className="text-[#6E747B]">
+                        {liveVoice.status === 'connecting'
+                          ? 'Opening 16kHz/24kHz audio stream…'
+                          : 'Ready to direct UI edits live.'}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={liveVoice.stopSession}
+                className="shrink-0 rounded-full border border-[var(--vermilion-border)] bg-[var(--vermilion-bg)] px-3 py-1.5 text-[11.5px] font-medium text-[var(--vermilion)] transition-colors hover:bg-[var(--vermilion)] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8AB4F8]"
+              >
+                End
+              </button>
+            </div>
+          )}
         </div>
 
         <CodeDiffModal

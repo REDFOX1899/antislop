@@ -1,6 +1,7 @@
 ---
 name: antislop-design-craft
-description: Open-source UI design-engineering craft standard for eliminating generic AI slop. Enforces Swiss International Typographic Style, Dieter Rams' 10 Principles, Radix/WCAG AA contrast math, Refactoring UI 4/8/16/24/48/96 spacing rhythm, fluid clamp() type scales, Google Modern Web Guidance (native HTML primitives and compositor-only motion), Canvas/WebGL/Shader preservation, and the Anti-Slop Ban List.
+version: 2.0.0
+description: Open-source UI design-engineering craft standard (v2) for eliminating generic AI slop. Enforces Swiss International Typographic Style, Dieter Rams' 10 Principles, Modern CSS 3D Spatial Depth, Domain-Grounded Visual Art, Radix/WCAG AA contrast math, Refactoring UI 4/8/16/24/48/96 spacing rhythm, fluid clamp() type scales, Google Modern Web Guidance, Canvas/WebGL/Shader preservation, and the Anti-Slop Ban List.
 ---
 
 # AntiSlop Design Craft Standard
@@ -103,7 +104,21 @@ Build on modern Baseline web platform primitives instead of bloated div-soup or 
 
 ---
 
-## 6. Interactive Canvas, WebGL & Shader Preservation
+## 6. Modern 3D Spatial Depth & Domain-Grounded Visual Art (v2)
+
+Elevate flat 2D wireframes into tactile, spatially legible interfaces without sacrificing Swiss restraint:
+
+- **CSS 3D Spatial Depth**:
+  - Frame showcase modules and architectural cards inside `perspective(1200px)` containers (`transform-style: preserve-3d`) with subtle resting/hover tilt or layered `translateZ` focal planes.
+  - Replace muddy dark drop-shadows with crisp specular top-edge hairlines (`inset 0 1px 0 rgba(255, 255, 255, 0.14)` on dark surfaces; `inset 0 1px 0 rgba(255, 255, 255, 0.7)` on warm/light surfaces) plus `1px solid var(--border-subtle)`.
+  - Compose an **asymmetric Swiss/Bento focal hierarchy**: one commanding 60–65% primary focal frame balanced against structured secondary spec/index modules rather than repetitive equal-width clones.
+  - Animate spatial shifts strictly on `transform` and `opacity` with `cubic-bezier(0.22, 1, 0.36, 1)` (`180–260ms`) gated inside `@media (prefers-reduced-motion: no-preference)`.
+- **Domain-Grounded Visual Art**:
+  - Every generated hero or editorial image MUST depict the website's **actual product, craft, or subject matter** calibrated to the manifest palette — ZERO unrelated abstract spheres, generic stock landscapes, or off-topic filler.
+
+---
+
+## 7. Interactive Canvas, WebGL & Shader Preservation
 
 When redesigning creative coding apps, 3D showcases, data visualizations, audio visualizers, or vanilla static repos containing `<canvas>`, WebGL/Three.js scenes, GLSL shaders, or `requestAnimationFrame` simulations:
 
@@ -113,7 +128,7 @@ When redesigning creative coding apps, 3D showcases, data visualizations, audio 
 
 ---
 
-## 7. The Explicit Anti-Slop Ban List (Zero Tolerance)
+## 8. The Explicit Anti-Slop Ban List (Zero Tolerance)
 
 Reject and purge ALL of the following generic AI-generated clichés:
 
@@ -126,7 +141,7 @@ Reject and purge ALL of the following generic AI-generated clichés:
 
 ---
 
-## 8. Deterministic Verification Gate
+## 9. Deterministic Verification Gate
 
 Before marking any UI engineering pass complete, verify deterministically:
 

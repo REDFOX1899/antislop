@@ -275,8 +275,8 @@ function DecisionPipelineGraph({
     drawnCirclesCount > 0
       ? `${drawnCirclesCount} circle${drawnCirclesCount > 1 ? 's' : ''}`
       : assetsCount > 0
-      ? `${assetsCount} ref${assetsCount > 1 ? 's' : ''}`
-      : 'ready';
+      ? `3.8 Live · ${assetsCount} ref${assetsCount > 1 ? 's' : ''}`
+      : '3.8 Live · ready';
 
   const directorSub = manifest?.latencyMs
     ? formatMsShort(manifest.latencyMs)
@@ -292,33 +292,40 @@ function DecisionPipelineGraph({
     ? 'coding…'
     : isCircleRun
     ? 'hydrogen'
-    : 'neon';
+    : 'neon · 4×';
 
   const decisionSub = scorecard?.latencyMs
     ? formatMsShort(scorecard.latencyMs)
     : decisionState === 'active'
     ? 'scoring…'
-    : '12 probes';
+    : '~250ms · 12p';
 
   const passSub = scorecard
     ? `${Math.round(scorecard.overallTasteScore)}/100`
     : 'gate';
+
+  const handoffState: NodeVisualState = hasPassed
+    ? 'passed'
+    : isRunning && hasScored
+    ? 'active'
+    : 'idle';
 
   const cRef = nodeColors(refState);
   const cDir = nodeColors(directorState);
   const cCode = nodeColors(coderState);
   const cDec = nodeColors(decisionState);
   const cPass = nodeColors(passState);
+  const cHandoff = nodeColors(handoffState);
 
   const loopActive =
     hasRefinementLoop || (isRunning && lastEvent?.type === 'refinement_triggered');
 
   return (
     <svg
-      viewBox="0 0 248 122"
-      className="h-[116px] w-full overflow-visible"
+      viewBox="0 0 252 152"
+      className="h-[148px] w-full overflow-visible"
       role="img"
-      aria-label="AntiSlop Gemini 4 and Decisions API pipeline flow graph"
+      aria-label="AntiSlop Gemini 3.8 Live, Gemini 4, Decisions API, and Managed Agent pipeline flow graph"
     >
       <defs>
         <marker
@@ -367,11 +374,11 @@ function DecisionPipelineGraph({
         </marker>
       </defs>
 
-      {/* Connector 1: Ref / Circles -> Director */}
+      {/* Connector 1: 3.8 Live / Refs -> Director */}
       <line
-        x1="112"
+        x1="114"
         y1="22"
-        x2="132"
+        x2="134"
         y2="22"
         stroke={
           directorState === 'active'
@@ -380,7 +387,7 @@ function DecisionPipelineGraph({
             ? 'var(--emerald)'
             : 'var(--svg-idle-arrow)'
         }
-        strokeWidth="1.4"
+        strokeWidth={directorState === 'idle' ? '1.35' : '1.8'}
         className={directorState === 'active' ? 'atelier-svg-flow' : undefined}
         markerEnd={
           directorState === 'active'
@@ -391,9 +398,9 @@ function DecisionPipelineGraph({
         }
       />
 
-      {/* Connector 2: Director -> Neon Coder */}
+      {/* Connector 2: Director -> Neon/Hydrogen Coder */}
       <path
-        d="M 190 38 L 190 47 L 42 47 L 42 56"
+        d="M 192 38 L 192 47 L 43 47 L 43 56"
         fill="none"
         stroke={
           coderState === 'active'
@@ -402,7 +409,7 @@ function DecisionPipelineGraph({
             ? 'var(--emerald)'
             : 'var(--svg-idle-arrow)'
         }
-        strokeWidth="1.4"
+        strokeWidth={coderState === 'idle' ? '1.35' : '1.8'}
         strokeLinejoin="round"
         className={coderState === 'active' ? 'atelier-svg-flow' : undefined}
         markerEnd={
@@ -416,9 +423,9 @@ function DecisionPipelineGraph({
 
       {/* Connector 3: Neon Coder -> Decision-1 Gate */}
       <line
-        x1="80"
+        x1="82"
         y1="75"
-        x2="90"
+        x2="92"
         y2="75"
         stroke={
           decisionState === 'active'
@@ -427,7 +434,7 @@ function DecisionPipelineGraph({
             ? 'var(--emerald)'
             : 'var(--svg-idle-arrow)'
         }
-        strokeWidth="1.4"
+        strokeWidth={decisionState === 'idle' ? '1.35' : '1.8'}
         className={decisionState === 'active' ? 'atelier-svg-flow' : undefined}
         markerEnd={
           decisionState === 'active'
@@ -440,58 +447,81 @@ function DecisionPipelineGraph({
 
       {/* Connector 4: Decision-1 Gate -> Pass */}
       <line
-        x1="174"
+        x1="176"
         y1="75"
-        x2="184"
+        x2="186"
         y2="75"
         stroke={passState === 'passed' ? 'var(--emerald)' : 'var(--svg-idle-arrow)'}
-        strokeWidth="1.4"
+        strokeWidth={passState === 'passed' ? '1.8' : '1.35'}
         markerEnd={
           passState === 'passed' ? 'url(#as-arrow-ok)' : 'url(#as-arrow-idle)'
         }
       />
 
+      {/* Connector 5: Pass -> Managed Agent Handoff */}
+      <path
+        d="M 217 92 L 217 110 L 182 110"
+        fill="none"
+        stroke={
+          handoffState === 'passed'
+            ? 'var(--emerald)'
+            : handoffState === 'active'
+            ? 'var(--cobalt-ice)'
+            : 'var(--svg-idle-arrow)'
+        }
+        strokeWidth={handoffState === 'idle' ? '1.3' : '1.75'}
+        strokeLinejoin="round"
+        className={handoffState === 'active' ? 'atelier-svg-flow' : undefined}
+        markerEnd={
+          handoffState === 'passed'
+            ? 'url(#as-arrow-ok)'
+            : handoffState === 'active'
+            ? 'url(#as-arrow-active)'
+            : 'url(#as-arrow-idle)'
+        }
+      />
+
       {/* Curved Loop-Back Arrow */}
       <path
-        d="M 133 93 C 133 114, 42 114, 42 95"
+        d="M 135 93 C 135 112, 43 112, 43 95"
         fill="none"
         stroke={loopActive ? 'var(--amber)' : 'var(--svg-idle-stroke)'}
-        strokeWidth={loopActive ? '1.6' : '1.2'}
+        strokeWidth={loopActive ? '1.75' : '1.25'}
         strokeDasharray={loopActive ? '4 3' : '3 3'}
         className={loopActive && isRunning ? 'atelier-svg-flow' : undefined}
         markerEnd={loopActive ? 'url(#as-arrow-loop)' : 'url(#as-arrow-idle)'}
       />
       <rect
-        x="61"
-        y="104"
+        x="62"
+        y="100"
         width="54"
         height="13"
         rx="6.5"
         fill={loopActive ? 'var(--svg-loop-fill)' : 'var(--bg-card)'}
         stroke={loopActive ? 'var(--amber)' : 'var(--svg-idle-stroke)'}
-        strokeWidth="0.9"
+        strokeWidth="0.95"
       />
       <text
-        x="88"
-        y="113"
+        x="89"
+        y="109"
         textAnchor="middle"
-        fill={loopActive ? 'var(--amber)' : 'var(--ink-muted)'}
+        fill={loopActive ? 'var(--amber)' : 'var(--ink-secondary)'}
         className="font-mono text-[7.5px] font-semibold"
       >
         Auto-Fix ↺
       </text>
 
-      {/* Node 1: Ref / Circles */}
+      {/* Node 1: 3.8 Live / Refs / Circles */}
       <g>
         <rect
           x="4"
           y="6"
-          width="108"
+          width="110"
           height="32"
           rx="6"
           fill={cRef.fill}
           stroke={cRef.stroke}
-          strokeWidth={refState === 'active' ? '1.5' : '1.1'}
+          strokeWidth={refState === 'active' ? '1.7' : '1.2'}
         />
         {refState === 'active' && (
           <circle
@@ -503,20 +533,20 @@ function DecisionPipelineGraph({
           />
         )}
         <text
-          x="58"
+          x="59"
           y="20"
           textAnchor="middle"
           fill={cRef.titleFill}
-          className="font-mono text-[8.5px] font-semibold"
+          className="font-mono text-[8.2px] font-semibold"
         >
-          Ref / Circles
+          Refs · 3.8 Live
         </text>
         <text
-          x="58"
+          x="59"
           y="31"
           textAnchor="middle"
           fill={cRef.subFill}
-          className="font-mono text-[7.5px]"
+          className="font-mono text-[7.2px]"
         >
           {refSub}
         </text>
@@ -525,56 +555,79 @@ function DecisionPipelineGraph({
       {/* Node 2: Director */}
       <g>
         <rect
-          x="136"
+          x="138"
           y="6"
-          width="108"
+          width="110"
           height="32"
           rx="6"
           fill={cDir.fill}
           stroke={cDir.stroke}
-          strokeWidth={directorState === 'active' ? '1.5' : '1.1'}
+          strokeWidth={directorState === 'active' ? '1.7' : '1.2'}
         />
         {directorState === 'active' && (
           <circle
-            cx="145"
+            cx="147"
             cy="15"
             r="2.4"
             fill="var(--cobalt-ice)"
             className="animate-studio-pulse"
           />
         )}
+        {directorState === 'passed' && (
+          <g>
+            <rect
+              x="217"
+              y="9"
+              width="27"
+              height="10"
+              rx="5"
+              fill="var(--emerald-bg)"
+              stroke="var(--emerald-border)"
+              strokeWidth="0.7"
+            />
+            <text
+              x="230.5"
+              y="16"
+              textAnchor="middle"
+              fill="var(--emerald)"
+              className="font-mono text-[6.3px] font-bold"
+            >
+              OK
+            </text>
+          </g>
+        )}
         <text
-          x="190"
+          x="193"
           y="20"
           textAnchor="middle"
           fill={cDir.titleFill}
-          className="font-mono text-[8.5px] font-semibold"
+          className="font-mono text-[8.2px] font-semibold"
         >
           Director
         </text>
         <text
-          x="190"
+          x="193"
           y="31"
           textAnchor="middle"
           fill={cDir.subFill}
-          className="font-mono text-[7.5px]"
+          className="font-mono text-[7.2px]"
         >
           {directorSub}
         </text>
       </g>
 
-      {/* Node 3: Neon Coder */}
+      {/* Node 3: Neon / Hydrogen Coder */}
       <g>
         <rect
           x="4"
           y="58"
-          width="76"
+          width="78"
           height="34"
           rx="6"
           fill={cCode.fill}
           stroke={cCode.stroke}
           strokeWidth={
-            coderState === 'active' || coderState === 'looping' ? '1.5' : '1.1'
+            coderState === 'active' || coderState === 'looping' ? '1.7' : '1.2'
           }
         />
         {(coderState === 'active' || coderState === 'looping') && (
@@ -587,7 +640,7 @@ function DecisionPipelineGraph({
           />
         )}
         <text
-          x="42"
+          x="43"
           y="73"
           textAnchor="middle"
           fill={cCode.titleFill}
@@ -596,11 +649,11 @@ function DecisionPipelineGraph({
           Neon Coder
         </text>
         <text
-          x="42"
+          x="43"
           y="84"
           textAnchor="middle"
           fill={cCode.subFill}
-          className="font-mono text-[7.5px]"
+          className="font-mono text-[7.2px]"
         >
           {coderSub}
         </text>
@@ -609,7 +662,7 @@ function DecisionPipelineGraph({
       {/* Node 4: Decision-1 Gate */}
       <g>
         <rect
-          x="92"
+          x="94"
           y="58"
           width="82"
           height="34"
@@ -618,13 +671,13 @@ function DecisionPipelineGraph({
           stroke={cDec.stroke}
           strokeWidth={
             decisionState === 'active' || decisionState === 'looping'
-              ? '1.5'
-              : '1.1'
+              ? '1.7'
+              : '1.2'
           }
         />
         {decisionState === 'active' && (
           <circle
-            cx="100"
+            cx="102"
             cy="67"
             r="2.3"
             fill="var(--cobalt-ice)"
@@ -632,20 +685,20 @@ function DecisionPipelineGraph({
           />
         )}
         <text
-          x="133"
+          x="135"
           y="73"
           textAnchor="middle"
           fill={cDec.titleFill}
           className="font-mono text-[8px] font-semibold"
         >
-          Decision-1 Gate
+          Decision-1
         </text>
         <text
-          x="133"
+          x="135"
           y="84"
           textAnchor="middle"
           fill={cDec.subFill}
-          className="font-mono text-[7.5px]"
+          className="font-mono text-[7.2px]"
         >
           {decisionSub}
         </text>
@@ -654,32 +707,66 @@ function DecisionPipelineGraph({
       {/* Node 5: Pass */}
       <g>
         <rect
-          x="186"
+          x="188"
           y="58"
-          width="58"
+          width="60"
           height="34"
           rx="6"
           fill={cPass.fill}
           stroke={cPass.stroke}
-          strokeWidth={passState === 'passed' ? '1.5' : '1.1'}
+          strokeWidth={passState === 'passed' ? '1.75' : '1.2'}
         />
         <text
-          x="215"
+          x="218"
           y="73"
           textAnchor="middle"
           fill={cPass.titleFill}
           className="font-mono text-[8px] font-semibold"
         >
-          Pass ✓
+          {passState === 'passed' ? 'PASS ✓' : 'Gate'}
         </text>
         <text
-          x="215"
+          x="218"
           y="84"
           textAnchor="middle"
           fill={cPass.subFill}
-          className="font-mono text-[7.5px]"
+          className="font-mono text-[7.2px]"
         >
           {passSub}
+        </text>
+      </g>
+
+      {/* Node 6: Managed Agent Handoff */}
+      <g>
+        <rect
+          x="4"
+          y="120"
+          width="176"
+          height="28"
+          rx="7"
+          fill={cHandoff.fill}
+          stroke={cHandoff.stroke}
+          strokeWidth={handoffState === 'passed' ? '1.6' : '1.15'}
+        />
+        <text
+          x="92"
+          y="132.5"
+          textAnchor="middle"
+          fill={cHandoff.titleFill}
+          className="font-mono text-[7.8px] font-semibold"
+        >
+          Managed Agent Handoff
+        </text>
+        <text
+          x="92"
+          y="142.5"
+          textAnchor="middle"
+          fill={cHandoff.subFill}
+          className="font-mono text-[6.8px]"
+        >
+          {handoffState === 'passed'
+            ? 'Verified Manifest → Remote VM PR Ready'
+            : 'antigravity-preview-09-2026 · v1beta'}
         </text>
       </g>
     </svg>
@@ -848,6 +935,501 @@ const TECHNICAL_DEMO_MISSIONS: Array<{
 
 const GEMINI_STACK_PILLS = ['Carbon', 'Neon', 'Hydrogen', 'Decision-1', 'Banana 2.1'];
 
+type ArchNodeId =
+  | 'intake'
+  | 'director'
+  | 'coder'
+  | 'decision'
+  | 'manifest'
+  | 'vm'
+  | 'build'
+  | 'pr';
+
+interface ArchNodeSpec {
+  id: ArchNodeId;
+  loop: 'critic' | 'ship';
+  label: string;
+  sub: string;
+  apiBadge: string;
+  detail: string;
+}
+
+const ARCH_NODES: Record<ArchNodeId, ArchNodeSpec> = {
+  intake: {
+    id: 'intake',
+    loop: 'critic',
+    label: 'Refs / URL / 3.8-Live',
+    sub: 'Moodboard · Cam · Voice',
+    apiBadge: 'gemini-3.8-live · 3.5-transcribe',
+    detail:
+      'Captures live site screenshots + CSS DNA, moodboard frames, webcam swatches, and streaming voice directives.',
+  },
+  director: {
+    id: 'director',
+    loop: 'critic',
+    label: 'Carbon/Hydrogen + SKILL.md',
+    sub: 'v1 interactions · Manifest',
+    apiBadge: 'gemini-4-carbon / hydrogen (v1)',
+    detail:
+      'Synthesizes a typed DesignManifest using Design Craft Skill v1 and thinking_level control without slop clichés.',
+  },
+  coder: {
+    id: 'coder',
+    loop: 'critic',
+    label: 'Vite HMR + Nano Banana 2.1',
+    sub: '4× Race · Bespoke Art',
+    apiBadge: 'gemini-4-neon · nano-banana-2.1',
+    detail:
+      'Compiles multi-file React/CSS edits into the live Vite sandbox and generates art-directed bespoke hero assets.',
+  },
+  decision: {
+    id: 'decision',
+    loop: 'critic',
+    label: 'Decision-1 · 12 Probes',
+    sub: '~250ms feedback arc',
+    apiBadge: 'gemini-decision-1 (v1beta) + embed-2',
+    detail:
+      'Evaluates 6 score probes, 4 noul probabilities, 2 classifications, and DOM layout checks, feeding Auto-Fix loops.',
+  },
+  manifest: {
+    id: 'manifest',
+    loop: 'ship',
+    label: 'Verified Manifest',
+    sub: 'Taste ≥ 80 · 0 Slop',
+    apiBadge: 'DesignManifest + Scorecard',
+    detail:
+      'Gate-passed visual tokens, diff summary, and calibrated Decision-1 scorecard packaged for autonomous repo shipping.',
+  },
+  vm: {
+    id: 'vm',
+    loop: 'ship',
+    label: 'Antigravity Remote VM',
+    sub: 'environment: remote',
+    apiBadge: 'antigravity-preview-09-2026 (v1beta)',
+    detail:
+      'Provisions a Google-hosted remote Linux sandbox mounting the target repository and .agents/skills context.',
+  },
+  build: {
+    id: 'build',
+    loop: 'ship',
+    label: 'tsc & vite build',
+    sub: 'Exit-0 Hook Gate',
+    apiBadge: 'Deterministic Verification',
+    detail:
+      'Executes full TypeScript and production bundle checks inside the remote Linux sandbox before allowing PR creation.',
+  },
+  pr: {
+    id: 'pr',
+    loop: 'ship',
+    label: 'GitHub PR',
+    sub: 'Branch · Commit · Diff',
+    apiBadge: 'POST /api/github/pr',
+    detail:
+      'Opens a clean branch, commits verified source surgery, and attaches the Decision-1 proof scorecard to the PR body.',
+  },
+};
+
+function SystemArchitectureFlow({
+  events,
+  isRunning,
+  manifest,
+  scorecard,
+  assetsCount,
+  drawnCirclesCount,
+}: {
+  events: StreamEvent[];
+  isRunning: boolean;
+  manifest?: DesignManifest;
+  scorecard?: DecisionsScorecard;
+  assetsCount: number;
+  drawnCirclesCount: number;
+}) {
+  const [selectedNode, setSelectedNode] = useState<ArchNodeId>('decision');
+  const eventTypes = new Set(events.map((e) => e.type));
+
+  const intakeActive = isRunning && events.length <= 2;
+  const intakeDone = assetsCount > 0 || drawnCirclesCount > 0 || events.length > 0;
+  const directorActive = isRunning && eventTypes.has('director_thinking') && !manifest;
+  const directorDone = Boolean(manifest) || eventTypes.has('manifest_ready');
+  const coderActive =
+    isRunning && (eventTypes.has('candidate_started') || eventTypes.has('asset_generated')) && !eventTypes.has('candidate_scored');
+  const coderDone = eventTypes.has('candidate_written') || eventTypes.has('hmr_reloaded') || Boolean(scorecard);
+  const decisionActive = isRunning && eventTypes.has('candidate_written') && !scorecard;
+  const decisionDone = Boolean(scorecard);
+  const shipReady = Boolean(scorecard?.passedAllGates);
+
+  const stageColor = (active: boolean, done: boolean): NodeVisualState =>
+    active ? 'active' : done ? 'passed' : 'idle';
+
+  const sIntake = nodeColors(stageColor(intakeActive, intakeDone));
+  const sDir = nodeColors(stageColor(directorActive, directorDone));
+  const sCode = nodeColors(stageColor(coderActive, coderDone));
+  const sDec = nodeColors(stageColor(decisionActive, decisionDone));
+  const sManifest = nodeColors(shipReady ? 'passed' : 'idle');
+  const sShipIdle = nodeColors('idle');
+
+  const activeSpec = ARCH_NODES[selectedNode];
+
+  const renderInteractiveNode = (
+    id: ArchNodeId,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    colors: ReturnType<typeof nodeColors>,
+    isActivePulse: boolean
+  ) => {
+    const spec = ARCH_NODES[id];
+    const isSelected = selectedNode === id;
+    return (
+      <g
+        key={id}
+        role="button"
+        tabIndex={0}
+        aria-label={`${spec.label}: ${spec.sub}. Inspect architecture details`}
+        aria-pressed={isSelected}
+        onClick={() => setSelectedNode(id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setSelectedNode(id);
+          }
+        }}
+        className="cursor-pointer focus:outline-none"
+      >
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          rx="7"
+          fill={isSelected ? 'var(--cobalt-tint)' : colors.fill}
+          stroke={isSelected ? 'var(--cobalt-ice)' : colors.stroke}
+          strokeWidth={isSelected ? '1.8' : '1.2'}
+        />
+        {isActivePulse && (
+          <circle
+            cx={x + 9}
+            cy={y + 9}
+            r="2.3"
+            fill="var(--cobalt-ice)"
+            className="animate-studio-pulse"
+          />
+        )}
+        <text
+          x={x + w / 2}
+          y={y + 14.5}
+          textAnchor="middle"
+          fill={colors.titleFill}
+          className="font-mono text-[7.8px] font-semibold"
+        >
+          {spec.label}
+        </text>
+        <text
+          x={x + w / 2}
+          y={y + 25}
+          textAnchor="middle"
+          fill={isSelected ? 'var(--cobalt-ice)' : colors.subFill}
+          className="font-mono text-[6.8px]"
+        >
+          {spec.sub}
+        </text>
+      </g>
+    );
+  };
+
+  return (
+    <div className="w-full space-y-2.5 text-left">
+      <div className="flex items-center justify-between px-0.5">
+        <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[var(--cobalt-ice)]">
+          Dual-Loop Pipeline
+        </span>
+        <span className="font-mono text-[9px] text-[var(--ink-secondary)]">
+          tap node to inspect
+        </span>
+      </div>
+
+      <svg
+        viewBox="0 0 260 326"
+        className="h-auto w-full overflow-visible"
+        role="img"
+        aria-label="AntiSlop Dual-Loop System Architecture showing Real-Time Critic Loop and Remote Ship Loop"
+      >
+        <defs>
+          <marker
+            id="arch-arrow-cobalt"
+            viewBox="0 0 8 8"
+            refX="6"
+            refY="4"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--cobalt-ice)" />
+          </marker>
+          <marker
+            id="arch-arrow-emerald"
+            viewBox="0 0 8 8"
+            refX="6"
+            refY="4"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--emerald)" />
+          </marker>
+          <marker
+            id="arch-arrow-amber"
+            viewBox="0 0 8 8"
+            refX="6"
+            refY="4"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--amber)" />
+          </marker>
+          <marker
+            id="arch-arrow-idle"
+            viewBox="0 0 8 8"
+            refX="6"
+            refY="4"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--svg-idle-arrow)" />
+          </marker>
+        </defs>
+
+        {/* LOOP 1 FRAME: Real-Time Critic Loop */}
+        <rect
+          x="2"
+          y="2"
+          width="256"
+          height="182"
+          rx="10"
+          fill="var(--bg-card-elevated)"
+          stroke="var(--cobalt-border)"
+          strokeWidth="1.1"
+        />
+        <text
+          x="12"
+          y="16"
+          fill="var(--cobalt-ice)"
+          className="font-mono text-[7.5px] font-semibold uppercase tracking-wider"
+        >
+          LOOP 1 · REAL-TIME CRITIC
+        </text>
+        <rect
+          x="198"
+          y="7"
+          width="50"
+          height="13"
+          rx="6.5"
+          fill="var(--cobalt-tint)"
+          stroke="var(--cobalt-border)"
+          strokeWidth="0.7"
+        />
+        <text
+          x="223"
+          y="16"
+          textAnchor="middle"
+          fill="var(--cobalt-ice)"
+          className="font-mono text-[6.8px] font-semibold"
+        >
+          ~250ms
+        </text>
+
+        {/* Loop 1 Nodes */}
+        {renderInteractiveNode('intake', 12, 24, 178, 31, sIntake, intakeActive)}
+        {renderInteractiveNode('director', 12, 65, 178, 31, sDir, directorActive)}
+        {renderInteractiveNode('coder', 12, 106, 178, 31, sCode, coderActive)}
+        {renderInteractiveNode('decision', 12, 147, 178, 31, sDec, decisionActive)}
+
+        {/* Vertical Loop 1 Connectors */}
+        <line
+          x1="101"
+          y1="55"
+          x2="101"
+          y2="63"
+          stroke="var(--cobalt-ice)"
+          strokeWidth="1.5"
+          markerEnd="url(#arch-arrow-cobalt)"
+        />
+        <line
+          x1="101"
+          y1="96"
+          x2="101"
+          y2="104"
+          stroke="var(--cobalt-ice)"
+          strokeWidth="1.5"
+          markerEnd="url(#arch-arrow-cobalt)"
+        />
+        <line
+          x1="101"
+          y1="137"
+          x2="101"
+          y2="145"
+          stroke="var(--cobalt-ice)"
+          strokeWidth="1.5"
+          markerEnd="url(#arch-arrow-cobalt)"
+        />
+
+        {/* ~250ms Feedback Arc from Decision-1 -> Carbon/Hydrogen */}
+        <path
+          d="M 192 162 C 234 162, 234 80, 194 80"
+          fill="none"
+          stroke="var(--amber)"
+          strokeWidth="1.5"
+          strokeDasharray="4 3"
+          className={isRunning ? 'atelier-svg-flow' : undefined}
+          markerEnd="url(#arch-arrow-amber)"
+        />
+        <rect
+          x="197"
+          y="112"
+          width="54"
+          height="20"
+          rx="5"
+          fill="var(--bg-card)"
+          stroke="var(--amber-border)"
+          strokeWidth="0.9"
+        />
+        <text
+          x="224"
+          y="121"
+          textAnchor="middle"
+          fill="var(--amber)"
+          className="font-mono text-[6.3px] font-semibold"
+        >
+          ~250ms
+        </text>
+        <text
+          x="224"
+          y="129"
+          textAnchor="middle"
+          fill="var(--ink-secondary)"
+          className="font-mono text-[6px]"
+        >
+          feedback arc
+        </text>
+
+        {/* Bridge Connector: Loop 1 -> Loop 2 */}
+        <line
+          x1="101"
+          y1="184"
+          x2="101"
+          y2="200"
+          stroke={shipReady ? 'var(--emerald)' : 'var(--cobalt-ice)'}
+          strokeWidth="1.6"
+          markerEnd={shipReady ? 'url(#arch-arrow-emerald)' : 'url(#arch-arrow-cobalt)'}
+        />
+        <text
+          x="110"
+          y="195"
+          fill={shipReady ? 'var(--emerald)' : 'var(--ink-secondary)'}
+          className="font-mono text-[6.8px] font-medium"
+        >
+          verified handoff
+        </text>
+
+        {/* LOOP 2 FRAME: Remote Ship Loop */}
+        <rect
+          x="2"
+          y="202"
+          width="256"
+          height="120"
+          rx="10"
+          fill="var(--bg-card-elevated)"
+          stroke={shipReady ? 'var(--emerald-border)' : 'var(--border-subtle)'}
+          strokeWidth="1.1"
+        />
+        <text
+          x="12"
+          y="216"
+          fill="var(--emerald)"
+          className="font-mono text-[7.5px] font-semibold uppercase tracking-wider"
+        >
+          LOOP 2 · REMOTE SHIP LOOP
+        </text>
+        <rect
+          x="206"
+          y="207"
+          width="42"
+          height="13"
+          rx="6.5"
+          fill="var(--emerald-bg)"
+          stroke="var(--emerald-border)"
+          strokeWidth="0.7"
+        />
+        <text
+          x="227"
+          y="216"
+          textAnchor="middle"
+          fill="var(--emerald)"
+          className="font-mono text-[6.8px] font-semibold"
+        >
+          v1beta
+        </text>
+
+        {/* Loop 2 Nodes (2x2 Grid) */}
+        {renderInteractiveNode('manifest', 12, 226, 110, 34, sManifest, false)}
+        {renderInteractiveNode('vm', 138, 226, 110, 34, sShipIdle, false)}
+        {renderInteractiveNode('build', 138, 276, 110, 34, sShipIdle, false)}
+        {renderInteractiveNode('pr', 12, 276, 110, 34, sShipIdle, false)}
+
+        {/* Loop 2 Connectors: Manifest -> Remote VM -> Build -> PR */}
+        <line
+          x1="122"
+          y1="243"
+          x2="136"
+          y2="243"
+          stroke={shipReady ? 'var(--emerald)' : 'var(--svg-idle-arrow)'}
+          strokeWidth="1.4"
+          markerEnd={shipReady ? 'url(#arch-arrow-emerald)' : 'url(#arch-arrow-idle)'}
+        />
+        <line
+          x1="193"
+          y1="260"
+          x2="193"
+          y2="274"
+          stroke="var(--svg-idle-arrow)"
+          strokeWidth="1.4"
+          markerEnd="url(#arch-arrow-idle)"
+        />
+        <line
+          x1="138"
+          y1="293"
+          x2="124"
+          y2="293"
+          stroke="var(--svg-idle-arrow)"
+          strokeWidth="1.4"
+          markerEnd="url(#arch-arrow-idle)"
+        />
+      </svg>
+
+      {/* Interactive Node Detail Card */}
+      <div className="rounded-xl border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] p-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[11.5px] font-semibold text-[var(--ink-primary)]">
+            {activeSpec.label}
+          </span>
+          <span className="shrink-0 rounded-full border border-[var(--cobalt-border)] bg-[var(--bg-card)] px-1.5 py-0.5 font-mono text-[8.5px] text-[var(--cobalt-ice)]">
+            {activeSpec.loop === 'critic' ? 'Loop 1' : 'Loop 2'}
+          </span>
+        </div>
+        <div className="mt-0.5 font-mono text-[9.5px] text-[var(--cobalt-ice)]">
+          {activeSpec.apiBadge}
+        </div>
+        <p className="mt-1 text-[10.5px] leading-snug text-[var(--ink-secondary)]">
+          {activeSpec.detail}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function CriticRail({
   collapsed,
   onToggleCollapse,
@@ -874,6 +1456,9 @@ export function CriticRail({
 }: CriticRailProps) {
   const [inspectCandidate, setInspectCandidate] =
     useState<CandidateResult | null>(null);
+  const [idleViewTab, setIdleViewTab] = useState<'missions' | 'system_flow'>(
+    'missions'
+  );
 
   const railVoice = useVoiceRecorder((out) => {
     onVoiceRecorded({
@@ -926,11 +1511,11 @@ export function CriticRail({
     <>
       {/* Floating 16px-radius Obsidian Director Card (#080A0E, 296px width) — Pure Code Wiki Gemini Panel */}
       <aside className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[var(--border-card)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
-        {/* Minimal 48px Header */}
-        <div className="flex h-[48px] shrink-0 items-center justify-between px-4">
-          <div className="flex min-w-0 items-center gap-2">
+        {/* Minimal 48px Header with Missions | System Flow Segmented Toggle */}
+        <div className="flex h-[48px] shrink-0 items-center justify-between gap-1.5 px-3">
+          <div className="flex min-w-0 items-center gap-1.5">
             <GeminiSparkleMark className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-[12.5px] font-medium text-[var(--ink-secondary)]">
+            <span className="truncate text-[12px] font-medium text-[var(--ink-secondary)]">
               Director
             </span>
             {isRunning && (
@@ -938,19 +1523,63 @@ export function CriticRail({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            title="Collapse Director panel"
-            aria-label="Collapse Director panel"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
-          >
-            <PanelRightClose className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <div
+              role="group"
+              aria-label="Director panel view"
+              className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card-elevated)] p-0.5"
+            >
+              <button
+                type="button"
+                aria-pressed={idleViewTab === 'missions'}
+                onClick={() => setIdleViewTab('missions')}
+                className={`rounded-full px-2 py-0.5 font-mono text-[9.5px] font-medium transition-colors ${
+                  idleViewTab === 'missions'
+                    ? 'bg-[var(--cobalt-core)] text-white'
+                    : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]'
+                }`}
+              >
+                {isFreshIdle ? 'Missions' : 'Live'}
+              </button>
+              <button
+                type="button"
+                aria-pressed={idleViewTab === 'system_flow'}
+                onClick={() => setIdleViewTab('system_flow')}
+                className={`rounded-full px-2 py-0.5 font-mono text-[9.5px] font-medium transition-colors ${
+                  idleViewTab === 'system_flow'
+                    ? 'bg-[var(--cobalt-core)] text-white'
+                    : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]'
+                }`}
+              >
+                System Flow
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Collapse Director panel"
+              aria-label="Collapse Director panel"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--bg-subtle-hover)] hover:text-[var(--ink-primary)]"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Middle Body: Serene Code Wiki Idle Sparkle + 3 Technical Missions OR Minimal Scored Disclosures */}
-        {isFreshIdle ? (
+        {/* Middle Body: System Flow OR Serene Code Wiki Idle Missions OR Live Scored Disclosures */}
+        {idleViewTab === 'system_flow' ? (
+          <div className="studio-scroll flex flex-1 flex-col justify-between overflow-y-auto px-3.5 pb-3 pt-1">
+            <SystemArchitectureFlow
+              events={events}
+              isRunning={isRunning}
+              manifest={manifest}
+              scorecard={scorecard}
+              assetsCount={assetsCount}
+              drawnCirclesCount={drawnCirclesCount}
+            />
+          </div>
+        ) : isFreshIdle ? (
           <div className="codewiki-sparkle-aura studio-scroll flex flex-1 flex-col items-center justify-between overflow-y-auto px-4 pb-3 pt-6 text-center">
             <div className="flex flex-col items-center">
               <GeminiSparkleMark className="h-11 w-11" glow />
@@ -1166,8 +1795,8 @@ export function CriticRail({
 
             {/* 3. Clean Hairline <details> Disclosures (Never a Dense Metrics Wall!) */}
             <div className="divide-y divide-[var(--border-subtle)]">
-              {/* Disclosure A: Decision Graph */}
-              <details className="atelier-details">
+              {/* Disclosure A: Decision Graph (open by default so judges see live pipeline) */}
+              <details className="atelier-details" open>
                 <summary className="flex select-none items-center justify-between gap-2 py-3 text-[12px] text-[var(--ink-secondary)] transition-colors hover:text-[var(--ink-primary)]">
                   <div className="flex min-w-0 items-center gap-2">
                     <ChevronDown className="atelier-chevron h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />

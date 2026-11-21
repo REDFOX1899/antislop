@@ -84,3 +84,25 @@ We evaluated **V1 Control (`text_baseline`)** against **V1 AntiSlop Multimodal (
 2. **Hostile `deep_atelier` stress-test latency (`190–276s`):** High-thinking `gemini-4-carbon` + bespoke `gemini-nano-banana-2.1` art + 3× parallel `gemini-4-neon` + sequential Puppeteer captures takes 3–4.5 minutes — confirming why splitting **`⚡ Fast Demo (~35s)`** vs **`🧠 Deep Atelier (Parallel)`** is essential for live UX.
 3. **Organic tactile grain without generated art (`Warm Botanical Atelier`):** In `fast_demo` (with Nano Banana art toggled off for speed), `slopPenalty` stayed slightly elevated (`3.04`) and `primaryDefectClass` flagged `broken_or_missing_imagery` because CSS alone cannot replace organic photography/linen textures.
 4. **Control baseline brittleness:** One naive text-only control trial (`control-brutalist-tokyo-poster`) failed JSON code extraction completely (`status=failed`), illustrating how unstructured single-shot text prompting breaks more often than schema-guided multimodal passes.
+
+
+---
+
+## 5. Breaking Point #4: `gemini-decision-1` Scaling Curve (`12` → `100` → `900` → `1,001` Hard Cap → `1,800` Sharded)
+
+To push calibrated zero-token visual auditing beyond our 12-probe critic rubric, we stress-tested **`gemini-decision-1`** (`v1beta`) by scaling the `questions` map from `12` up to `1,800` orthogonal `noul` probes against a shared multimodal UI screenshot payload.
+
+### Empirical Probe Scaling Curve (`v1beta`, `gemini-decision-1`)
+
+| Probe Batch Size | Execution Topology | Output Tokens | Measured Latency / Outcome | Engineering Takeaway |
+| :--- | :--- | ---: | :--- | :--- |
+| **`12` probes** *(6 `score`, 4 `noul`, 2 `choice`)* | Single `decisions.create` call (`critic.ts`) | **`0`** | `~250ms` ✅ **PASS** | Sub-second critic gate for real-time refinement loops. |
+| **`100` `noul` probes** | Single `decisions.create` call | **`0`** | **`690ms`** ✅ **PASS** | Sub-second 10×10 spatial grid or single-pillar sweep. |
+| **`900` `noul` probes** *(9 pillars × 100 probes)* | Single `decisions.create` call (`900_single_pass`) | **`0`** | **`2,293ms`** ✅ **PASS** | Full 9-pillar + 10×10 spatial X-Ray in ~2.3s (~20–25K prompt tokens, well under 262K max). |
+| **`1,001` `noul` probes** | Single `decisions.create` call | `0` | **HTTP `400`** ❌ **HARD CAP** | `CreateDecisionRequest.questions: must have between 1 and 1000 questions`. |
+| **`1,800` `noul` probes** *(2 × 900 parallel shards)* | Dual-Key Sharded `Promise.all` (`1800_dual_key_sharded`) | **`0`** | Scales past `1,000` cap ✅ **PASS** | Parallel round-robin `withV1BetaClient` bypasses the 1,000-question single-request limit. |
+
+### Root Cause & Architectural Solution
+1. **Hard API Ceiling at `1,000` Questions:** `gemini-decision-1` enforces a strict schema constraint (`CreateDecisionRequest.questions: must have between 1 and 1000 questions`) plus ASCII-only question keys (`^[A-Za-z0-9_-]+$`). Sending `1,001+` probes in one request fails deterministically with HTTP `400`.
+2. **Instruction Token Discipline:** Keeping each `noul` probe instruction concise (~12–18 words) keeps a full **900-probe** audit compact (~20–25K input tokens vs. 262K limit), enabling **`2,293ms`** end-to-end evaluation with **`0` output tokens**.
+3. **Dual-Key Sharding Beyond 1K (`backend/src/gemini/deepDecisionMatrix.ts`):** When pushing beyond `1,000` probes (`1800_dual_key_sharded`), AntiSlop partitions the audit into two parallel `900`-probe `withV1BetaClient` calls (Shard A: Desktop/Spatial Craft Pass; Shard B: Mobile Reflow & Creative Director Stress Pass), fusing all `1,800` calibrated probabilities into a unified `10×10` spatial viewport heatmap, `30×30` probability mosaic, and auto-generated surgical fix prompt.

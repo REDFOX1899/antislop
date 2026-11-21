@@ -29,6 +29,7 @@ export interface SynthesizeManifestParams {
   mode: TransformRunRequest['mode'];
   speedMode: ExecutionSpeedMode;
   currentCodeSummary?: string;
+  projectContextSummary?: string;
   annotatedScreenshotBase64?: string;
   drawnCircles?: DrawnCircleAnnotation[];
   onThinking?: (delta: string) => void;
@@ -43,7 +44,7 @@ Your mission:
 4. Ensure REAL visual legibility and accessibility: inkPrimary MUST have >= 4.5:1 WCAG AA contrast against canvas and surface; accentContrast MUST have >= 4.5:1 contrast against accent.
 5. Provide a REAL, valid Google Fonts CSS2 URL (https://fonts.googleapis.com/css2?family=...&display=swap) matching displayFont, bodyFont, and monoFont.
 6. When multiple conflicting visual styles are present (e.g. brutalist concrete + delicate Japanese calligraphy + warm terracotta + cyber telemetry), do NOT average them into muddy grey — resolve them into a disciplined hierarchy (dominant ground + structural typographic voice + surgical accent) and document your synthesis clearly in "conflictResolutionNotes".
-7. Craft bespoke editorial photography/artwork prompts in "bespokeAssets" (using slotId "hero_primary" at "/generated/hero-primary.jpg" and optionally "editorial_secondary" at "/generated/editorial-secondary.jpg") that visually harmonize with the moodboard palette and lighting — NO text inside generated imagery.
+7. Craft domain-grounded editorial photography/artwork prompts in "bespokeAssets" (using slotId "hero_primary" at "/generated/hero-primary.jpg" and optionally "editorial_secondary" at "/generated/editorial-secondary.jpg") that MUST depict the target website's actual product, brand subject, and domain from TARGET WEBSITE DOMAIN & SUBJECT CONTEXT while harmonizing with the moodboard palette and lighting — ZERO unrelated abstract filler and NO text inside generated imagery.
 
 ${ANTISLOP_DESIGN_CRAFT_DISTILLED}
 
@@ -526,9 +527,10 @@ export async function synthesizeDesignManifest(
       if (params.textPrompt && params.textPrompt.trim()) {
         briefParts.push(`Written Direction Notes:\n"${params.textPrompt.trim()}"`);
       }
-      if (params.currentCodeSummary && params.currentCodeSummary.trim()) {
+      const domainContext = (params.projectContextSummary || params.currentCodeSummary || '').trim();
+      if (domainContext) {
         briefParts.push(
-          `Target Application Context (preserve real domain semantics while completely elevating visual craft):\n${params.currentCodeSummary.slice(0, 2800)}`
+          `TARGET WEBSITE DOMAIN & SUBJECT CONTEXT (preserve real domain semantics and ground ALL bespokeAssets prompts directly in this website's actual product/subject — never unrelated filler):\n${domainContext.slice(0, 2800)}`
         );
       }
       if (params.mode === 'stress_test') {

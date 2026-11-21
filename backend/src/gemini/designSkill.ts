@@ -11,18 +11,19 @@ export const DESIGN_CRAFT_SKILL_PATH = path.join(
 );
 
 /**
- * Distilled ~430-token UI Design Craft standard injected into Director & Coder
- * system instructions for museum-grade hierarchy, typography, spacing, and contrast
- * without inflating prompt latency.
+ * Distilled <=360-word UI Design Craft v2 standard injected into Director & Coder
+ * system instructions for museum-grade hierarchy, 3D spatial depth, domain-grounded art,
+ * typography, spacing, and contrast without inflating prompt latency.
  */
-export const ANTISLOP_DESIGN_CRAFT_DISTILLED = `ANTISLOP DESIGN CRAFT STANDARD (MANDATORY):
-- Swiss & Dieter Rams Discipline: Less, but better. Build an authoritative asymmetric 12-column grid anchored by 1px hairline dividers, subtle surface stepping (--canvas -> --surface -> --surface-muted), and generous negative space instead of drop-shadow card piles.
-- Fluid Typography & Measure: Pair an expressive Display font + legible Body font + crisp Mono font for indices/metadata (01 / 02 / 03) via a real Google Fonts CSS2 URL. Use fluid clamp() type scales (h1 clamp(2.5rem, 5.5vw, 5.25rem) with -0.03em tracking and ~1.02 leading; body clamp(1rem, 1.05vw, 1.125rem) at 1.6 leading and 52ch–68ch max measure) plus font-variant-numeric: tabular-nums on metrics.
-- WCAG AA / Radix Contrast Math: Enforce >= 4.5:1 contrast for ALL body text, captions, muted metadata, nav links, inputs, and CTA labels (--accent-contrast on --accent); enforce >= 3.0:1 for display headings and UI boundaries. Hold 60/30/10 color restraint (dominant ground, quiet surface, surgical <= 10% accent). Never blend conflicting styles into muddy grey—resolve them via strict hierarchy.
-- Refactoring UI Spacing Rhythm: Obey the 4/8/16/24/48/96px progression and Law of Proximity (section padding >= 2x panel padding >= 1.5x internal gap). Guarantee 0px horizontal overflow at 1440px and 390px (min-w-0 on grid/flex children, overflow-x: hidden).
-- Modern Web Guidance: Use semantic landmarks (<header>, <nav>, <main>, <footer>), one <h1>, and native interactive primitives (<dialog>, <details>/<summary>, [popover]) over div-soup. Set fetchpriority="high" on LCP hero media (never lazy-load above the fold) with explicit aspect ratios. Animate ONLY compositor properties (transform, opacity) with editorial easing (cubic-bezier(0.22, 1, 0.36, 1), 180–260ms), gated cleanly via @media (prefers-reduced-motion: no-preference | reduce)—never blanket 0.01ms overrides.
-- Canvas/WebGL/Shader Preservation: Never break, delete, or cover <canvas>, WebGL/Three.js scenes, GLSL shaders, or requestAnimationFrame loops; keep HUD overlays pointer-events-none with pointer-events-auto on controls, and strictly match the repo's native stack.
-- Explicit Anti-Slop Ban List: ZERO purple/indigo-to-cyan gradients on dark slate, ZERO neon glows or blurred aurora blobs, ZERO generic Inter-everywhere 3-col icon-circle SaaS cards, ZERO sparkle/rocket emoji bullets or hollow AI buzzwords ("Revolutionize", "Supercharge", "Next-Gen"), ZERO invented external image URLs or uninstalled npm packages.`;
+export const ANTISLOP_DESIGN_CRAFT_DISTILLED = `ANTISLOP DESIGN CRAFT STANDARD v2 (MANDATORY):
+- Swiss & Dieter Rams Discipline: Less, but better. Build an asymmetric Swiss/Bento focal hierarchy anchored by 1px structural hairlines, disciplined surface stepping (--canvas -> --surface -> --surface-muted), and generous negative space instead of muddy drop-shadow stacks.
+- Modern CSS 3D Spatial Depth: Frame architectural showcase cards inside perspective(1200px) with crisp specular top-edge hairlines (inset 0 1px 0 rgba(255,255,255,0.14) on dark or rgba(255,255,255,0.7) on light) and subtle layered Z-plane depth. Animate ONLY compositor properties (transform, opacity) with cubic-bezier(0.22, 1, 0.36, 1) (180–260ms) gated by @media (prefers-reduced-motion: no-preference).
+- Fluid Typography & Measure: Pair an expressive Display font + legible Body font + crisp Mono font for indices (01 / 02 / 03) via a real Google Fonts CSS2 URL. Use fluid clamp() scales (h1 clamp(2.5rem, 5.5vw, 5.25rem), -0.03em tracking; body clamp(1rem, 1.05vw, 1.125rem), 1.6 leading, 52ch–68ch max measure) and tabular-nums on metrics.
+- WCAG AA / Radix Contrast Math: Enforce >= 4.5:1 contrast for ALL body text, captions, muted metadata, nav links, inputs, and CTA labels (--accent-contrast on --accent); >= 3.0:1 for display headings and UI boundaries. Hold 60/30/10 color restraint.
+- Spacing & Modern Web Guidance: Obey the 4/8/16/24/48/96px scale and Law of Proximity; guarantee 0px horizontal overflow at 1440px and 390px (min-w-0, overflow-x: hidden). Use semantic landmarks (<header>, <nav>, <main>, <footer>), one <h1>, native primitives (<dialog>, <details>, [popover]), and fetchpriority="high" on LCP hero media.
+- Domain-Grounded Visual Art: Hero and editorial imagery MUST depict the website's actual product or subject matter calibrated to the manifest palette — zero unrelated abstract filler or invented external URLs.
+- Canvas/WebGL Preservation & Stack Fidelity: Never break or cover <canvas>, WebGL/shader scenes, or requestAnimationFrame loops; match the repository's native stack (React/Vite OR vanilla HTML/CSS/JS).
+- Explicit Anti-Slop Ban List: ZERO purple/indigo-to-cyan dark-slate gradients, ZERO neon glows or aurora blobs, ZERO generic Inter 3-col SaaS icon-circle grids, ZERO sparkle/rocket emojis or hollow AI buzzwords ("Revolutionize", "Supercharge", "Next-Gen"), ZERO uninstalled npm packages.`;
 
 let cachedFullSkill: string | null = null;
 let cachedSkillHash: string | null = null;

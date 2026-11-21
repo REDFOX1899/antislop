@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ExecutionSpeedMode, WorkspaceRepoInfo } from '@shared/types';
 import {
+  Activity,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -37,6 +38,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   directorOpen: boolean;
   onToggleDirector: () => void;
+  onOpenDeepAudit?: () => void;
   onGoLanding: () => void;
 }
 
@@ -125,6 +127,7 @@ export function TopBar({
   onToggleTheme,
   directorOpen,
   onToggleDirector,
+  onOpenDeepAudit,
   onGoLanding,
 }: TopBarProps) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -347,7 +350,20 @@ export function TopBar({
           </button>
         </div>
 
-        {/* 2. Clean Circle Theme Toggle */}
+        {/* 2. Clean 900-Probe Decisions API X-Ray Trigger */}
+        {onOpenDeepAudit && (
+          <button
+            type="button"
+            onClick={onOpenDeepAudit}
+            title="Run 900-Probe / 1,800-Sharded Decisions API Spatial X-Ray Audit"
+            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--emerald-border)] bg-[var(--emerald-bg)] px-3 text-[11.5px] font-medium text-[var(--emerald)] transition-colors hover:brightness-110 whitespace-nowrap"
+          >
+            <Activity className="h-3.5 w-3.5 shrink-0" />
+            <span>900 Probes</span>
+          </button>
+        )}
+
+        {/* 3. Clean Circle Theme Toggle */}
         <button
           type="button"
           onClick={onToggleTheme}

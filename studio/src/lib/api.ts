@@ -74,6 +74,104 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface WorkspaceRecommendation {
+  id: string;
+  badge: string;
+  title: string;
+  rationale: string;
+  prompt: string;
+  enableBespokeArt: boolean;
+  mode: 'antislop' | 'circle_tweak';
+}
+
+export interface RecommendationsResponse {
+  workspaceId: string;
+  brandSummary: string;
+  recommendations: WorkspaceRecommendation[];
+  generatedAt: string;
+}
+
+const DEFAULT_RECOMMENDATIONS: WorkspaceRecommendation[] = [
+  {
+    id: 'rec-3d-spatial',
+    badge: '3D SPATIAL',
+    title: '3D Spatial Cards + Alabaster Hero',
+    rationale: 'Elevates flat grid blocks with crisp tactile depth and warm editorial hierarchy.',
+    prompt:
+      'Transform the hero and feature cards into a Warm Alabaster editorial system with 3D spatial perspective cards, crisp 1px borders, Instrument Serif display headings, and generous whitespace.',
+    enableBespokeArt: false,
+    mode: 'antislop',
+  },
+  {
+    id: 'rec-bespoke-art',
+    badge: 'BESPOKE ART',
+    title: 'Nano Banana 2.1 Editorial Hero',
+    rationale: 'Replaces generic placeholders with custom art-directed studio imagery.',
+    prompt:
+      'Generate bespoke editorial hero photography via Nano Banana 2.1 and pair it with high-contrast typographic framing and balanced caption rhythm.',
+    enableBespokeArt: true,
+    mode: 'antislop',
+  },
+  {
+    id: 'rec-editorial-craft',
+    badge: 'EDITORIAL',
+    title: 'Swiss Grid & Tabular Telemetry',
+    rationale: 'Tightens typographic rhythm, tabular numerals, and hairline structural dividers.',
+    prompt:
+      'Apply Swiss editorial grid discipline with JetBrains Mono tabular telemetry, crisp hairline dividers, and intentional visual contrast.',
+    enableBespokeArt: false,
+    mode: 'antislop',
+  },
+  {
+    id: 'rec-conversion-flow',
+    badge: 'CONVERSION',
+    title: 'Interactive Proof & Primary CTA Focus',
+    rationale: 'Removes competing visual noise so primary actions and live trust metrics convert.',
+    prompt:
+      'Clarify the primary value proposition, elevate the single primary Cobalt CTA, and organize supporting proof into scannable interactive cards.',
+    enableBespokeArt: false,
+    mode: 'antislop',
+  },
+];
+
+export async function fetchWorkspaceRecommendations(
+  referenceSummary?: string
+): Promise<RecommendationsResponse> {
+  try {
+    const data = await fetchJson<Partial<RecommendationsResponse>>(
+      '/api/recommendations',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          referenceSummary: referenceSummary?.trim() || undefined,
+        }),
+      }
+    );
+
+    if (Array.isArray(data?.recommendations) && data.recommendations.length > 0) {
+      return {
+        workspaceId: data.workspaceId || 'active',
+        brandSummary:
+          data.brandSummary ||
+          'Curated transformations tailored to your active workspace and attached references.',
+        recommendations: data.recommendations,
+        generatedAt: data.generatedAt || new Date().toISOString(),
+      };
+    }
+  } catch {
+    // Graceful client fallback when backend is unreachable or endpoint unavailable
+  }
+
+  return {
+    workspaceId: 'fallback',
+    brandSummary: referenceSummary?.trim()
+      ? `Tailored to ${referenceSummary.trim().slice(0, 80)}`
+      : 'Curated AntiSlop craft upgrades for the active workspace.',
+    recommendations: DEFAULT_RECOMMENDATIONS,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 export async function getHealth(): Promise<HealthResponse> {
   return fetchJson<HealthResponse>('/api/health', { cache: 'no-store' });
 }

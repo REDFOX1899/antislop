@@ -8,6 +8,11 @@ import type {
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
 import { geminiEngine } from '../gemini/index.js';
+import {
+  runDeepDecisionAudit,
+  type DeepDecisionAuditMode,
+} from '../gemini/deepDecisionMatrix.js';
+import { generateWorkspaceRecommendations } from '../gemini/recommender.js';
 import { transformOrchestrator } from '../orchestrator/transformOrchestrator.js';
 import { eventBus } from '../sandbox/eventBus.js';
 import { githubManager } from '../sandbox/githubManager.js';
@@ -239,6 +244,77 @@ export function createApiRouter(): Router {
       const msg = errorMessage(err);
       const isClientError = /required|Invalid URL|Unsupported URL|Blocked|embedded credentials/i.test(msg);
       res.status(isClientError ? 400 : 502).json({ error: msg });
+    }
+  });
+
+  /**
+   * POST /api/recommendations
+   * Generates 4 domain-grounded AntiSlop design & Nano Banana art recommendations for the active workspace.
+   */
+  router.post('/recommendations', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as { focus?: string; referenceSummary?: string };
+      const focus =
+        typeof body.focus === 'string' && body.focus.trim()
+          ? body.focus.trim()
+          : typeof body.referenceSummary === 'string' && body.referenceSummary.trim()
+          ? body.referenceSummary.trim()
+          : undefined;
+      const result = await generateWorkspaceRecommendations({
+        focus,
+      });
+      res.json(result);
+    } catch (err) {
+      const msg = errorMessage(err);
+      const status = /No active/i.test(msg) ? 400 : 500;
+      res.status(status).json({ error: msg });
+    }
+  });
+
+  /**
+   * POST /api/decisions/deep-audit
+   * Runs 900 single-pass (or 1,800 dual-key sharded) calibrated Decisions API probes over the active UI.
+   */
+  router.post('/decisions/deep-audit', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        mode?: DeepDecisionAuditMode;
+        screenshotBase64?: string;
+        workspaceId?: string;
+        brandSummary?: string;
+      };
+      let screenshotBase64 =
+        typeof body.screenshotBase64 === 'string'
+          ? stripBase64Prefix(body.screenshotBase64)
+          : '';
+      let screenshotUrl: string | undefined;
+
+      if (!screenshotBase64 || screenshotBase64.length < 64) {
+        const snap = await puppeteerAuditor.captureAndAudit(
+          undefined,
+          `deep-audit-${Date.now()}`
+        );
+        screenshotBase64 = snap.desktopBase64;
+        screenshotUrl = snap.desktopUrl;
+      }
+
+      const activeWs = viteManager.getActiveWorkspace();
+      const result = await runDeepDecisionAudit({
+        mode:
+          body.mode === '1800_dual_key_sharded'
+            ? '1800_dual_key_sharded'
+            : '900_single_pass',
+        screenshotBase64,
+        workspaceId: body.workspaceId || activeWs?.id,
+        brandSummary: body.brandSummary || activeWs?.name,
+      });
+
+      res.json({
+        ...result,
+        ...(screenshotUrl ? { screenshotUrl } : {}),
+      });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
     }
   });
 
