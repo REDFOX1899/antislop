@@ -7,16 +7,30 @@ import type {
   TransformRunRequest,
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
+import { getVerifiedArchetypes } from '../design/paletteArchetypes.js';
+import {
+  compileDesignTokens,
+  type CompileDesignTokensInput,
+} from '../design/tokenCompiler.js';
 import { geminiEngine } from '../gemini/index.js';
 import {
   runDeepDecisionAudit,
   type DeepDecisionAuditMode,
 } from '../gemini/deepDecisionMatrix.js';
+import {
+  routeByDecisionEntropy,
+  runConversionAndBrandAudit,
+  runPairwiseBlindJudge,
+} from '../gemini/decisionsEngineV2.js';
 import { generateWorkspaceRecommendations } from '../gemini/recommender.js';
 import { transformOrchestrator } from '../orchestrator/transformOrchestrator.js';
 import { eventBus } from '../sandbox/eventBus.js';
 import { githubManager } from '../sandbox/githubManager.js';
 import { puppeteerAuditor } from '../sandbox/puppeteerAuditor.js';
+import {
+  buildRepoDependencyGraph,
+  selectRelevantFiles,
+} from '../sandbox/repoIndexer.js';
 import { snapshotManager } from '../sandbox/snapshotManager.js';
 import { viteManager } from '../sandbox/viteManager.js';
 
@@ -313,6 +327,154 @@ export function createApiRouter(): Router {
         ...result,
         ...(screenshotUrl ? { screenshotUrl } : {}),
       });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/decisions/route-entropy
+   * Shannon-entropy adaptive compute router (early_stop / argon / neon / carbon).
+   */
+  router.post('/decisions/route-entropy', (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        prodReadyProb?: number;
+        brokenProb?: number;
+        domGatesPassed?: boolean;
+      };
+      const decision = routeByDecisionEntropy({
+        prodReadyProb: typeof body.prodReadyProb === 'number' ? body.prodReadyProb : 0.5,
+        brokenProb: typeof body.brokenProb === 'number' ? body.brokenProb : 0.2,
+        domGatesPassed: body.domGatesPassed !== false,
+      });
+      res.json(decision);
+    } catch (err) {
+      res.status(400).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/decisions/pairwise-judge
+   * Position-swapped blind Bradley-Terry A/B judge via gemini-decision-1 (0 output tokens).
+   */
+  router.post('/decisions/pairwise-judge', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        baselineBase64?: string;
+        candidateBase64?: string;
+        brandSummary?: string;
+      };
+      if (!body.baselineBase64 || !body.candidateBase64) {
+        res.status(400).json({ error: 'baselineBase64 and candidateBase64 are required' });
+        return;
+      }
+      const result = await runPairwiseBlindJudge({
+        baselineBase64: stripBase64Prefix(body.baselineBase64),
+        candidateBase64: stripBase64Prefix(body.candidateBase64),
+        brandSummary: body.brandSummary,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/decisions/conversion-audit
+   * 10-probe Conversion Readiness & Brand Drift audit via gemini-decision-1 (0 output tokens).
+   */
+  router.post('/decisions/conversion-audit', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        screenshotBase64?: string;
+        referenceBase64?: string;
+        brandSummary?: string;
+      };
+      let screenshotBase64 =
+        typeof body.screenshotBase64 === 'string'
+          ? stripBase64Prefix(body.screenshotBase64)
+          : '';
+      if (!screenshotBase64 || screenshotBase64.length < 64) {
+        const snap = await puppeteerAuditor.captureAndAudit(
+          undefined,
+          `conv-audit-${Date.now()}`
+        );
+        screenshotBase64 = snap.desktopBase64;
+      }
+      const activeWs = viteManager.getActiveWorkspace();
+      const result = await runConversionAndBrandAudit({
+        screenshotBase64,
+        referenceBase64: body.referenceBase64 ? stripBase64Prefix(body.referenceBase64) : undefined,
+        brandSummary: body.brandSummary || activeWs?.name,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/design/archetypes
+   * Returns 10 APCA-verified world-class OKLCH palette archetypes.
+   */
+  router.get('/design/archetypes', (_req: Request, res: Response) => {
+    try {
+      res.json({ archetypes: getVerifiedArchetypes() });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/design/compile-palette
+   * Compiles OKLCH 12-step ramps, enforces APCA Lc contrast, and outputs CSS + Tailwind v4 + W3C tokens.json.
+   */
+  router.post('/design/compile-palette', (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as Partial<CompileDesignTokensInput>;
+      const compiled = compileDesignTokens({
+        name: typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Custom Atelier',
+        mode: body.mode === 'light' ? 'light' : 'dark',
+        palette: body.palette,
+        seedAccentHex: body.seedAccentHex,
+        seedNeutralHex: body.seedNeutralHex,
+        typography: body.typography,
+      });
+      res.json(compiled);
+    } catch (err) {
+      res.status(400).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/audit/geometry
+   * Runs deterministic computed-DOM APCA contrast, typography measure, layout rhythm & A11y audit.
+   */
+  router.post('/audit/geometry', async (_req: Request, res: Response) => {
+    try {
+      const report = await puppeteerAuditor.auditLiveGeometry(viteManager.getProxiedPreviewUrl());
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/repo/graph
+   * Returns the codebase-scale dependency graph and optional query-ranked relevant files.
+   */
+  router.get('/repo/graph', async (req: Request, res: Response) => {
+    try {
+      const activeWs = viteManager.getActiveWorkspace();
+      if (!activeWs) {
+        res.status(400).json({ error: 'No active workspace' });
+        return;
+      }
+      const graph = await buildRepoDependencyGraph(activeWs.localPath, 60);
+      const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      const relevantFiles = q ? selectRelevantFiles(graph, q, 16) : graph.indexedFiles.slice(0, 16).map((f) => f.relPath);
+      res.json({ graph, relevantFiles });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }

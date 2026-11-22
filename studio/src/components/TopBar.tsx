@@ -11,7 +11,9 @@ import {
   GitPullRequest,
   Layers,
   Moon,
+  Palette,
   Plus,
+  Ruler,
   Search,
   Sun,
   Zap,
@@ -39,6 +41,8 @@ interface TopBarProps {
   directorOpen: boolean;
   onToggleDirector: () => void;
   onOpenDeepAudit?: () => void;
+  onOpenDesignSystem?: () => void;
+  onOpenGeometryAudit?: () => void;
   onGoLanding: () => void;
 }
 
@@ -128,6 +132,8 @@ export function TopBar({
   directorOpen,
   onToggleDirector,
   onOpenDeepAudit,
+  onOpenDesignSystem,
+  onOpenGeometryAudit,
   onGoLanding,
 }: TopBarProps) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -360,6 +366,32 @@ export function TopBar({
           >
             <Activity className="h-3.5 w-3.5 shrink-0" />
             <span>900 Probes</span>
+          </button>
+        )}
+
+        {/* 2b. OKLCH + APCA Color Kernel & Token Compiler */}
+        {onOpenDesignSystem && (
+          <button
+            type="button"
+            onClick={onOpenDesignSystem}
+            title="Open OKLCH + APCA Color Kernel, 12-Step Scales & W3C Token Compiler"
+            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] px-3 text-[11.5px] font-medium text-[var(--cobalt-ice)] transition-colors hover:brightness-110 whitespace-nowrap"
+          >
+            <Palette className="h-3.5 w-3.5 shrink-0" />
+            <span>Color Kernel</span>
+          </button>
+        )}
+
+        {/* 2c. Computed-DOM Geometry & A11y Audit */}
+        {onOpenGeometryAudit && (
+          <button
+            type="button"
+            onClick={onOpenGeometryAudit}
+            title="Run Deterministic Computed-DOM Geometry, APCA Contrast & A11y Audit"
+            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-3 text-[11.5px] font-medium text-[var(--ink-primary)] transition-colors hover:border-[var(--border-strong)] whitespace-nowrap"
+          >
+            <Ruler className="h-3.5 w-3.5 shrink-0 text-[var(--amber)]" />
+            <span>DOM Audit</span>
           </button>
         )}
 

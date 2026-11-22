@@ -127,7 +127,7 @@ export class ViteManager {
       }
       let editableFiles = ws.editableFiles;
       if (!editableFiles || editableFiles.length === 0) {
-        editableFiles = await snapshotManager.discoverEditableFiles(ws.localPath, ws.source === 'github' ? 6 : 10);
+        editableFiles = await snapshotManager.discoverEditableFiles(ws.localPath, ws.source === 'github' ? 16 : 12);
         ws.editableFiles = editableFiles;
       }
       result.push({

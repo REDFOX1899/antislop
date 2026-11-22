@@ -13,6 +13,7 @@ import type {
   TransformRunResult,
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
+import { enforceApcaPalette } from '../design/colorKernel.js';
 import type { GeneratedCandidateCode } from '../gemini/contracts.js';
 import { generateBespokeAssets, generateTargetedArtwork } from '../gemini/assets.js';
 import { geminiEngine } from '../gemini/index.js';
@@ -1118,6 +1119,18 @@ export class TransformOrchestrator {
       const [fastResult, parallelArt] = await Promise.all([fastPassPromise, parallelArtPromise]);
 
       manifest = fastResult.manifest;
+      // Deterministic OKLCH + APCA contrast gate: guarantee every manifest palette passes APCA Lc floors
+      const apcaCheck = enforceApcaPalette(manifest.tokens.palette);
+      if (apcaCheck.report.repairedCount > 0) {
+        manifest = {
+          ...manifest,
+          tokens: {
+            ...manifest.tokens,
+            palette: apcaCheck.repaired,
+          },
+        };
+      }
+
       run.manifest = manifest;
       modelsInvoked.add(manifest.modelUsed);
 
@@ -1200,6 +1213,18 @@ export class TransformOrchestrator {
           }
         },
       });
+
+      // Deterministic OKLCH + APCA contrast gate: guarantee every manifest palette passes APCA Lc floors
+      const apcaCheck = enforceApcaPalette(manifest.tokens.palette);
+      if (apcaCheck.report.repairedCount > 0) {
+        manifest = {
+          ...manifest,
+          tokens: {
+            ...manifest.tokens,
+            palette: apcaCheck.repaired,
+          },
+        };
+      }
 
       run.manifest = manifest;
       modelsInvoked.add(manifest.modelUsed);

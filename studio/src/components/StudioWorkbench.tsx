@@ -44,6 +44,8 @@ import {
   type TechnicalMissionId,
 } from './CriticRail';
 import { DecisionMatrixModal } from './DecisionMatrixModal';
+import { DesignSystemModal } from './DesignSystemModal';
+import { GeometryAuditModal } from './GeometryAuditModal';
 import { LandingHub } from './LandingHub';
 import {
   LiveCanvas,
@@ -143,6 +145,8 @@ export function StudioWorkbench() {
     useState<TechnicalMissionId | null>(null);
   const [repoModalOpen, setRepoModalOpen] = useState(false);
   const [deepAuditOpen, setDeepAuditOpen] = useState(false);
+  const [designSystemOpen, setDesignSystemOpen] = useState(false);
+  const [geometryAuditOpen, setGeometryAuditOpen] = useState(false);
 
   // Multimodal References, Continuous Talk & Canvas Annotations
   const [assets, setAssets] = useState<LocalMediaAsset[]>([]);
@@ -1334,6 +1338,8 @@ export function StudioWorkbench() {
         directorOpen={!rightCollapsed}
         onToggleDirector={() => setRightCollapsed((v) => !v)}
         onOpenDeepAudit={() => setDeepAuditOpen(true)}
+        onOpenDesignSystem={() => setDesignSystemOpen(true)}
+        onOpenGeometryAudit={() => setGeometryAuditOpen(true)}
         onGoLanding={goToLanding}
       />
 
@@ -1545,6 +1551,25 @@ export function StudioWorkbench() {
         onApplySurgicalFix={(surgicalPrompt) => {
           setVoiceTranscript(surgicalPrompt);
           enqueueOrExecuteRun('antislop', { textPrompt: surgicalPrompt });
+        }}
+      />
+
+      <DesignSystemModal
+        open={designSystemOpen}
+        onClose={() => setDesignSystemOpen(false)}
+        onApplyDesignSystem={(designPrompt) => {
+          setVoiceTranscript(designPrompt);
+          enqueueOrExecuteRun('antislop', { textPrompt: designPrompt });
+        }}
+      />
+
+      <GeometryAuditModal
+        open={geometryAuditOpen}
+        onClose={() => setGeometryAuditOpen(false)}
+        workspaceId={activeWorkspaceId}
+        onApplyEngineeringFix={(fixPrompt) => {
+          setVoiceTranscript(fixPrompt);
+          enqueueOrExecuteRun('antislop', { textPrompt: fixPrompt });
         }}
       />
     </div>

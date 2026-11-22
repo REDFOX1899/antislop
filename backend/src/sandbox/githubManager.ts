@@ -261,9 +261,9 @@ export class GitHubManager {
       }
     }
 
-    // Identify up to 6 key editable frontend files and capture fresh baseline
-    const editableFiles = await snapshotManager.discoverEditableFiles(localPath, 6);
-    await snapshotManager.captureBaseline(localPath, true, 6);
+    // Identify up to 16 graph-ranked editable frontend files and capture fresh baseline
+    const editableFiles = await snapshotManager.discoverEditableFiles(localPath, 16);
+    await snapshotManager.captureBaseline(localPath, true, 16);
 
     const workspaceId = `gh-${parsed.slug}`;
     viteManager.registerWorkspace({

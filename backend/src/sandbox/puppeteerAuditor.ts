@@ -5,6 +5,7 @@ import path from 'node:path';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import type { DecisionsScorecard } from '../../../shared/types.js';
 import { BACKEND_ROOT, ENV } from '../config/env.js';
+import { runComputedGeometryAudit, type GeometryAuditReport } from './geometryAuditor.js';
 
 export const SCREENSHOTS_DIR = path.join(BACKEND_ROOT, 'screenshots');
 
@@ -803,6 +804,19 @@ export class PuppeteerAuditor {
         cssDna,
         latencyMs: Date.now() - startedAt,
       };
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  async auditLiveGeometry(previewUrl: string): Promise<GeometryAuditReport> {
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      await page.goto(previewUrl, { waitUntil: 'domcontentloaded', timeout: 25_000 });
+      await new Promise((r) => setTimeout(r, 900));
+      return await runComputedGeometryAudit(page);
     } finally {
       await page.close().catch(() => undefined);
     }
