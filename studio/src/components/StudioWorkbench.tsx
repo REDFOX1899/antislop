@@ -67,6 +67,10 @@ const BrandMemoryModal = dynamic(
   () => import('./BrandMemoryModal').then((m) => m.BrandMemoryModal),
   { ssr: false }
 );
+const SanzoWadaMcpModal = dynamic(
+  () => import('./SanzoWadaMcpModal').then((m) => m.SanzoWadaMcpModal),
+  { ssr: false }
+);
 import {
   LiveCanvas,
   type CanvasChangeSummary,
@@ -169,6 +173,10 @@ export function StudioWorkbench() {
   const [geometryAuditOpen, setGeometryAuditOpen] = useState(false);
   const [conversionJudgeOpen, setConversionJudgeOpen] = useState(false);
   const [brandMemoryOpen, setBrandMemoryOpen] = useState(false);
+  const [sanzoMcpModal, setSanzoMcpModal] = useState<{ open: boolean; tab: 'sanzo' | 'mcp' }>({
+    open: false,
+    tab: 'sanzo',
+  });
 
   // Multimodal References, Continuous Talk & Canvas Annotations
   const [assets, setAssets] = useState<LocalMediaAsset[]>([]);
@@ -1364,6 +1372,7 @@ export function StudioWorkbench() {
         onOpenGeometryAudit={() => setGeometryAuditOpen(true)}
         onOpenConversionJudge={() => setConversionJudgeOpen(true)}
         onOpenBrandMemory={() => setBrandMemoryOpen(true)}
+        onOpenSanzoMcp={(tab) => setSanzoMcpModal({ open: true, tab })}
         onGoLanding={goToLanding}
       />
 
@@ -1629,6 +1638,22 @@ export function StudioWorkbench() {
           workspaceId={activeWorkspaceId}
           workspaceName={workspaceCardTitle}
           onNotify={(msg) => pushToast('success', msg)}
+        />
+      )}
+
+      {sanzoMcpModal.open && (
+        <SanzoWadaMcpModal
+          open={sanzoMcpModal.open}
+          initialTab={sanzoMcpModal.tab}
+          onClose={() => setSanzoMcpModal((prev) => ({ ...prev, open: false }))}
+          onInstantLookApplied={() => {
+            setReloadNonce((n) => n + 1);
+            pushToast('success', 'Sanzo Wada APCA-OKLCH palette applied live (<50ms)');
+          }}
+          onApplyDesignSystem={(designPrompt) => {
+            setVoiceTranscript(designPrompt);
+            enqueueOrExecuteRun('antislop', { textPrompt: designPrompt });
+          }}
         />
       )}
     </div>

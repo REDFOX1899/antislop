@@ -6,6 +6,7 @@ import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ENV } from './config/env.js';
 import { liveVoiceUpgradeHandler } from './gemini/liveVoiceDirector.js';
+import { createMcpRouter } from './mcp/antislopMcpServer.js';
 import { createApiRouter } from './routes/api.js';
 import { puppeteerAuditor, SCREENSHOTS_DIR } from './sandbox/puppeteerAuditor.js';
 import { viteManager } from './sandbox/viteManager.js';
@@ -75,6 +76,11 @@ async function bootstrap(): Promise<void> {
 
   // REST + SSE API endpoints
   app.use('/api', createApiRouter());
+
+  // Public Remote MCP Server (Streamable HTTP JSON-RPC 2.0 + well-known discovery)
+  const mcpRouter = createMcpRouter();
+  app.use('/mcp', mcpRouter);
+  app.use('/.well-known/mcp.json', mcpRouter);
 
   // Reverse proxy for embedded Vite HMR / Next / Static preview sandbox (single-port Cloud Run ready!)
   const { httpMiddleware, wsUpgradeHandler } = viteManager.createPreviewProxy();

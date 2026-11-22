@@ -12,11 +12,13 @@ import {
   Layers,
   Moon,
   Palette,
+  Plug,
   Plus,
   Ruler,
   Scale,
   Search,
   ShieldCheck,
+  SwatchBook,
   Sun,
   Zap,
 } from 'lucide-react';
@@ -47,6 +49,7 @@ interface TopBarProps {
   onOpenGeometryAudit?: () => void;
   onOpenConversionJudge?: () => void;
   onOpenBrandMemory?: () => void;
+  onOpenSanzoMcp?: (tab: 'sanzo' | 'mcp') => void;
   onGoLanding: () => void;
 }
 
@@ -140,6 +143,7 @@ export function TopBar({
   onOpenGeometryAudit,
   onOpenConversionJudge,
   onOpenBrandMemory,
+  onOpenSanzoMcp,
   onGoLanding,
 }: TopBarProps) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -425,6 +429,30 @@ export function TopBar({
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[var(--emerald)]" />
             <span>Brand DNA</span>
           </button>
+        )}
+
+        {/* 2f. Sanzo Wada 348 Color Dictionary & Remote MCP */}
+        {onOpenSanzoMcp && (
+          <>
+            <button
+              type="button"
+              onClick={() => onOpenSanzoMcp('sanzo')}
+              title="Browse all 348 Sanzo Wada (1933) Japanese Color Combinations"
+              className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2.5 text-[11.5px] font-medium text-[var(--ink-primary)] transition-colors hover:border-[var(--border-strong)] whitespace-nowrap"
+            >
+              <SwatchBook className="h-3.5 w-3.5 shrink-0 text-[var(--vermilion)]" />
+              <span>Sanzo 348</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenSanzoMcp('mcp')}
+              title="Connect external AI coding agents via Remote Streamable HTTP MCP"
+              className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] px-2.5 text-[11.5px] font-medium text-[var(--cobalt-ice)] transition-colors hover:brightness-110 whitespace-nowrap"
+            >
+              <Plug className="h-3.5 w-3.5 shrink-0" />
+              <span>MCP</span>
+            </button>
+          </>
         )}
 
         {/* 3. Clean Circle Theme Toggle */}

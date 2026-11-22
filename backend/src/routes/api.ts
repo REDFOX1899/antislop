@@ -10,6 +10,11 @@ import { ENV } from '../config/env.js';
 import { brandMemoryStore, type BrandMemoryProfile } from '../design/brandMemory.js';
 import { getVerifiedArchetypes } from '../design/paletteArchetypes.js';
 import {
+  compileSanzoWadaToDesignSystem,
+  getSanzoWadaCombination,
+  listSanzoWadaCombinations,
+} from '../design/sanzoWada.js';
+import {
   compileDesignTokens,
   type CompileDesignTokensInput,
 } from '../design/tokenCompiler.js';
@@ -446,6 +451,79 @@ export function createApiRouter(): Router {
     try {
       res.setHeader('Cache-Control', 'public, max-age=300');
       res.json({ pairings: VERIFIED_TYPOGRAPHY_PAIRINGS });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/design/sanzo-wada
+   * Searches and filters all 348 Sanzo Wada (1933) Japanese Color Combinations.
+   */
+  router.get('/design/sanzo-wada', (req: Request, res: Response) => {
+    try {
+      const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+      const rawSize = Number(req.query.size);
+      const size = rawSize === 2 || rawSize === 3 || rawSize === 4 ? rawSize : undefined;
+      const mood = typeof req.query.mood === 'string' && req.query.mood !== 'all' ? req.query.mood : undefined;
+      const limit = Number.isFinite(Number(req.query.limit)) ? Number(req.query.limit) : 60;
+      const offset = Number.isFinite(Number(req.query.offset)) ? Number(req.query.offset) : 0;
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.json(listSanzoWadaCombinations({ q, size, mood, limit, offset }));
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/design/sanzo-wada/:id
+   * Compiles a specific Sanzo Wada combination (#1..#348) into an APCA-verified OKLCH design system.
+   */
+  router.get('/design/sanzo-wada/:id', (req: Request, res: Response) => {
+    try {
+      const id = Number(getParam(req, 'id'));
+      const combo = getSanzoWadaCombination(id);
+      if (!combo) {
+        res.status(404).json({ error: `Sanzo Wada combination #${id} not found` });
+        return;
+      }
+      const modeOverride =
+        req.query.mode === 'light' || req.query.mode === 'dark' ? req.query.mode : undefined;
+      const pairingId = typeof req.query.pairingId === 'string' ? req.query.pairingId : undefined;
+      res.json(compileSanzoWadaToDesignSystem(id, modeOverride, pairingId));
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/design/sanzo-wada/:id/apply
+   * Compiles Sanzo Wada combo #id and injects it live into the active workspace in <50ms.
+   */
+  router.post('/design/sanzo-wada/:id/apply', async (req: Request, res: Response) => {
+    try {
+      const activeWs = viteManager.getActiveWorkspace();
+      if (!activeWs) {
+        res.status(400).json({ error: 'No active workspace' });
+        return;
+      }
+      const id = Number(getParam(req, 'id'));
+      const body = (req.body ?? {}) as { mode?: 'light' | 'dark'; pairingId?: string };
+      const compiledBundle = compileSanzoWadaToDesignSystem(id, body.mode, body.pairingId);
+      const injected = await injectInstantLookIntoWorkspace({
+        workspacePath: activeWs.localPath,
+        compiled: compiledBundle.compiled,
+        stylesheetUrls: compiledBundle.pairing.stylesheetUrls,
+        typographyCss: buildTypographyCssBlock(compiledBundle.pairing),
+        displayFont: compiledBundle.pairing.displayFont,
+        bodyFont: compiledBundle.pairing.bodyFont,
+        monoFont: compiledBundle.pairing.monoFont,
+      });
+      res.json({
+        applied: true,
+        ...compiledBundle,
+        injected,
+      });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }
