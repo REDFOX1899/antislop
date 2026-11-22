@@ -11,6 +11,7 @@ import type {
   TransformRunRequest,
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
+import { resolveVerifiedTypography } from '../design/typographyKernel.js';
 import { traceSpan, withV1Client } from './clientPool.js';
 import { ANTISLOP_DESIGN_CRAFT_DISTILLED } from './designSkill.js';
 import {
@@ -310,25 +311,30 @@ export function normalizeManifest(
     borderSubtle: asString(rawPalette.borderSubtle, DEFAULT_TOKENS.palette.borderSubtle),
   };
 
-  const displayFont = asString(rawTypo.displayFont, DEFAULT_TOKENS.typography.displayFont);
-  const bodyFont = asString(rawTypo.bodyFont, DEFAULT_TOKENS.typography.bodyFont);
-  const monoFont = asString(rawTypo.monoFont, DEFAULT_TOKENS.typography.monoFont);
+  const rawDisplayFont = asString(rawTypo.displayFont, DEFAULT_TOKENS.typography.displayFont);
+  const rawBodyFont = asString(rawTypo.bodyFont, DEFAULT_TOKENS.typography.bodyFont);
+  const rawMonoFont = asString(rawTypo.monoFont, DEFAULT_TOKENS.typography.monoFont);
+  const verifiedTypo = resolveVerifiedTypography({
+    displayFont: rawDisplayFont,
+    bodyFont: rawBodyFont,
+    monoFont: rawMonoFont,
+  });
 
   const typography: DesignTokens['typography'] = {
-    displayFont,
-    bodyFont,
-    monoFont,
-    googleFontsUrl: normalizeGoogleFontsUrl(rawTypo.googleFontsUrl, displayFont, bodyFont, monoFont),
-    headlineTracking: asString(rawTypo.headlineTracking, DEFAULT_TOKENS.typography.headlineTracking),
+    displayFont: verifiedTypo.displayFont,
+    bodyFont: verifiedTypo.bodyFont,
+    monoFont: verifiedTypo.monoFont,
+    googleFontsUrl: verifiedTypo.primaryGoogleFontsUrl,
+    headlineTracking: asString(rawTypo.headlineTracking, verifiedTypo.h1Tracking),
     editorialScaleRatio: asNumber(
       rawTypo.editorialScaleRatio,
-      DEFAULT_TOKENS.typography.editorialScaleRatio,
+      verifiedTypo.scaleRatio,
       1.125,
       1.618
     ),
     bodyLineHeight: asNumber(
       rawTypo.bodyLineHeight,
-      DEFAULT_TOKENS.typography.bodyLineHeight,
+      verifiedTypo.bodyLineHeight,
       1.35,
       1.9
     ),

@@ -1584,6 +1584,10 @@ export function StudioWorkbench() {
         <DesignSystemModal
           open={designSystemOpen}
           onClose={() => setDesignSystemOpen(false)}
+          onInstantLookApplied={() => {
+            setReloadNonce((n) => n + 1);
+            pushToast('success', 'Instant OKLCH palette & verified webfonts injected live (<50ms)');
+          }}
           onApplyDesignSystem={(designPrompt) => {
             setVoiceTranscript(designPrompt);
             enqueueOrExecuteRun('antislop', { textPrompt: designPrompt });

@@ -5,6 +5,10 @@ import path from 'node:path';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import type { DecisionsScorecard } from '../../../shared/types.js';
 import { BACKEND_ROOT, ENV } from '../config/env.js';
+import {
+  extractPaletteFromImageBase64,
+  type ImagePaletteExtractionResult,
+} from '../design/imageColorExtractor.js';
 import { runComputedGeometryAudit, type GeometryAuditReport } from './geometryAuditor.js';
 import { runInteractionAudit, type InteractionAuditReport } from './interactionAuditor.js';
 import { inspectCircledRegion, type InspectedDomNode, type NormalizedBox } from './domInspectorScript.js';
@@ -845,6 +849,20 @@ export class PuppeteerAuditor {
       await page.goto(previewUrl, { waitUntil: 'domcontentloaded', timeout: 25_000 });
       await new Promise((r) => setTimeout(r, 700));
       return await inspectCircledRegion(page, box);
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  async extractPaletteFromImage(
+    imageBase64: string,
+    mimeType = 'image/png',
+    modeHint?: 'light' | 'dark'
+  ): Promise<ImagePaletteExtractionResult> {
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
+    try {
+      return await extractPaletteFromImageBase64(page, imageBase64, mimeType, modeHint);
     } finally {
       await page.close().catch(() => undefined);
     }

@@ -13,6 +13,12 @@ import {
   compileDesignTokens,
   type CompileDesignTokensInput,
 } from '../design/tokenCompiler.js';
+import { injectInstantLookIntoWorkspace } from '../design/tokenInjector.js';
+import {
+  buildTypographyCssBlock,
+  resolveVerifiedTypography,
+  VERIFIED_TYPOGRAPHY_PAIRINGS,
+} from '../design/typographyKernel.js';
 import { geminiEngine } from '../gemini/index.js';
 import { runCoarseFineZoomXray, type ZoomTileRegion } from '../gemini/coarseFineXray.js';
 import { runCopilotMicroPulse } from '../gemini/copilotPulse.js';
@@ -427,6 +433,98 @@ export function createApiRouter(): Router {
     try {
       res.setHeader('Cache-Control', 'public, max-age=300');
       res.json({ archetypes: getVerifiedArchetypes() });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/design/typography
+   * Returns 24 verified Google Fonts + Fontshare pairings with optical metrics (cached).
+   */
+  router.get('/design/typography', (_req: Request, res: Response) => {
+    try {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.json({ pairings: VERIFIED_TYPOGRAPHY_PAIRINGS });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/design/extract-image-palette
+   * Extracts Oklab k-means++ swatches & APCA-verified OKLCH seeds from any uploaded moodboard image.
+   */
+  router.post('/design/extract-image-palette', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        imageBase64?: string;
+        mimeType?: string;
+        modeHint?: 'light' | 'dark';
+      };
+      if (!body.imageBase64 || body.imageBase64.trim().length < 32) {
+        res.status(400).json({ error: 'imageBase64 is required' });
+        return;
+      }
+      const extracted = await puppeteerAuditor.extractPaletteFromImage(
+        body.imageBase64,
+        body.mimeType || 'image/png',
+        body.modeHint
+      );
+      res.json(extracted);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/design/apply-instant-look
+   * Zero-LLM (<50ms) live palette + verified webfont injection directly into the active workspace.
+   */
+  router.post('/design/apply-instant-look', async (req: Request, res: Response) => {
+    try {
+      const activeWs = viteManager.getActiveWorkspace();
+      if (!activeWs) {
+        res.status(400).json({ error: 'No active workspace' });
+        return;
+      }
+      const body = (req.body ?? {}) as Partial<CompileDesignTokensInput> & {
+        pairingId?: string;
+      };
+      const pairing = resolveVerifiedTypography({
+        pairingId: body.pairingId,
+        displayFont: body.typography?.displayFont,
+        bodyFont: body.typography?.bodyFont,
+        monoFont: body.typography?.monoFont,
+      });
+      const compiled = compileDesignTokens({
+        name: typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Instant Atelier Look',
+        mode: body.mode === 'light' ? 'light' : 'dark',
+        palette: body.palette,
+        seedAccentHex: body.seedAccentHex,
+        seedNeutralHex: body.seedNeutralHex,
+        typography: {
+          displayFont: pairing.displayFont,
+          bodyFont: pairing.bodyFont,
+          monoFont: pairing.monoFont,
+          googleFontsUrl: pairing.primaryGoogleFontsUrl,
+        },
+      });
+      const injected = await injectInstantLookIntoWorkspace({
+        workspacePath: activeWs.localPath,
+        compiled,
+        stylesheetUrls: pairing.stylesheetUrls,
+        typographyCss: buildTypographyCssBlock(pairing),
+        displayFont: pairing.displayFont,
+        bodyFont: pairing.bodyFont,
+        monoFont: pairing.monoFont,
+      });
+      res.json({
+        applied: true,
+        pairing,
+        compiled,
+        injected,
+      });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }

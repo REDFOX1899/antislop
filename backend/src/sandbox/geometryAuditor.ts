@@ -43,6 +43,8 @@ export interface GeometryAuditReport {
   engineeringFixDirectives: string[];
   latencyMs: number;
   viewport: { width: number; height: number };
+  loadedFonts?: string[];
+  failedFonts?: string[];
 }
 
 interface RawBrowserAuditResult {
@@ -50,6 +52,8 @@ interface RawBrowserAuditResult {
   textNodesAudited: number;
   viewport: { width: number; height: number };
   violations: GeometryViolation[];
+  loadedFonts: string[];
+  failedFonts: string[];
 }
 
 const MAX_VIOLATIONS = 30;
@@ -141,9 +145,22 @@ function computeOverallScore(scores: GeometryAuditCategoryScores): number {
 
 function synthesizeEngineeringFixDirectives(
   violations: GeometryViolation[],
-  scores: GeometryAuditCategoryScores
+  scores: GeometryAuditCategoryScores,
+  failedFonts: string[] = []
 ): string[] {
   const directives: string[] = [];
+
+  const webfontViolations = violations.filter(
+    (v) => v.category === 'typography_measure' && v.message.toLowerCase().includes('webfont')
+  );
+  if (webfontViolations.length > 0 || failedFonts.length > 0) {
+    const affectedSelectors = webfontViolations.map((v) => `${v.selector} (${v.measured})`).join(', ');
+    const failedList = failedFonts.length > 0 ? `failed FontFace entries: ${failedFonts.join(', ')}` : '';
+    const detail = [affectedSelectors, failedList].filter(Boolean).join('; ');
+    directives.push(
+      `[Webfont Loading] Fix broken or unloaded custom webfont declaration(s) (${detail || 'unloaded font family'}) by verifying Google Fonts / @font-face stylesheet <link> tags, font-family spelling, and CORS/network availability so typography does not silently fall back to system fonts.`
+    );
+  }
 
   const apcaViolations = violations.filter((v) => v.category === 'apca_contrast');
   if (apcaViolations.length > 0) {
@@ -207,7 +224,9 @@ function synthesizeEngineeringFixDirectives(
       );
     }
 
-    directives.push(`[Typography & Hierarchy] ${issues.join('; ')}.`);
+    if (issues.length > 0) {
+      directives.push(`[Typography & Hierarchy] ${issues.join('; ')}.`);
+    }
   }
 
   const a11yViolations = violations.filter((v) => v.category === 'semantic_a11y');
@@ -244,7 +263,16 @@ function synthesizeEngineeringFixDirectives(
 export async function runComputedGeometryAudit(page: Page): Promise<GeometryAuditReport> {
   const startedAt = Date.now();
 
-  const rawResult: RawBrowserAuditResult = await page.evaluate(() => {
+  const rawResult: RawBrowserAuditResult = await page.evaluate(async () => {
+    if (document.fonts && document.fonts.ready) {
+      await Promise.race([
+        document.fonts.ready.catch(() => undefined),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 1500);
+        }),
+      ]);
+    }
+
     type RGBA = [number, number, number, number];
     type RGB = [number, number, number];
 
@@ -701,6 +729,101 @@ export async function runComputedGeometryAudit(page: Page): Promise<GeometryAudi
       prevHeadingLevel = level;
     }
 
+    // Webfont Load Verification via document.fonts
+    const loadedFontSet = new Set<string>();
+    const loadedFontLowerSet = new Set<string>();
+    const failedFontSet = new Set<string>();
+
+    const normalizeFontFamilyName = (raw: string): string =>
+      raw.replace(/^['"]+|['"]+$/g, '').trim();
+
+    if (document.fonts) {
+      document.fonts.forEach((face) => {
+        const family = normalizeFontFamilyName(face.family || '');
+        if (!family) return;
+        if (face.status === 'loaded') {
+          loadedFontSet.add(family);
+          loadedFontLowerSet.add(family.toLowerCase());
+        } else if (face.status === 'error') {
+          failedFontSet.add(family);
+        }
+      });
+    }
+
+    const loadedFonts = Array.from(loadedFontSet);
+    const failedFonts = Array.from(failedFontSet);
+
+    const genericSystemFonts = new Set<string>([
+      'system-ui',
+      '-apple-system',
+      'blinkmacsystemfont',
+      'sans-serif',
+      'serif',
+      'monospace',
+      'cursive',
+      'fantasy',
+      'ui-sans-serif',
+      'ui-serif',
+      'ui-monospace',
+      'ui-rounded',
+      'emoji',
+      'math',
+      'fangsong',
+      'segoe ui',
+      'arial',
+      'helvetica',
+      'helvetica neue',
+      'times',
+      'times new roman',
+      'georgia',
+      'courier',
+      'courier new',
+      'inherit',
+      'initial',
+      'unset',
+    ]);
+
+    const getPrimaryDeclaredFont = (el: Element): string | null => {
+      const fontFamily = window.getComputedStyle(el).fontFamily || '';
+      const firstToken = fontFamily
+        .split(',')
+        .map((token) => normalizeFontFamilyName(token))
+        .find((token) => token.length > 0);
+      return firstToken || null;
+    };
+
+    const webfontTargets: Array<{ selector: 'h1' | 'body'; el: Element | null }> = [
+      { selector: 'h1', el: visibleH1s[0] || document.querySelector('h1') },
+      { selector: 'body', el: document.body },
+    ];
+
+    for (let i = 0; i < webfontTargets.length; i += 1) {
+      const target = webfontTargets[i];
+      if (!target.el) continue;
+
+      const primaryFamily = getPrimaryDeclaredFont(target.el);
+      if (!primaryFamily) continue;
+
+      const primaryLower = primaryFamily.toLowerCase();
+      if (genericSystemFonts.has(primaryLower)) continue;
+
+      const isLoaded = loadedFontLowerSet.has(primaryLower);
+      if (!isLoaded || failedFonts.length > 0) {
+        const reportedFamily = !isLoaded ? primaryFamily : failedFonts[0];
+        const rect = target.selector === 'h1' ? roundRect(target.el.getBoundingClientRect()) : undefined;
+        violations.push({
+          id: nextId('typo'),
+          category: 'typography_measure',
+          severity: 'critical',
+          selector: target.selector,
+          message: 'Declared webfont failed to load and fell back to system font',
+          measured: `${reportedFamily} (unloaded)`,
+          threshold: 'status === loaded',
+          ...(rect ? { rect } : {}),
+        });
+      }
+    }
+
     // -------------------------------------------------------------------------
     // 3. LAYOUT & SPATIAL RHYTHM AUDIT
     // -------------------------------------------------------------------------
@@ -902,13 +1025,19 @@ export async function runComputedGeometryAudit(page: Page): Promise<GeometryAudi
       textNodesAudited,
       viewport: { width: vw, height: vh },
       violations,
+      loadedFonts,
+      failedFonts,
     };
   });
 
   const { deduped, capped } = deduplicateAndSortViolations(rawResult.violations);
   const categoryScores = computeCategoryScores(deduped);
   const overallScore = computeOverallScore(categoryScores);
-  const engineeringFixDirectives = synthesizeEngineeringFixDirectives(deduped, categoryScores);
+  const engineeringFixDirectives = synthesizeEngineeringFixDirectives(
+    deduped,
+    categoryScores,
+    rawResult.failedFonts
+  );
   const latencyMs = Math.max(0, Date.now() - startedAt);
 
   return {
@@ -920,5 +1049,7 @@ export async function runComputedGeometryAudit(page: Page): Promise<GeometryAudi
     engineeringFixDirectives,
     latencyMs,
     viewport: rawResult.viewport,
+    loadedFonts: rawResult.loadedFonts,
+    failedFonts: rawResult.failedFonts,
   };
 }

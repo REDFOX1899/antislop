@@ -7,12 +7,15 @@ import {
   Code2,
   Copy,
   Eye,
+  ImagePlus,
   Loader2,
   Moon,
   Palette,
   ShieldCheck,
   Sparkles,
   Sun,
+  Type,
+  Zap,
 } from 'lucide-react';
 import { BACKEND_URL } from '@/lib/api';
 import { NativeDialog } from './NativeDialog';
@@ -21,16 +24,46 @@ export interface DesignSystemModalProps {
   open: boolean;
   onClose: () => void;
   onApplyDesignSystem: (prompt: string) => void;
+  onInstantLookApplied?: () => void;
 }
 
 type Polarity = 'light' | 'dark';
 type CvdMode = 'normal' | 'protanopia' | 'deuteranopia' | 'tritanopia';
 type CodeTab = 'tokens.json' | 'tokens.css' | 'tailwind';
+type TypographyCategory =
+  | 'All'
+  | 'Editorial Serif'
+  | 'Swiss Grotesk'
+  | 'Luxury'
+  | 'Technical'
+  | 'Brutalist';
 
 interface FontPairing {
   display: string;
   body: string;
   mono: string;
+}
+
+interface VerifiedTypographyPairing {
+  id: string;
+  name: string;
+  category: Exclude<TypographyCategory, 'All'>;
+  display: string;
+  body: string;
+  mono: string;
+  stylesheetUrl: string;
+  h1Tracking: string;
+  scaleRatio: number;
+  opticalSizing: boolean;
+  vibe: string;
+}
+
+interface ExtractedImagePalette {
+  accentHex: string;
+  neutralHex: string;
+  mode: Polarity;
+  clusters: string[];
+  fileName: string;
 }
 
 interface ArchetypePreset {
@@ -186,6 +219,102 @@ const CVD_MATRICES: Record<Exclude<CvdMode, 'normal'>, string> = {
   tritanopia:
     '1.255528 -0.076749 -0.178779 0 0 -0.078411 0.930809 0.147602 0 0 0.004733 0.691367 0.303900 0 0 0 0 0 1 0',
 };
+
+const TYPOGRAPHY_CATEGORIES: readonly TypographyCategory[] = [
+  'All',
+  'Editorial Serif',
+  'Swiss Grotesk',
+  'Luxury',
+  'Technical',
+  'Brutalist',
+];
+
+const FALLBACK_TYPOGRAPHY_PAIRINGS: readonly VerifiedTypographyPairing[] = [
+  {
+    id: 'editorial-instrument-jakarta',
+    name: 'Archival Press',
+    category: 'Editorial Serif',
+    display: 'Instrument Serif',
+    body: 'Plus Jakarta Sans',
+    mono: 'JetBrains Mono',
+    stylesheetUrl:
+      'https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    h1Tracking: '-0.025em',
+    scaleRatio: 1.333,
+    opticalSizing: false,
+    vibe: 'Warm magazine display serif with crisp humanist body',
+  },
+  {
+    id: 'editorial-fraunces-inter',
+    name: 'Botanical Monograph',
+    category: 'Editorial Serif',
+    display: 'Fraunces',
+    body: 'Inter',
+    mono: 'JetBrains Mono',
+    stylesheetUrl:
+      'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap',
+    h1Tracking: '-0.03em',
+    scaleRatio: 1.25,
+    opticalSizing: true,
+    vibe: 'Soft-serif optical axis with neutral neo-grotesk UI',
+  },
+  {
+    id: 'swiss-space-inter',
+    name: 'Zurich Grid',
+    category: 'Swiss Grotesk',
+    display: 'Space Grotesk',
+    body: 'Inter',
+    mono: 'IBM Plex Mono',
+    stylesheetUrl:
+      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    h1Tracking: '-0.035em',
+    scaleRatio: 1.25,
+    opticalSizing: false,
+    vibe: 'Geometric Swiss poster precision for modern product interfaces',
+  },
+  {
+    id: 'luxury-cormorant-dm',
+    name: 'Maison Couture',
+    category: 'Luxury',
+    display: 'Cormorant Garamond',
+    body: 'DM Sans',
+    mono: 'IBM Plex Mono',
+    stylesheetUrl:
+      'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    h1Tracking: '-0.02em',
+    scaleRatio: 1.414,
+    opticalSizing: true,
+    vibe: 'High-contrast Parisian serif with understated geometric sans',
+  },
+  {
+    id: 'technical-ibm-plex',
+    name: 'Telemetry Console',
+    category: 'Technical',
+    display: 'IBM Plex Sans',
+    body: 'IBM Plex Sans',
+    mono: 'IBM Plex Mono',
+    stylesheetUrl:
+      'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap',
+    h1Tracking: '-0.02em',
+    scaleRatio: 1.2,
+    opticalSizing: false,
+    vibe: 'Engineered industrial clarity with tabular numerals',
+  },
+  {
+    id: 'brutalist-syne-mono',
+    name: 'Concrete Manifesto',
+    category: 'Brutalist',
+    display: 'Syne',
+    body: 'Space Mono',
+    mono: 'Space Mono',
+    stylesheetUrl:
+      'https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Space+Mono:wght@400;700&display=swap',
+    h1Tracking: '-0.04em',
+    scaleRatio: 1.333,
+    opticalSizing: false,
+    vibe: 'Wide expressive avant-garde display with raw monospace body',
+  },
+];
 
 // ============================================================================
 // Pure OKLCH + APCA W3 Math Engine (instant local fallback + live preview)
@@ -884,6 +1013,148 @@ function parseCompiledResponse(
   };
 }
 
+function normalizeTypographyCategory(raw: string): Exclude<TypographyCategory, 'All'> {
+  const lower = raw.toLowerCase();
+  if (lower.includes('editorial') || lower.includes('serif')) return 'Editorial Serif';
+  if (lower.includes('swiss') || lower.includes('grotesk') || lower.includes('neo')) return 'Swiss Grotesk';
+  if (lower.includes('luxury') || lower.includes('fashion') || lower.includes('couture')) return 'Luxury';
+  if (lower.includes('tech') || lower.includes('mono') || lower.includes('dev') || lower.includes('system')) {
+    return 'Technical';
+  }
+  if (lower.includes('brutal') || lower.includes('avant') || lower.includes('expressive')) return 'Brutalist';
+  return 'Editorial Serif';
+}
+
+function buildGoogleFontsUrl(display: string, body: string, mono: string): string {
+  const unique = Array.from(new Set([display, body, mono].filter((f) => f.trim().length > 0)));
+  const families = unique
+    .map((family) => `family=${encodeURIComponent(family).replace(/%20/g, '+')}:wght@400;500;600;700`)
+    .join('&');
+  return `https://fonts.googleapis.com/css2?${families}&display=swap`;
+}
+
+function parseTypographyResponse(raw: unknown): VerifiedTypographyPairing[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : isRecord(raw) && Array.isArray(raw.pairings)
+      ? raw.pairings
+      : isRecord(raw) && Array.isArray(raw.typography)
+        ? raw.typography
+        : isRecord(raw) && Array.isArray(raw.items)
+          ? raw.items
+          : [];
+
+  const parsed: VerifiedTypographyPairing[] = [];
+  for (const item of list) {
+    if (!isRecord(item)) continue;
+    const id = asString(item.id);
+    const name = asString(item.name ?? item.label ?? item.title);
+    if (!id && !name) continue;
+
+    const fontsObj = isRecord(item.fonts) ? item.fonts : isRecord(item.fontPairing) ? item.fontPairing : {};
+    const display = asString(
+      item.display ?? item.displayFont ?? item.headingFont ?? fontsObj.display,
+      'Instrument Serif',
+    );
+    const body = asString(
+      item.body ?? item.bodyFont ?? item.sansFont ?? fontsObj.body ?? fontsObj.sans,
+      'Plus Jakarta Sans',
+    );
+    const mono = asString(item.mono ?? item.monoFont ?? fontsObj.mono, 'JetBrains Mono');
+
+    const stylesheetUrl = asString(
+      item.stylesheetUrl ?? item.cssUrl ?? item.googleFontsUrl ?? item.fontUrl ?? item.linkHref,
+      buildGoogleFontsUrl(display, body, mono),
+    );
+
+    const h1Tracking = asString(
+      item.h1Tracking ?? item.displayTracking ?? item.headingTracking ?? item.tracking,
+      '-0.025em',
+    );
+
+    const rawRatio = item.scaleRatio ?? item.typeScaleRatio ?? item.ratio;
+    const scaleRatio =
+      typeof rawRatio === 'number' && Number.isFinite(rawRatio) && rawRatio > 1
+        ? Number(rawRatio.toFixed(3))
+        : typeof rawRatio === 'string' && Number.isFinite(parseFloat(rawRatio)) && parseFloat(rawRatio) > 1
+          ? Number(parseFloat(rawRatio).toFixed(3))
+          : 1.25;
+
+    const opticalSizing = Boolean(
+      item.opticalSizing ?? item.hasOpticalSizing ?? item.opsz ?? item.supportsOpticalSizing ?? false,
+    );
+
+    parsed.push({
+      id: id || `${display}-${body}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: name || `${display} + ${body}`,
+      category: normalizeTypographyCategory(asString(item.category ?? item.group ?? item.style, 'Editorial Serif')),
+      display,
+      body,
+      mono,
+      stylesheetUrl,
+      h1Tracking,
+      scaleRatio,
+      opticalSizing,
+      vibe: asString(item.vibe ?? item.description ?? item.notes, `${display} paired with ${body}`),
+    });
+  }
+
+  return parsed.length > 0 ? parsed : [...FALLBACK_TYPOGRAPHY_PAIRINGS];
+}
+
+function parseExtractedPaletteResponse(
+  raw: unknown,
+  fileName: string,
+  fallbackPolarity: Polarity,
+): ExtractedImagePalette | null {
+  if (!isRecord(raw)) return null;
+  const source = isRecord(raw.palette) ? raw.palette : raw;
+
+  const accentRaw = asString(
+    source.accentHex ?? source.seedAccentHex ?? source.accent ?? source.primaryAccent,
+  );
+  const neutralRaw = asString(
+    source.neutralHex ?? source.seedNeutralHex ?? source.neutral ?? source.canvasHex ?? source.canvas,
+  );
+
+  if (!accentRaw && !neutralRaw) return null;
+
+  const modeRaw = asString(source.mode ?? source.polarity).toLowerCase();
+  const mode: Polarity =
+    modeRaw === 'dark' ? 'dark' : modeRaw === 'light' ? 'light' : fallbackPolarity;
+
+  const accentHex = normalizeHex(accentRaw, mode === 'dark' ? '#4285F4' : '#0B57D0');
+  const neutralHex = normalizeHex(neutralRaw, mode === 'dark' ? '#0A0D12' : '#F5F3EF');
+
+  const rawClusters = Array.isArray(source.clusters)
+    ? source.clusters
+    : Array.isArray(source.swatches)
+      ? source.swatches
+      : Array.isArray(source.dominantColors)
+        ? source.dominantColors
+        : Array.isArray(raw.clusters)
+          ? raw.clusters
+          : [];
+
+  const clusters: string[] = [];
+  for (const c of rawClusters) {
+    if (typeof c === 'string') {
+      const hex = normalizeHex(c, '');
+      if (hex) clusters.push(hex);
+    } else if (isRecord(c)) {
+      const hex = normalizeHex(asString(c.hex ?? c.color), '');
+      if (hex) clusters.push(hex);
+    }
+    if (clusters.length >= 6) break;
+  }
+
+  if (clusters.length === 0) {
+    clusters.push(neutralHex, accentHex);
+  }
+
+  return { accentHex, neutralHex, mode, clusters, fileName };
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -892,6 +1163,7 @@ export function DesignSystemModal({
   open,
   onClose,
   onApplyDesignSystem,
+  onInstantLookApplied,
 }: DesignSystemModalProps) {
   const filterPrefix = useId().replace(/:/g, '');
 
@@ -905,6 +1177,29 @@ export function DesignSystemModal({
   const [fontPairing, setFontPairing] = useState<FontPairing>(FALLBACK_ARCHETYPES[0].fontPairing);
   const [cvdMode, setCvdMode] = useState<CvdMode>('normal');
   const [activeCodeTab, setActiveCodeTab] = useState<CodeTab>('tokens.css');
+
+  // Verified 24-Pairing Typography Studio state
+  const [typographyPairings, setTypographyPairings] = useState<VerifiedTypographyPairing[]>([
+    ...FALLBACK_TYPOGRAPHY_PAIRINGS,
+  ]);
+  const [typographyCategory, setTypographyCategory] = useState<TypographyCategory>('All');
+  const [selectedPairingId, setSelectedPairingId] = useState<string>(
+    FALLBACK_TYPOGRAPHY_PAIRINGS[0].id,
+  );
+  const [loadedStylesheetUrl, setLoadedStylesheetUrl] = useState<string>('');
+
+  // Moodboard Image-to-OKLCH Extractor state
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [isExtractingImage, setIsExtractingImage] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [extractedImage, setExtractedImage] = useState<ExtractedImagePalette | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
+  // Instant 0ms Live Apply state
+  const [isApplyingInstant, setIsApplyingInstant] = useState(false);
+  const [instantStatus, setInstantStatus] = useState<'idle' | 'applied' | 'error'>('idle');
+  const [instantMessage, setInstantMessage] = useState<string | null>(null);
+  const instantTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [compiled, setCompiled] = useState<CompiledPalette>(() =>
     compilePaletteLocally(
@@ -932,6 +1227,7 @@ export function DesignSystemModal({
   useEffect(() => {
     return () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      if (instantTimerRef.current) clearTimeout(instantTimerRef.current);
     };
   }, []);
 
@@ -956,6 +1252,66 @@ export function DesignSystemModal({
     return () => controller.abort();
   }, [open]);
 
+  // 1b. Fetch Verified 24-Pairing Typography Studio catalog on modal open
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+
+    fetch(`${BACKEND_URL}/api/design/typography`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const parsed = parseTypographyResponse(data);
+        if (parsed.length > 0) {
+          setTypographyPairings(parsed);
+          setSelectedPairingId((prev) =>
+            parsed.some((p) => p.id === prev) ? prev : parsed[0].id,
+          );
+        }
+      })
+      .catch(() => {
+        // Keep curated local fallback pairings silently
+      });
+
+    return () => controller.abort();
+  }, [open]);
+
+  const activeTypographyPairing = useMemo<VerifiedTypographyPairing | undefined>(
+    () => typographyPairings.find((p) => p.id === selectedPairingId) ?? typographyPairings[0],
+    [typographyPairings, selectedPairingId],
+  );
+
+  // Dynamically inject selected pairing's <link rel="stylesheet"> into document.head
+  useEffect(() => {
+    if (!open || !activeTypographyPairing?.stylesheetUrl) return;
+    const href = activeTypographyPairing.stylesheetUrl;
+    if (typeof document === 'undefined') return;
+
+    const existing = document.getElementById(
+      'antislop-typography-studio-font',
+    ) as HTMLLinkElement | null;
+    if (existing) {
+      if (existing.href !== href) {
+        existing.href = href;
+      }
+      setLoadedStylesheetUrl(href);
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.id = 'antislop-typography-studio-font';
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.setAttribute('data-antislop-typography', 'true');
+    document.head.appendChild(link);
+    setLoadedStylesheetUrl(href);
+  }, [open, activeTypographyPairing]);
+
+  const filteredTypographyPairings = useMemo(() => {
+    if (typographyCategory === 'All') return typographyPairings;
+    return typographyPairings.filter((p) => p.category === typographyCategory);
+  }, [typographyPairings, typographyCategory]);
+
   // 2. Compile Palette via local instant math + POST /api/design/compile-palette
   useEffect(() => {
     if (!open) return;
@@ -976,6 +1332,7 @@ export function DesignSystemModal({
           polarity,
           cvdMode,
           archetypeId: selectedArchetypeId,
+          pairingId: selectedPairingId,
           fontPairing,
         }),
       })
@@ -998,17 +1355,147 @@ export function DesignSystemModal({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [open, accentHex, neutralHex, polarity, cvdMode, selectedArchetypeId, fontPairing]);
+  }, [open, accentHex, neutralHex, polarity, cvdMode, selectedArchetypeId, selectedPairingId, fontPairing]);
 
-  const handleSelectArchetype = useCallback((preset: ArchetypePreset) => {
-    setSelectedArchetypeId(preset.id);
-    setPolarity(preset.polarity);
-    setAccentHex(preset.accentHex);
-    setAccentInput(preset.accentHex);
-    setNeutralHex(preset.neutralHex);
-    setNeutralInput(preset.neutralHex);
-    setFontPairing(preset.fontPairing);
+  const handleSelectArchetype = useCallback(
+    (preset: ArchetypePreset) => {
+      setSelectedArchetypeId(preset.id);
+      setPolarity(preset.polarity);
+      setAccentHex(preset.accentHex);
+      setAccentInput(preset.accentHex);
+      setNeutralHex(preset.neutralHex);
+      setNeutralInput(preset.neutralHex);
+      setFontPairing(preset.fontPairing);
+      const matched = typographyPairings.find(
+        (p) => p.display.toLowerCase() === preset.fontPairing.display.toLowerCase(),
+      );
+      if (matched) {
+        setSelectedPairingId(matched.id);
+      }
+    },
+    [typographyPairings],
+  );
+
+  const handleSelectTypographyPairing = useCallback((pairing: VerifiedTypographyPairing) => {
+    setSelectedPairingId(pairing.id);
+    setFontPairing({
+      display: pairing.display,
+      body: pairing.body,
+      mono: pairing.mono,
+    });
   }, []);
+
+  const handleExtractImageFile = useCallback(
+    async (file: File | null | undefined) => {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        setExtractError('Please choose an image file (PNG, JPG, WebP).');
+        return;
+      }
+
+      setIsExtractingImage(true);
+      setExtractError(null);
+
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              resolve(reader.result);
+            } else {
+              reject(new Error('Failed to read image data'));
+            }
+          };
+          reader.onerror = () => reject(new Error('Could not read image file'));
+          reader.readAsDataURL(file);
+        });
+
+        const rawBase64 = dataUrl.replace(/^data:[^;]+;base64,/i, '').trim();
+        const res = await fetch(`${BACKEND_URL}/api/design/extract-image-palette`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: dataUrl,
+            dataBase64: rawBase64,
+            mimeType: file.type || 'image/png',
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Palette extraction returned ${res.status}`);
+        }
+
+        const data: unknown = await res.json();
+        const extracted = parseExtractedPaletteResponse(data, file.name, polarity);
+        if (!extracted) {
+          throw new Error('Could not parse Oklab clusters from image response.');
+        }
+
+        setExtractedImage(extracted);
+        setPolarity(extracted.mode);
+        setAccentHex(extracted.accentHex);
+        setAccentInput(extracted.accentHex);
+        setNeutralHex(extracted.neutralHex);
+        setNeutralInput(extracted.neutralHex);
+      } catch (err) {
+        setExtractError(err instanceof Error ? err.message : 'Image palette extraction failed');
+      } finally {
+        setIsExtractingImage(false);
+        if (imageInputRef.current) {
+          imageInputRef.current.value = '';
+        }
+      }
+    },
+    [polarity],
+  );
+
+  const handleApplyInstantLook = useCallback(async () => {
+    const activeArchetype = archetypes.find((a) => a.id === selectedArchetypeId);
+    setIsApplyingInstant(true);
+    setInstantStatus('idle');
+    setInstantMessage(null);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/design/apply-instant-look`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: activeArchetype?.name ?? 'Custom OKLCH System',
+          mode: polarity,
+          seedAccentHex: accentHex,
+          seedNeutralHex: neutralHex,
+          pairingId: selectedPairingId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Instant apply failed (${res.status})`);
+      }
+
+      setInstantStatus('applied');
+      setInstantMessage('Injected OKLCH tokens + live webfonts into preview');
+      onInstantLookApplied?.();
+
+      if (instantTimerRef.current) clearTimeout(instantTimerRef.current);
+      instantTimerRef.current = setTimeout(() => {
+        setInstantStatus('idle');
+        setInstantMessage(null);
+      }, 3200);
+    } catch (err) {
+      setInstantStatus('error');
+      setInstantMessage(err instanceof Error ? err.message : 'Instant live preview failed');
+    } finally {
+      setIsApplyingInstant(false);
+    }
+  }, [
+    archetypes,
+    selectedArchetypeId,
+    polarity,
+    accentHex,
+    neutralHex,
+    selectedPairingId,
+    onInstantLookApplied,
+  ]);
 
   const handlePolaritySwitch = useCallback((nextPolarity: Polarity) => {
     setPolarity(nextPolarity);
@@ -1055,6 +1542,21 @@ export function DesignSystemModal({
       .map((row) => `${row.label}: Lc ${row.lc >= 0 ? '+' : ''}${row.lc} (${row.wcagRatio}:1, ${row.status})`)
       .join('; ');
 
+    const pairingMeta = activeTypographyPairing
+      ? [
+          `Verified Typography Pairing: ${activeTypographyPairing.name} (${activeTypographyPairing.category} · id: ${activeTypographyPairing.id})`,
+          `- Display: ${activeTypographyPairing.display} (h1Tracking: ${activeTypographyPairing.h1Tracking}, scaleRatio: ${activeTypographyPairing.scaleRatio}×, opticalSizing: ${activeTypographyPairing.opticalSizing ? 'enabled (opsz)' : 'standard'})`,
+          `- Body: ${activeTypographyPairing.body}`,
+          `- Mono: ${activeTypographyPairing.mono}`,
+          `- Stylesheet: ${activeTypographyPairing.stylesheetUrl}`,
+        ]
+      : [
+          `Typography Pairing:`,
+          `- Display: ${fontPairing.display}`,
+          `- Body: ${fontPairing.body}`,
+          `- Mono: ${fontPairing.mono}`,
+        ];
+
     const prompt = [
       `Apply this APCA-verified OKLCH Design System (${activeArchetype?.name ?? 'Custom Palette'} · ${compiled.polarity.toUpperCase()} polarity) across the entire live application:`,
       '',
@@ -1065,18 +1567,23 @@ export function DesignSystemModal({
       `- Ink Primary: ${s.inkPrimary} (${neutral12?.cssOklch ?? ''}) | Ink Secondary: ${s.inkSecondary} | Ink Muted: ${s.inkMuted}`,
       `- Accent: ${s.accent} (${accent9?.cssOklch ?? ''}) | Hover: ${s.accentHover} | Soft Tint: ${s.accentSoft} | On-Accent Contrast: ${s.accentContrast}`,
       '',
-      `Typography Pairing:`,
-      `- Display: ${fontPairing.display}`,
-      `- Body: ${fontPairing.body}`,
-      `- Mono: ${fontPairing.mono}`,
+      ...pairingMeta,
       '',
       `APCA Contrast Verification: ${auditSummary}.`,
-      `Update CSS custom properties / Tailwind @theme tokens and ensure all surfaces, typography, borders, badges, and primary CTAs strictly use these verified tokens with crisp editorial hierarchy.`,
+      `Update CSS custom properties / Tailwind @theme tokens, load the verified typography stylesheet, and ensure all surfaces, typography, borders, badges, and primary CTAs strictly use these verified tokens with crisp editorial hierarchy.`,
     ].join('\n');
 
     onApplyDesignSystem(prompt);
     onClose();
-  }, [archetypes, selectedArchetypeId, compiled, fontPairing, onApplyDesignSystem, onClose]);
+  }, [
+    archetypes,
+    selectedArchetypeId,
+    compiled,
+    activeTypographyPairing,
+    fontPairing,
+    onApplyDesignSystem,
+    onClose,
+  ]);
 
   return (
     <NativeDialog
@@ -1317,6 +1824,199 @@ export function DesignSystemModal({
               })}
             </div>
           </div>
+
+          {/* Moodboard Image-to-OKLCH Color Extractor */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[var(--border-subtle)] pt-3 lg:col-span-12">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  void handleExtractImageFile(e.target.files?.[0]);
+                }}
+              />
+              <button
+                type="button"
+                disabled={isExtractingImage}
+                onClick={() => imageInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingImage(true);
+                }}
+                onDragLeave={() => setIsDraggingImage(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingImage(false);
+                  void handleExtractImageFile(e.dataTransfer.files?.[0]);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-60"
+                style={{
+                  backgroundColor: isDraggingImage ? 'var(--cobalt-tint-strong)' : 'var(--bg-card)',
+                  borderColor: isDraggingImage ? 'var(--cobalt-border-strong)' : 'var(--border-strong)',
+                  color: 'var(--ink-primary)',
+                }}
+              >
+                {isExtractingImage ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--cobalt-bright)]" />
+                ) : (
+                  <ImagePlus className="h-3.5 w-3.5 text-[var(--cobalt-bright)]" />
+                )}
+                <span>
+                  {isExtractingImage
+                    ? 'Clustering Oklab pixels…'
+                    : isDraggingImage
+                      ? 'Drop moodboard image'
+                      : 'Extract Palette from Image'}
+                </span>
+              </button>
+
+              {extractedImage ? (
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex items-center -space-x-1">
+                    {extractedImage.clusters.map((hex, idx) => (
+                      <span
+                        key={`cluster-${hex}-${idx}`}
+                        title={hex}
+                        className="h-4 w-4 rounded-full border border-white/25"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+                  <span className="truncate font-mono text-[10px] text-[var(--ink-secondary)]">
+                    Oklab extracted ({extractedImage.mode}) · {extractedImage.fileName}
+                  </span>
+                </div>
+              ) : extractError ? (
+                <span className="font-mono text-[10px] text-[var(--vermilion)]">
+                  {extractError}
+                </span>
+              ) : (
+                <span className="text-[11px] text-[var(--ink-muted)]">
+                  Drop or upload a moodboard image to auto-derive Accent, Neutral &amp; Polarity via Oklab k-means.
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* 2b. Verified 24-Pairing Typography Studio */}
+        <section
+          aria-label="Verified Typography Studio"
+          className="flex flex-col gap-3 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card-elevated)] p-3.5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+              <Type className="h-3.5 w-3.5 text-[var(--cobalt-bright)]" />
+              <span>Verified Typography Studio ({typographyPairings.length} Pairings)</span>
+            </div>
+
+            {activeTypographyPairing && (
+              <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+                <span className="rounded-full border border-[var(--border-pill)] bg-[var(--bg-card)] px-2 py-0.5 text-[var(--ink-secondary)]">
+                  h1Tracking: <strong className="text-[var(--ink-primary)]">{activeTypographyPairing.h1Tracking}</strong>
+                </span>
+                <span className="rounded-full border border-[var(--border-pill)] bg-[var(--bg-card)] px-2 py-0.5 text-[var(--ink-secondary)]">
+                  scale: <strong className="text-[var(--ink-primary)]">{activeTypographyPairing.scaleRatio}×</strong>
+                </span>
+                {activeTypographyPairing.opticalSizing && (
+                  <span
+                    className="rounded-full border px-2 py-0.5 font-semibold"
+                    style={{
+                      backgroundColor: 'var(--emerald-bg)',
+                      borderColor: 'var(--emerald-border)',
+                      color: 'var(--emerald)',
+                    }}
+                  >
+                    Optical Sizing (opsz)
+                  </span>
+                )}
+                {loadedStylesheetUrl && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--cobalt-border)] bg-[var(--cobalt-tint)] px-2 py-0.5 text-[var(--cobalt-ice)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--cobalt-bright)]" />
+                    Live Webfont
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {TYPOGRAPHY_CATEGORIES.map((category) => {
+              const active = typographyCategory === category;
+              const count =
+                category === 'All'
+                  ? typographyPairings.length
+                  : typographyPairings.filter((p) => p.category === category).length;
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setTypographyCategory(category)}
+                  className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
+                  style={{
+                    backgroundColor: active ? 'var(--cobalt-tint-strong)' : 'var(--bg-card)',
+                    borderColor: active ? 'var(--cobalt-border-strong)' : 'var(--border-card)',
+                    color: active ? 'var(--ink-primary)' : 'var(--ink-secondary)',
+                  }}
+                >
+                  {category}{' '}
+                  <span className="ml-0.5 font-mono text-[10px] opacity-70">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Pairing Cards Grid */}
+          <div className="studio-scroll grid max-h-52 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredTypographyPairings.map((pairing) => {
+              const isSelected = pairing.id === activeTypographyPairing?.id;
+              return (
+                <button
+                  key={pairing.id}
+                  type="button"
+                  onClick={() => handleSelectTypographyPairing(pairing)}
+                  className="flex flex-col gap-1.5 rounded-lg border p-2.5 text-left transition-all"
+                  style={{
+                    backgroundColor: isSelected ? 'var(--cobalt-tint)' : 'var(--bg-card)',
+                    borderColor: isSelected ? 'var(--cobalt-border-strong)' : 'var(--border-card)',
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[12px] font-semibold text-[var(--ink-primary)]">
+                      {pairing.name}
+                    </span>
+                    <span className="shrink-0 rounded-full border border-[var(--border-pill)] bg-[var(--bg-card-elevated)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--ink-secondary)]">
+                      {pairing.category}
+                    </span>
+                  </div>
+                  <div className="truncate text-[11px] text-[var(--ink-secondary)]">
+                    <span className="font-medium text-[var(--ink-primary)]">{pairing.display}</span>
+                    {' + '}
+                    <span>{pairing.body}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5 font-mono text-[9px] text-[var(--ink-muted)]">
+                    <span>track {pairing.h1Tracking}</span>
+                    <span>·</span>
+                    <span>ratio {pairing.scaleRatio}×</span>
+                    {pairing.opticalSizing && (
+                      <span
+                        className="ml-auto rounded px-1.5 py-0.5 font-semibold"
+                        style={{
+                          backgroundColor: 'var(--emerald-bg)',
+                          color: 'var(--emerald)',
+                        }}
+                      >
+                        opsz
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         {/* 3. 12-Step Functional OKLCH Scale Visualizer */}
@@ -1476,36 +2176,49 @@ export function DesignSystemModal({
                 backgroundColor: compiled.semantic.canvas,
                 borderColor: compiled.semantic.border,
                 color: compiled.semantic.inkPrimary,
+                fontFamily: `"${fontPairing.body}", -apple-system, BlinkMacSystemFont, sans-serif`,
               }}
             >
               <div className="flex items-center justify-between gap-2">
                 <span
-                  className="rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]"
+                  className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
                   style={{
                     backgroundColor: compiled.semantic.accentSoft,
                     color: compiled.semantic.accent,
+                    fontFamily: `"${fontPairing.mono}", ui-monospace, monospace`,
                   }}
                 >
                   {compiled.polarity} · OKLCH
                 </span>
                 <span
-                  className="font-mono text-[10px]"
-                  style={{ color: compiled.semantic.inkSecondary }}
+                  className="truncate text-[10px]"
+                  style={{
+                    color: compiled.semantic.inkSecondary,
+                    fontFamily: `"${fontPairing.mono}", ui-monospace, monospace`,
+                  }}
                 >
-                  {fontPairing.display}
+                  {fontPairing.display} · {activeTypographyPairing?.scaleRatio ?? 1.25}×
                 </span>
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 <h3
-                  className="text-[18px] font-semibold leading-snug tracking-[-0.015em]"
-                  style={{ color: compiled.semantic.inkPrimary }}
+                  className="text-[22px] font-semibold leading-tight"
+                  style={{
+                    color: compiled.semantic.inkPrimary,
+                    fontFamily: `"${fontPairing.display}", Georgia, serif`,
+                    letterSpacing: activeTypographyPairing?.h1Tracking ?? '-0.02em',
+                    fontOpticalSizing: activeTypographyPairing?.opticalSizing ? 'auto' : 'none',
+                  }}
                 >
                   Editorial Precision at Scale
                 </h3>
                 <p
                   className="text-[12px] leading-relaxed"
-                  style={{ color: compiled.semantic.inkSecondary }}
+                  style={{
+                    color: compiled.semantic.inkSecondary,
+                    fontFamily: `"${fontPairing.body}", -apple-system, BlinkMacSystemFont, sans-serif`,
+                  }}
                 >
                   Every surface, border, and ink pairing is mathematically verified against APCA perceptual lightness contrast.
                 </p>
@@ -1520,14 +2233,20 @@ export function DesignSystemModal({
               >
                 <div className="min-w-0">
                   <div
-                    className="font-mono text-[10px] uppercase tracking-[0.05em]"
-                    style={{ color: compiled.semantic.inkSecondary }}
+                    className="text-[10px] uppercase tracking-[0.05em]"
+                    style={{
+                      color: compiled.semantic.inkSecondary,
+                      fontFamily: `"${fontPairing.mono}", ui-monospace, monospace`,
+                    }}
                   >
-                    Contrast Score
+                    Contrast Score · {activeTypographyPairing?.h1Tracking ?? '-0.02em'}
                   </div>
                   <div
-                    className="font-mono text-[14px] font-semibold"
-                    style={{ color: compiled.semantic.inkPrimary }}
+                    className="text-[14px] font-semibold"
+                    style={{
+                      color: compiled.semantic.inkPrimary,
+                      fontFamily: `"${fontPairing.mono}", ui-monospace, monospace`,
+                    }}
                   >
                     Lc {Math.abs(compiled.apcaAudit[0]?.lc ?? 90).toFixed(1)}
                   </div>
@@ -1537,6 +2256,7 @@ export function DesignSystemModal({
                   style={{
                     backgroundColor: compiled.semantic.accent,
                     color: compiled.semantic.accentContrast,
+                    fontFamily: `"${fontPairing.body}", -apple-system, BlinkMacSystemFont, sans-serif`,
                   }}
                 >
                   Primary CTA
@@ -1606,24 +2326,71 @@ export function DesignSystemModal({
 
         {/* Footer CTA */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
-          <div className="flex items-center gap-2 text-[12px] text-[var(--ink-secondary)]">
-            <Sparkles className="h-4 w-4 text-[var(--cobalt-bright)]" />
-            <span>
-              Injects exact APCA-verified hex + OKLCH tokens &amp;{' '}
-              <strong className="font-medium text-[var(--ink-primary)]">
-                {fontPairing.display}
-              </strong>{' '}
-              pairing into the live app.
-            </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex items-center gap-2 text-[12px] text-[var(--ink-secondary)]">
+              <Sparkles className="h-4 w-4 shrink-0 text-[var(--cobalt-bright)]" />
+              <span className="truncate">
+                APCA-verified OKLCH tokens +{' '}
+                <strong className="font-medium text-[var(--ink-primary)]">
+                  {activeTypographyPairing?.name ?? fontPairing.display}
+                </strong>{' '}
+                ({fontPairing.display} / {fontPairing.body})
+              </span>
+            </div>
+            {instantMessage && (
+              <span
+                className="pl-6 font-mono text-[10px]"
+                style={{
+                  color: instantStatus === 'error' ? 'var(--vermilion)' : 'var(--emerald)',
+                }}
+              >
+                {instantMessage}
+              </span>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={handleApplyToApp}
-            className="inline-flex items-center gap-2 rounded-full bg-[var(--btn-primary-bg)] px-5 py-2.5 text-[13px] font-semibold text-[var(--btn-primary-ink)] shadow-[var(--cobalt-glow)] transition-colors hover:bg-[var(--btn-primary-hover)]"
-          >
-            <span>Apply Verified Palette to Live App</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isApplyingInstant}
+              onClick={() => void handleApplyInstantLook()}
+              className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2.5 text-[12px] font-semibold transition-colors disabled:opacity-60"
+              style={{
+                backgroundColor:
+                  instantStatus === 'applied' ? 'var(--emerald-bg)' : 'var(--cobalt-tint)',
+                borderColor:
+                  instantStatus === 'applied'
+                    ? 'var(--emerald-border)'
+                    : 'var(--cobalt-border-strong)',
+                color:
+                  instantStatus === 'applied' ? 'var(--emerald)' : 'var(--ink-primary)',
+              }}
+            >
+              {isApplyingInstant ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : instantStatus === 'applied' ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Zap className="h-3.5 w-3.5 text-[var(--cobalt-bright)]" />
+              )}
+              <span>
+                {isApplyingInstant
+                  ? 'Applying…'
+                  : instantStatus === 'applied'
+                    ? 'Applied Live (0ms)'
+                    : '⚡ Instant Live Preview (0ms)'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleApplyToApp}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--btn-primary-bg)] px-5 py-2.5 text-[13px] font-semibold text-[var(--btn-primary-ink)] shadow-[var(--cobalt-glow)] transition-colors hover:bg-[var(--btn-primary-hover)]"
+            >
+              <span>Apply Full AI Redesign</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </NativeDialog>
