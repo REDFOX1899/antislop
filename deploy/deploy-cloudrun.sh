@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${REPO_ROOT}/env/.env"
 
-EXPECTED_ACCOUNT="patilshantanu1899@gmail.com"
+EXPECTED_ACCOUNT="${EXPECTED_ACCOUNT:-patilshantanu1899@gmail.com}"
 DRY_RUN=false
 SKIP_BUILD=false
 

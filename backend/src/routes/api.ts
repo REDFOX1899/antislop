@@ -7,12 +7,15 @@ import type {
   TransformRunRequest,
 } from '../../../shared/types.js';
 import { ENV } from '../config/env.js';
+import { brandMemoryStore, type BrandMemoryProfile } from '../design/brandMemory.js';
 import { getVerifiedArchetypes } from '../design/paletteArchetypes.js';
 import {
   compileDesignTokens,
   type CompileDesignTokensInput,
 } from '../design/tokenCompiler.js';
 import { geminiEngine } from '../gemini/index.js';
+import { runCoarseFineZoomXray, type ZoomTileRegion } from '../gemini/coarseFineXray.js';
+import { runCopilotMicroPulse } from '../gemini/copilotPulse.js';
 import {
   runDeepDecisionAudit,
   type DeepDecisionAuditMode,
@@ -22,7 +25,9 @@ import {
   runConversionAndBrandAudit,
   runPairwiseBlindJudge,
 } from '../gemini/decisionsEngineV2.js';
+import { runMultiViewportDeltaTensor } from '../gemini/deltaTensor.js';
 import { generateWorkspaceRecommendations } from '../gemini/recommender.js';
+import { listInstalledSkills } from '../gemini/skillRegistry.js';
 import { transformOrchestrator } from '../orchestrator/transformOrchestrator.js';
 import { eventBus } from '../sandbox/eventBus.js';
 import { githubManager } from '../sandbox/githubManager.js';
@@ -416,11 +421,168 @@ export function createApiRouter(): Router {
 
   /**
    * GET /api/design/archetypes
-   * Returns 10 APCA-verified world-class OKLCH palette archetypes.
+   * Returns 10 APCA-verified world-class OKLCH palette archetypes (cached).
    */
   router.get('/design/archetypes', (_req: Request, res: Response) => {
     try {
+      res.setHeader('Cache-Control', 'public, max-age=300');
       res.json({ archetypes: getVerifiedArchetypes() });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/skills
+   * Lists all installed SKILL.md design craft bundles (AntiSlop v2, Google M3E Baseline 2026, etc.).
+   */
+  router.get('/skills', async (_req: Request, res: Response) => {
+    try {
+      const skills = await listInstalledSkills();
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      res.json({ skills });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/brand-memory/:workspaceId & POST /api/brand-memory/:workspaceId
+   * Persistent Brand DNA profiles (locked OKLCH palettes, fonts, mounted skills, banned tropes & score history).
+   */
+  router.get('/brand-memory/:workspaceId', async (req: Request, res: Response) => {
+    try {
+      const workspaceId = getParam(req, 'workspaceId') || 'novaflow-slop';
+      const profile = await brandMemoryStore.getProfile(workspaceId);
+      res.json({ profile });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  router.post('/brand-memory/:workspaceId', async (req: Request, res: Response) => {
+    try {
+      const workspaceId = getParam(req, 'workspaceId') || 'novaflow-slop';
+      const patch = (req.body ?? {}) as Partial<BrandMemoryProfile>;
+      const profile = await brandMemoryStore.saveProfile(workspaceId, patch);
+      res.json({ profile });
+    } catch (err) {
+      res.status(400).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/audit/interactions
+   * Runs 5-state interactive browser audit (default, hover, focus-visible Tab, scroll, reduced-motion + CWV).
+   */
+  router.post('/audit/interactions', async (_req: Request, res: Response) => {
+    try {
+      const report = await puppeteerAuditor.auditLiveInteractions(viteManager.getProxiedPreviewUrl());
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/inspect/region
+   * Resolves a normalized circled box [0..1] to exact DOM selectors, computed styles & React Fiber source lines.
+   */
+  router.post('/inspect/region', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as { x?: number; y?: number; width?: number; height?: number };
+      const nodes = await puppeteerAuditor.inspectCircledDom(viteManager.getProxiedPreviewUrl(), {
+        x: typeof body.x === 'number' ? body.x : 0.25,
+        y: typeof body.y === 'number' ? body.y : 0.25,
+        width: typeof body.width === 'number' ? body.width : 0.5,
+        height: typeof body.height === 'number' ? body.height : 0.3,
+      });
+      res.json({ nodes });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/decisions/delta-tensor
+   * Multi-Viewport & Polarity Delta Tensor with Silent Regression Veto.
+   */
+  router.post('/decisions/delta-tensor', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        beforeDesktopBase64?: string;
+        afterDesktopBase64?: string;
+        beforeMobileBase64?: string;
+        afterMobileBase64?: string;
+        brandSummary?: string;
+      };
+      if (!body.beforeDesktopBase64 || !body.afterDesktopBase64) {
+        res.status(400).json({ error: 'beforeDesktopBase64 and afterDesktopBase64 are required' });
+        return;
+      }
+      const result = await runMultiViewportDeltaTensor({
+        beforeDesktopBase64: stripBase64Prefix(body.beforeDesktopBase64),
+        afterDesktopBase64: stripBase64Prefix(body.afterDesktopBase64),
+        beforeMobileBase64: body.beforeMobileBase64 ? stripBase64Prefix(body.beforeMobileBase64) : undefined,
+        afterMobileBase64: body.afterMobileBase64 ? stripBase64Prefix(body.afterMobileBase64) : undefined,
+        brandSummary: body.brandSummary,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/decisions/coarse-fine-xray
+   * Two-stage 2x DPR micro-craft zoom X-Ray over cropped hotspot tiles.
+   */
+  router.post('/decisions/coarse-fine-xray', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        tileCrops?: Array<{ region: ZoomTileRegion; cropBase64: string }>;
+        brandSummary?: string;
+      };
+      if (!Array.isArray(body.tileCrops) || body.tileCrops.length === 0) {
+        res.status(400).json({ error: 'tileCrops array is required' });
+        return;
+      }
+      const result = await runCoarseFineZoomXray({
+        tileCrops: body.tileCrops.map((c) => ({
+          region: c.region,
+          cropBase64: stripBase64Prefix(c.cropBase64),
+        })),
+        brandSummary: body.brandSummary,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/decisions/copilot-pulse
+   * Real-time <400ms 12-probe micro-pulse for live coding / Gemini 3.8 Live proactive alerts.
+   */
+  router.post('/decisions/copilot-pulse', async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as {
+        screenshotBase64?: string;
+        brandSummary?: string;
+        threshold?: number;
+      };
+      let screenshotBase64 =
+        typeof body.screenshotBase64 === 'string' ? stripBase64Prefix(body.screenshotBase64) : '';
+      if (!screenshotBase64 || screenshotBase64.length < 64) {
+        const snap = await puppeteerAuditor.captureAndAudit(undefined, `pulse-${Date.now()}`);
+        screenshotBase64 = snap.desktopBase64;
+      }
+      const result = await runCopilotMicroPulse({
+        screenshotBase64,
+        brandSummary: body.brandSummary,
+        threshold: body.threshold,
+      });
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }

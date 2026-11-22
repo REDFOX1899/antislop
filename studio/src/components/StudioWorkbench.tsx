@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CriticIteration,
@@ -43,10 +44,29 @@ import {
   type QueuedEditSummary,
   type TechnicalMissionId,
 } from './CriticRail';
-import { DecisionMatrixModal } from './DecisionMatrixModal';
-import { DesignSystemModal } from './DesignSystemModal';
-import { GeometryAuditModal } from './GeometryAuditModal';
 import { LandingHub } from './LandingHub';
+
+// Lazy-load heavy inspection & design-system modals to minimize First Load JS
+const DecisionMatrixModal = dynamic(
+  () => import('./DecisionMatrixModal').then((m) => m.DecisionMatrixModal),
+  { ssr: false }
+);
+const DesignSystemModal = dynamic(
+  () => import('./DesignSystemModal').then((m) => m.DesignSystemModal),
+  { ssr: false }
+);
+const GeometryAuditModal = dynamic(
+  () => import('./GeometryAuditModal').then((m) => m.GeometryAuditModal),
+  { ssr: false }
+);
+const ConversionJudgeModal = dynamic(
+  () => import('./ConversionJudgeModal').then((m) => m.ConversionJudgeModal),
+  { ssr: false }
+);
+const BrandMemoryModal = dynamic(
+  () => import('./BrandMemoryModal').then((m) => m.BrandMemoryModal),
+  { ssr: false }
+);
 import {
   LiveCanvas,
   type CanvasChangeSummary,
@@ -147,6 +167,8 @@ export function StudioWorkbench() {
   const [deepAuditOpen, setDeepAuditOpen] = useState(false);
   const [designSystemOpen, setDesignSystemOpen] = useState(false);
   const [geometryAuditOpen, setGeometryAuditOpen] = useState(false);
+  const [conversionJudgeOpen, setConversionJudgeOpen] = useState(false);
+  const [brandMemoryOpen, setBrandMemoryOpen] = useState(false);
 
   // Multimodal References, Continuous Talk & Canvas Annotations
   const [assets, setAssets] = useState<LocalMediaAsset[]>([]);
@@ -1340,6 +1362,8 @@ export function StudioWorkbench() {
         onOpenDeepAudit={() => setDeepAuditOpen(true)}
         onOpenDesignSystem={() => setDesignSystemOpen(true)}
         onOpenGeometryAudit={() => setGeometryAuditOpen(true)}
+        onOpenConversionJudge={() => setConversionJudgeOpen(true)}
+        onOpenBrandMemory={() => setBrandMemoryOpen(true)}
         onGoLanding={goToLanding}
       />
 
@@ -1542,36 +1566,67 @@ export function StudioWorkbench() {
 
       {repoModal}
 
-      <DecisionMatrixModal
-        open={deepAuditOpen}
-        onClose={() => setDeepAuditOpen(false)}
-        screenshotUrl={finalScreenshotUrl || baselineScreenshotUrl}
-        workspaceId={activeWorkspaceId}
-        brandSummary={workspaceCardTitle}
-        onApplySurgicalFix={(surgicalPrompt) => {
-          setVoiceTranscript(surgicalPrompt);
-          enqueueOrExecuteRun('antislop', { textPrompt: surgicalPrompt });
-        }}
-      />
+      {deepAuditOpen && (
+        <DecisionMatrixModal
+          open={deepAuditOpen}
+          onClose={() => setDeepAuditOpen(false)}
+          screenshotUrl={finalScreenshotUrl || baselineScreenshotUrl}
+          workspaceId={activeWorkspaceId}
+          brandSummary={workspaceCardTitle}
+          onApplySurgicalFix={(surgicalPrompt) => {
+            setVoiceTranscript(surgicalPrompt);
+            enqueueOrExecuteRun('antislop', { textPrompt: surgicalPrompt });
+          }}
+        />
+      )}
 
-      <DesignSystemModal
-        open={designSystemOpen}
-        onClose={() => setDesignSystemOpen(false)}
-        onApplyDesignSystem={(designPrompt) => {
-          setVoiceTranscript(designPrompt);
-          enqueueOrExecuteRun('antislop', { textPrompt: designPrompt });
-        }}
-      />
+      {designSystemOpen && (
+        <DesignSystemModal
+          open={designSystemOpen}
+          onClose={() => setDesignSystemOpen(false)}
+          onApplyDesignSystem={(designPrompt) => {
+            setVoiceTranscript(designPrompt);
+            enqueueOrExecuteRun('antislop', { textPrompt: designPrompt });
+          }}
+        />
+      )}
 
-      <GeometryAuditModal
-        open={geometryAuditOpen}
-        onClose={() => setGeometryAuditOpen(false)}
-        workspaceId={activeWorkspaceId}
-        onApplyEngineeringFix={(fixPrompt) => {
-          setVoiceTranscript(fixPrompt);
-          enqueueOrExecuteRun('antislop', { textPrompt: fixPrompt });
-        }}
-      />
+      {geometryAuditOpen && (
+        <GeometryAuditModal
+          open={geometryAuditOpen}
+          onClose={() => setGeometryAuditOpen(false)}
+          workspaceId={activeWorkspaceId}
+          onApplyEngineeringFix={(fixPrompt) => {
+            setVoiceTranscript(fixPrompt);
+            enqueueOrExecuteRun('antislop', { textPrompt: fixPrompt });
+          }}
+        />
+      )}
+
+      {conversionJudgeOpen && (
+        <ConversionJudgeModal
+          open={conversionJudgeOpen}
+          onClose={() => setConversionJudgeOpen(false)}
+          tasteScore={scorecard?.overallTasteScore}
+          baselineScreenshotUrl={baselineScreenshotUrl}
+          finalScreenshotUrl={finalScreenshotUrl}
+          brandSummary={workspaceCardTitle}
+          onApplyConversionFix={(fixPrompt) => {
+            setVoiceTranscript(fixPrompt);
+            enqueueOrExecuteRun('antislop', { textPrompt: fixPrompt });
+          }}
+        />
+      )}
+
+      {brandMemoryOpen && (
+        <BrandMemoryModal
+          open={brandMemoryOpen}
+          onClose={() => setBrandMemoryOpen(false)}
+          workspaceId={activeWorkspaceId}
+          workspaceName={workspaceCardTitle}
+          onNotify={(msg) => pushToast('success', msg)}
+        />
+      )}
     </div>
   );
 }

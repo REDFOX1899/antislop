@@ -14,7 +14,9 @@ import {
   Palette,
   Plus,
   Ruler,
+  Scale,
   Search,
+  ShieldCheck,
   Sun,
   Zap,
 } from 'lucide-react';
@@ -43,6 +45,8 @@ interface TopBarProps {
   onOpenDeepAudit?: () => void;
   onOpenDesignSystem?: () => void;
   onOpenGeometryAudit?: () => void;
+  onOpenConversionJudge?: () => void;
+  onOpenBrandMemory?: () => void;
   onGoLanding: () => void;
 }
 
@@ -134,6 +138,8 @@ export function TopBar({
   onOpenDeepAudit,
   onOpenDesignSystem,
   onOpenGeometryAudit,
+  onOpenConversionJudge,
+  onOpenBrandMemory,
   onGoLanding,
 }: TopBarProps) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -392,6 +398,32 @@ export function TopBar({
           >
             <Ruler className="h-3.5 w-3.5 shrink-0 text-[var(--amber)]" />
             <span>DOM Audit</span>
+          </button>
+        )}
+
+        {/* 2d. Conversion x Taste & Blind Pairwise A/B Judge */}
+        {onOpenConversionJudge && (
+          <button
+            type="button"
+            onClick={onOpenConversionJudge}
+            title="Conversion Readiness x Taste Quadrant & Blind Bradley-Terry A/B Judge"
+            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2.5 text-[11.5px] font-medium text-[var(--ink-primary)] transition-colors hover:border-[var(--border-strong)] whitespace-nowrap"
+          >
+            <Scale className="h-3.5 w-3.5 shrink-0 text-[var(--cobalt-bright)]" />
+            <span>A/B Judge</span>
+          </button>
+        )}
+
+        {/* 2e. Brand Memory & Active Design Skills */}
+        {onOpenBrandMemory && (
+          <button
+            type="button"
+            onClick={onOpenBrandMemory}
+            title="Lock Persistent Brand DNA Tokens & Toggle Mounted Design Skills"
+            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2.5 text-[11.5px] font-medium text-[var(--ink-primary)] transition-colors hover:border-[var(--border-strong)] whitespace-nowrap"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[var(--emerald)]" />
+            <span>Brand DNA</span>
           </button>
         )}
 

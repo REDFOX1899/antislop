@@ -1,0 +1,128 @@
+name: AntiSlop Visual Design Gate
+
+# ==============================================================================
+# AntiSlop v3 — CI/CD Visual Craft & Conversion Gate
+#
+# Runs deterministic APCA/geometry auditing + Gemini Decisions API conversion
+# readiness scoring on every UI pull request and manual dispatch.
+#
+# HOW TO ENABLE STRICT PR BLOCKING:
+#   1. Remove the `--soft` flag from the "Run AntiSlop Visual Design Gate" step
+#      below (or pass `strict: true` on workflow_dispatch).
+#   2. In GitHub repo Settings -> Branches -> Branch protection rules, add
+#      "AntiSlop Visual Design Gate / visual-design-gate" as a required check.
+#   3. (Optional) To auto-post `antislop-gate-report.md` as a PR comment,
+#      grant `pull-requests: write` below and uncomment the PR comment step.
+# ==============================================================================
+
+on:
+  pull_request:
+    paths:
+      - 'studio/**'
+      - 'target-repo/**'
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: 'Live preview URL to audit (defaults to repo var ANTISLOP_PREVIEW_URL or active engine workspace)'
+        required: false
+        type: string
+        default: ''
+      engine_url:
+        description: 'AntiSlop Engine base URL'
+        required: false
+        type: string
+        default: 'https://antislop-engine-a53petnlfa-uc.a.run.app'
+      min_geometry:
+        description: 'Minimum deterministic Geometry & APCA score (0-100)'
+        required: false
+        type: string
+        default: '70'
+      min_conversion:
+        description: 'Minimum Conversion Readiness score (0-100)'
+        required: false
+        type: string
+        default: '60'
+      strict:
+        description: 'Fail the workflow if any gate threshold is missed (strict blocking mode)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # Uncomment to enable automated PR comments with the gate report:
+  # pull-requests: write
+
+concurrency:
+  group: antislop-design-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-design-gate:
+    name: Visual Design Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run AntiSlop Visual Design Gate
+        id: antislop_gate
+        env:
+          ANTISLOP_PREVIEW_URL: ${{ inputs.preview_url || vars.ANTISLOP_PREVIEW_URL || '' }}
+          ANTISLOP_ENGINE_URL: ${{ inputs.engine_url || vars.ANTISLOP_ENGINE_URL || 'https://antislop-engine-a53petnlfa-uc.a.run.app' }}
+          ANTISLOP_MIN_GEOMETRY: ${{ inputs.min_geometry || vars.ANTISLOP_MIN_GEOMETRY || '70' }}
+          ANTISLOP_MIN_CONVERSION: ${{ inputs.min_conversion || vars.ANTISLOP_MIN_CONVERSION || '60' }}
+          STRICT_MODE: ${{ inputs.strict || false }}
+        run: |
+          # Advisory mode (--soft) is enabled by default so PRs are never blocked
+          # unexpectedly. Remove `--soft` below to enforce strict PR blocking.
+          if [ "${STRICT_MODE}" = "true" ]; then
+            node scripts/antislop-ci-gate.mjs \
+              --engine "${ANTISLOP_ENGINE_URL}" \
+              --min-geometry "${ANTISLOP_MIN_GEOMETRY}" \
+              --min-conversion "${ANTISLOP_MIN_CONVERSION}" \
+              --out antislop-gate-report.md
+          else
+            node scripts/antislop-ci-gate.mjs \
+              --soft \
+              --engine "${ANTISLOP_ENGINE_URL}" \
+              --min-geometry "${ANTISLOP_MIN_GEOMETRY}" \
+              --min-conversion "${ANTISLOP_MIN_CONVERSION}" \
+              --out antislop-gate-report.md
+          fi
+
+      - name: Publish Gate Report to Job Summary
+        if: always() && hashFiles('antislop-gate-report.md') != ''
+        run: cat antislop-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload AntiSlop Gate Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: antislop-gate-report
+          path: antislop-gate-report.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Optional: Post the Markdown report directly as a PR comment.
+      # Requires `pull-requests: write` in the top-level `permissions` block.
+      # - name: Comment Report on Pull Request
+      #   if: always() && github.event_name == 'pull_request' && hashFiles('antislop-gate-report.md') != ''
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const fs = require('node:fs');
+      #       const body = fs.readFileSync('antislop-gate-report.md', 'utf8');
+      #       await github.rest.issues.createComment({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         issue_number: context.issue.number,
+      #         body,
+      #       });

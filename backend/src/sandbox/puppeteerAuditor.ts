@@ -6,6 +6,8 @@ import puppeteer, { type Browser, type Page } from 'puppeteer';
 import type { DecisionsScorecard } from '../../../shared/types.js';
 import { BACKEND_ROOT, ENV } from '../config/env.js';
 import { runComputedGeometryAudit, type GeometryAuditReport } from './geometryAuditor.js';
+import { runInteractionAudit, type InteractionAuditReport } from './interactionAuditor.js';
+import { inspectCircledRegion, type InspectedDomNode, type NormalizedBox } from './domInspectorScript.js';
 
 export const SCREENSHOTS_DIR = path.join(BACKEND_ROOT, 'screenshots');
 
@@ -817,6 +819,32 @@ export class PuppeteerAuditor {
       await page.goto(previewUrl, { waitUntil: 'domcontentloaded', timeout: 25_000 });
       await new Promise((r) => setTimeout(r, 900));
       return await runComputedGeometryAudit(page);
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  async auditLiveInteractions(previewUrl: string): Promise<InteractionAuditReport> {
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      await page.goto(previewUrl, { waitUntil: 'domcontentloaded', timeout: 25_000 });
+      await new Promise((r) => setTimeout(r, 900));
+      return await runInteractionAudit(page);
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  async inspectCircledDom(previewUrl: string, box: NormalizedBox): Promise<InspectedDomNode[]> {
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      await page.goto(previewUrl, { waitUntil: 'domcontentloaded', timeout: 25_000 });
+      await new Promise((r) => setTimeout(r, 700));
+      return await inspectCircledRegion(page, box);
     } finally {
       await page.close().catch(() => undefined);
     }
